@@ -1,0 +1,819 @@
+{
+ "source": "Origin, RpId and AppId parsing (contract R8-R10; RFC 5890 2.3.1 for LDH labels)",
+ "cases": [
+  {
+   "id": "origin-https",
+   "op": "origin_parse",
+   "input": "https://example.org",
+   "spec": "contract R8 (https scheme and a host)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "origin-https-port",
+   "op": "origin_parse",
+   "input": "https://example.org:8443",
+   "spec": "contract R8 (a port that is not the scheme's default)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "origin-https-subdomain",
+   "op": "origin_parse",
+   "input": "https://login.example.org",
+   "spec": "contract R8 (several labels)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "origin-https-port-1",
+   "op": "origin_parse",
+   "input": "https://example.org:1",
+   "spec": "contract R8 (decimal port, lowest)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "origin-https-port-65535",
+   "op": "origin_parse",
+   "input": "https://example.org:65535",
+   "spec": "contract R8 (decimal port, highest)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "origin-digit-label",
+   "op": "origin_parse",
+   "input": "https://1example.org",
+   "spec": "contract R8  (lowercase LDH labels, RFC 5890 2.3.1: a hyphen is not first or last)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "origin-inner-hyphen",
+   "op": "origin_parse",
+   "input": "https://a-b.example",
+   "spec": "contract R8  (lowercase LDH labels, RFC 5890 2.3.1: a hyphen is not first or last)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "origin-a-label",
+   "op": "origin_parse",
+   "input": "https://xn--bcher-kva.example",
+   "spec": "contract R8 (A-labels as written, never converted)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "origin-http-localhost",
+   "op": "origin_parse",
+   "input": "http://localhost",
+   "spec": "contract R8 (http only for the host localhost)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "origin-http-localhost-port",
+   "op": "origin_parse",
+   "input": "http://localhost:8080",
+   "spec": "contract R8 (http for localhost with a port)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "origin-https-localhost",
+   "op": "origin_parse",
+   "input": "https://localhost",
+   "spec": "contract R8 (localhost over https)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "origin-android",
+   "op": "origin_parse",
+   "input": "android:apk-key-hash:ABABABABABABABABABABABABABABABABABABABABABA",
+   "spec": "contract R8 (android:apk-key-hash: with 43 base64url symbols)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "origin-http-other-host",
+   "op": "origin_parse",
+   "input": "http://example.org",
+   "spec": "contract R8 (http is for localhost only)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-http-ip",
+   "op": "origin_parse",
+   "input": "http://127.0.0.1",
+   "spec": "contract R8 (http is for the host localhost only, not an IP literal)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-http-localhost-suffix",
+   "op": "origin_parse",
+   "input": "http://localhost.example",
+   "spec": "contract R8 (http only for the host localhost exactly)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-http-subdomain-of-localhost",
+   "op": "origin_parse",
+   "input": "http://app.localhost",
+   "spec": "contract R8 (http only for the host localhost exactly)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-https-default-port",
+   "op": "origin_parse",
+   "input": "https://example.org:443",
+   "spec": "contract R8 (a port that is not the scheme's default)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-http-localhost-default-port",
+   "op": "origin_parse",
+   "input": "http://localhost:80",
+   "spec": "contract R8 (a port that is not the scheme's default)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-empty-port",
+   "op": "origin_parse",
+   "input": "https://example.org:",
+   "spec": "contract R8 (a decimal port when a colon is written)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-port-zero",
+   "op": "origin_parse",
+   "input": "https://example.org:0",
+   "spec": "contract R8 (a decimal port; 0 is not a port)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-port-65536",
+   "op": "origin_parse",
+   "input": "https://example.org:65536",
+   "spec": "contract R8 (a decimal port of 16 bits)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-port-text",
+   "op": "origin_parse",
+   "input": "https://example.org:http",
+   "spec": "contract R8 (a decimal port)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-two-ports",
+   "op": "origin_parse",
+   "input": "https://example.org:8443:9",
+   "spec": "contract R8 (one optional port)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-uppercase-host",
+   "op": "origin_parse",
+   "input": "https://Example.org",
+   "spec": "contract R8 (lowercase labels)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-uppercase-scheme",
+   "op": "origin_parse",
+   "input": "HTTPS://example.org",
+   "spec": "contract R8 (the scheme is https, written as such)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-trailing-dot",
+   "op": "origin_parse",
+   "input": "https://example.org.",
+   "spec": "contract R8 (no empty label)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-empty-label",
+   "op": "origin_parse",
+   "input": "https://a..example.org",
+   "spec": "contract R8 (no empty label)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-leading-dot",
+   "op": "origin_parse",
+   "input": "https://.example.org",
+   "spec": "contract R8 (no empty label)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-leading-hyphen",
+   "op": "origin_parse",
+   "input": "https://-a.example.org",
+   "spec": "contract R8  (lowercase LDH labels, RFC 5890 2.3.1: a hyphen is not first or last)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-trailing-hyphen",
+   "op": "origin_parse",
+   "input": "https://a-.example.org",
+   "spec": "contract R8  (lowercase LDH labels, RFC 5890 2.3.1: a hyphen is not first or last)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-underscore",
+   "op": "origin_parse",
+   "input": "https://exa_mple.org",
+   "spec": "contract R8 (LDH labels: letters, digits, hyphen)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-u-label",
+   "op": "origin_parse",
+   "input": "https://b\u00fccher.example",
+   "spec": "contract R8 (A-labels as written: a non-ASCII label is refused, never converted)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-ipv4",
+   "op": "origin_parse",
+   "input": "https://192.168.0.1",
+   "spec": "contract R8 (an IP literal is refused)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-ipv4-port",
+   "op": "origin_parse",
+   "input": "https://192.168.0.1:8443",
+   "spec": "contract R8 (an IP literal is refused)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-ipv6",
+   "op": "origin_parse",
+   "input": "https://[::1]",
+   "spec": "contract R8 (an IP literal is refused)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-ipv6-port",
+   "op": "origin_parse",
+   "input": "https://[::1]:8443",
+   "spec": "contract R8 (an IP literal is refused)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-path-slash",
+   "op": "origin_parse",
+   "input": "https://example.org/",
+   "spec": "contract R8 (nothing after the host and port; an origin has no path)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-path",
+   "op": "origin_parse",
+   "input": "https://example.org/login",
+   "spec": "contract R8 (no path)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-port-then-slash",
+   "op": "origin_parse",
+   "input": "https://example.org:8443/",
+   "spec": "contract R8 (no path)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-query",
+   "op": "origin_parse",
+   "input": "https://example.org?x=1",
+   "spec": "contract R8 (no query)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-fragment",
+   "op": "origin_parse",
+   "input": "https://example.org#f",
+   "spec": "contract R8 (no fragment)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-userinfo",
+   "op": "origin_parse",
+   "input": "https://user@example.org",
+   "spec": "contract R8 (no userinfo)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-userinfo-password",
+   "op": "origin_parse",
+   "input": "https://user:pw@example.org",
+   "spec": "contract R8 (no userinfo)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-ftp",
+   "op": "origin_parse",
+   "input": "ftp://example.org",
+   "spec": "contract R8 (any other scheme is refused)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-wss",
+   "op": "origin_parse",
+   "input": "wss://example.org",
+   "spec": "contract R8 (any other scheme is refused)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-no-scheme",
+   "op": "origin_parse",
+   "input": "example.org",
+   "spec": "contract R8 (a scheme is required)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-scheme-relative",
+   "op": "origin_parse",
+   "input": "//example.org",
+   "spec": "contract R8 (a scheme is required)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-scheme-only",
+   "op": "origin_parse",
+   "input": "https://",
+   "spec": "contract R8 (a host is required)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-empty",
+   "op": "origin_parse",
+   "input": "",
+   "spec": "contract R8 (an origin is required)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-leading-space",
+   "op": "origin_parse",
+   "input": " https://example.org",
+   "spec": "contract R8 (nothing around the origin)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-trailing-space",
+   "op": "origin_parse",
+   "input": "https://example.org ",
+   "spec": "contract R8 (nothing after the host and port)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-percent-escape",
+   "op": "origin_parse",
+   "input": "https://example%2eorg",
+   "spec": "contract R8 (LDH labels only)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-android-42-symbols",
+   "op": "origin_parse",
+   "input": "android:apk-key-hash:ABABABABABABABABABABABABABABABABABABABABAB",
+   "spec": "contract R8 (exactly 43 base64url symbols)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-android-44-symbols",
+   "op": "origin_parse",
+   "input": "android:apk-key-hash:ABABABABABABABABABABABABABABABABABABABABABAA",
+   "spec": "contract R8 (exactly 43 base64url symbols)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-android-padded",
+   "op": "origin_parse",
+   "input": "android:apk-key-hash:ABABABABABABABABABABABABABABABABABABABABAB=",
+   "spec": "contract R8 (base64url symbols, no padding)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-android-standard-alphabet",
+   "op": "origin_parse",
+   "input": "android:apk-key-hash:ABABABABABABABABABABABABABABABABABABABABA+A",
+   "spec": "contract R8 (base64url symbols: '+' is not one)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-android-empty-hash",
+   "op": "origin_parse",
+   "input": "android:apk-key-hash:",
+   "spec": "contract R8 (exactly 43 base64url symbols)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-android-trailing-slash",
+   "op": "origin_parse",
+   "input": "android:apk-key-hash:ABABABABABABABABABABABABABABABABABABABABABA/",
+   "spec": "contract R8 (nothing after the hash)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "origin-android-uppercase-scheme",
+   "op": "origin_parse",
+   "input": "Android:apk-key-hash:ABABABABABABABABABABABABABABABABABABABABABA",
+   "spec": "contract R8 (the scheme as written)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rp-id-registrable",
+   "op": "rp_id_parse",
+   "input": "example.org",
+   "spec": "contract R9 (lowercase LDH labels)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "rp-id-subdomain",
+   "op": "rp_id_parse",
+   "input": "login.example.org",
+   "spec": "contract R9 (several labels)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "rp-id-localhost",
+   "op": "rp_id_parse",
+   "input": "localhost",
+   "spec": "contract R9 (localhost is accepted)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "rp-id-a-label",
+   "op": "rp_id_parse",
+   "input": "xn--bcher-kva.example",
+   "spec": "contract R9 (A-labels as written)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "rp-id-uppercase",
+   "op": "rp_id_parse",
+   "input": "Example.org",
+   "spec": "contract R9 (lowercase labels)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rp-id-trailing-dot",
+   "op": "rp_id_parse",
+   "input": "example.org.",
+   "spec": "contract R9 (a trailing dot is refused)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rp-id-empty-label",
+   "op": "rp_id_parse",
+   "input": "a..example.org",
+   "spec": "contract R9 (an empty label is refused)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rp-id-leading-dot",
+   "op": "rp_id_parse",
+   "input": ".example.org",
+   "spec": "contract R9 (an empty label is refused)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rp-id-empty",
+   "op": "rp_id_parse",
+   "input": "",
+   "spec": "contract R9 (an empty value where one is required is Malformed)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rp-id-ipv4",
+   "op": "rp_id_parse",
+   "input": "192.168.0.1",
+   "spec": "contract R9 (an IP literal is refused)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rp-id-ipv6",
+   "op": "rp_id_parse",
+   "input": "::1",
+   "spec": "contract R9 (an IP literal is refused)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rp-id-ipv6-bracketed",
+   "op": "rp_id_parse",
+   "input": "[::1]",
+   "spec": "contract R9 (an IP literal is refused)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rp-id-with-port",
+   "op": "rp_id_parse",
+   "input": "example.org:8443",
+   "spec": "contract R9 (an RP ID has no port)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rp-id-with-scheme",
+   "op": "rp_id_parse",
+   "input": "https://example.org",
+   "spec": "contract R9 (an RP ID is a domain, not an origin)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rp-id-with-path",
+   "op": "rp_id_parse",
+   "input": "example.org/",
+   "spec": "contract R9 (an RP ID has no path)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rp-id-leading-hyphen",
+   "op": "rp_id_parse",
+   "input": "-a.example.org",
+   "spec": "contract R9  (lowercase LDH labels, RFC 5890 2.3.1: a hyphen is not first or last)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rp-id-underscore",
+   "op": "rp_id_parse",
+   "input": "exa_mple.org",
+   "spec": "contract R9 (LDH labels)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rp-id-u-label",
+   "op": "rp_id_parse",
+   "input": "b\u00fccher.example",
+   "spec": "contract R9 (A-labels as written; a non-ASCII label is refused)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rp-id-trailing-space",
+   "op": "rp_id_parse",
+   "input": "example.org ",
+   "spec": "contract R9 (LDH labels only)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "app-id-https-json",
+   "op": "app_id_parse",
+   "input": "https://example.org/app-id.json",
+   "spec": "contract R10 (an https URL, hashed as written)",
+   "expect": {
+    "ok": true,
+    "as_written": "https://example.org/app-id.json"
+   }
+  },
+  {
+   "id": "app-id-origin-only",
+   "op": "app_id_parse",
+   "input": "https://example.org",
+   "spec": "contract R10 (an https URL)",
+   "expect": {
+    "ok": true,
+    "as_written": "https://example.org"
+   }
+  },
+  {
+   "id": "app-id-port-query",
+   "op": "app_id_parse",
+   "input": "https://example.org:8443/a/b?q=1",
+   "spec": "contract R10 (an https URL without fragment; a port and a query are allowed)",
+   "expect": {
+    "ok": true,
+    "as_written": "https://example.org:8443/a/b?q=1"
+   }
+  },
+  {
+   "id": "app-id-uppercase-kept",
+   "op": "app_id_parse",
+   "input": "https://EXAMPLE.org/App",
+   "spec": "contract R10 (hashed as written: no case folding)",
+   "expect": {
+    "ok": true,
+    "as_written": "https://EXAMPLE.org/App"
+   }
+  },
+  {
+   "id": "app-id-http",
+   "op": "app_id_parse",
+   "input": "http://example.org/app-id.json",
+   "spec": "contract R10 (https only)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "app-id-fragment",
+   "op": "app_id_parse",
+   "input": "https://example.org/app-id.json#f",
+   "spec": "contract R10 (without fragment)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "app-id-empty-fragment",
+   "op": "app_id_parse",
+   "input": "https://example.org/app-id.json#",
+   "spec": "contract R10 (without fragment, an empty one included)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "app-id-ftp",
+   "op": "app_id_parse",
+   "input": "ftp://example.org/app-id.json",
+   "spec": "contract R10 (https only)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "app-id-no-scheme",
+   "op": "app_id_parse",
+   "input": "example.org/app-id.json",
+   "spec": "contract R10 (an https URL)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "app-id-empty",
+   "op": "app_id_parse",
+   "input": "",
+   "spec": "contract R10 (an AppID is required)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "app-id-scheme-only",
+   "op": "app_id_parse",
+   "input": "https://",
+   "spec": "contract R10 (an https URL has a host)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "app-id-android",
+   "op": "app_id_parse",
+   "input": "android:apk-key-hash:ABABABABABABABABABABABABABABABABABABABABABA",
+   "spec": "contract R10 (an https URL)",
+   "expect": {
+    "ok": false
+   }
+  }
+ ]
+}

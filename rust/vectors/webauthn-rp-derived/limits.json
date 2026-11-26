@@ -1,0 +1,902 @@
+{
+ "source": "input bounds (contract R1, R6, R18, R19, R31). An excess 0 case is well formed apart from its size and is accepted by the reader its op names; excess 1 is TooLarge. Large inputs carry input_len and input_sha256 and a recipe, small ones the bytes",
+ "cases": [
+  {
+   "id": "client-data-json-at-bound",
+   "op": "client_data",
+   "bound": "webauthn_rp::MAX_CLIENT_DATA_JSON",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R6 (clientDataJSON size)",
+   "input_len": 16384,
+   "input_sha256": "21a4e1a6515d7d17227ec17731902d53c2202aaaaaece583f486f77bb6e87f7c",
+   "recipe": "the members type, challenge, origin and crossOrigin of a webauthn.get clientDataJSON, then a string member `pad` of 'a' bytes, the whole document exactly bound+excess bytes",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "client-data-json-one-past",
+   "op": "client_data",
+   "bound": "webauthn_rp::MAX_CLIENT_DATA_JSON",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R6 (clientDataJSON size)",
+   "input_len": 16385,
+   "input_sha256": "0548d8c34bc7f008fba2d41bb8202a8cbb3c6eb24b5b9db02fe814b92e1e870a",
+   "recipe": "the members type, challenge, origin and crossOrigin of a webauthn.get clientDataJSON, then a string member `pad` of 'a' bytes, the whole document exactly bound+excess bytes",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "client-data-depth-objects-at-bound",
+   "op": "client_data",
+   "bound": "webauthn_rp::MAX_CLIENT_DATA_DEPTH",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R6 (nesting past MAX_CLIENT_DATA_DEPTH is TooLarge; the top-level object is depth 1)",
+   "input_len": 175,
+   "input_sha256": "03656e077d03787219be4cb01de1c5363827d7cf637dc8bfc84cbfe32155274e",
+   "input": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73652c2278223a7b2278223a7b2278223a7b2278223a7b2278223a7b2278223a7b2278223a7b7d7d7d7d7d7d7d7d",
+   "recipe": "a valid webauthn.get clientDataJSON with a member `x` holding nested objects so that the deepest container is at depth bound+excess",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "client-data-depth-objects-one-past",
+   "op": "client_data",
+   "bound": "webauthn_rp::MAX_CLIENT_DATA_DEPTH",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R6 (nesting past MAX_CLIENT_DATA_DEPTH is TooLarge; the top-level object is depth 1)",
+   "input_len": 181,
+   "input_sha256": "3f331e6d92c90790fc1d747da66ed939ffd9628536c3a740d28abf4d98d4a8a5",
+   "input": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73652c2278223a7b2278223a7b2278223a7b2278223a7b2278223a7b2278223a7b2278223a7b2278223a7b7d7d7d7d7d7d7d7d7d",
+   "recipe": "a valid webauthn.get clientDataJSON with a member `x` holding nested objects so that the deepest container is at depth bound+excess",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "client-data-depth-arrays-at-bound",
+   "op": "client_data",
+   "bound": "webauthn_rp::MAX_CLIENT_DATA_DEPTH",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R6 (nesting past MAX_CLIENT_DATA_DEPTH is TooLarge; the top-level object is depth 1)",
+   "input_len": 151,
+   "input_sha256": "ab143d1c97196e60d30fd3260e29eaec47f3829c99e857341ec33a6555ebac5f",
+   "input": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73652c2278223a5b5b5b5b5b5b5b5d5d5d5d5d5d5d7d",
+   "recipe": "a valid webauthn.get clientDataJSON with a member `x` holding nested arrays so that the deepest container is at depth bound+excess",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "client-data-depth-arrays-one-past",
+   "op": "client_data",
+   "bound": "webauthn_rp::MAX_CLIENT_DATA_DEPTH",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R6 (nesting past MAX_CLIENT_DATA_DEPTH is TooLarge; the top-level object is depth 1)",
+   "input_len": 153,
+   "input_sha256": "e04d934ab6b7ec23882fdccfc6b7cf79db072daef4c80d0ea159f9629217e520",
+   "input": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73652c2278223a5b5b5b5b5b5b5b5b5d5d5d5d5d5d5d5d7d",
+   "recipe": "a valid webauthn.get clientDataJSON with a member `x` holding nested arrays so that the deepest container is at depth bound+excess",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "attestation-object-at-bound",
+   "op": "attestation_object",
+   "bound": "webauthn_rp::MAX_ATTESTATION_OBJECT",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R40 (the attestation object's size)",
+   "input_len": 65536,
+   "input_sha256": "e0818027d63be482f6cba496c61663b766db48b7f694ef714bcc65b6164257b8",
+   "recipe": "a fmt none attestation object whose attStmt map holds one `pad` entry of zero bytes, the whole object exactly bound+excess bytes (shape only; the none rules are not applied)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "authenticator-data-at-bound",
+   "op": "authenticator_data",
+   "bound": "webauthn_rp::MAX_AUTHENTICATOR_DATA",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R4 (authenticator data's size)",
+   "input_len": 16384,
+   "input_sha256": "02e061328e398e2305e1d9c1113bbcedff8845b88df984482fbaa75bf7594423",
+   "recipe": "authenticator data of UP|UV|ED whose extensions map holds one `pad` entry of zero bytes, the whole value exactly bound+excess bytes (shape only)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "cbor-depth-at-bound",
+   "op": "cbor_limit",
+   "bound": "webauthn_rp::MAX_CBOR_DEPTH",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R2 (CBOR nesting depth; the outer array is depth 1)",
+   "input_len": 17,
+   "input_sha256": "c5d57cb61a5122f903251eac0d242c1b75c4d031aac0c4c254a99f6cc1c83cd8",
+   "input": "8181818181818181818181818181818100",
+   "recipe": "nested one-element arrays 0x81 ... 0x81 0x00 whose depth is bound+excess",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "cbor-items-at-bound",
+   "op": "cbor_limit",
+   "bound": "webauthn_rp::MAX_CBOR_ITEMS",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R2 (CBOR item count, the array itself included)",
+   "input_len": 1026,
+   "input_sha256": "e4b76950d7e56b5e5d011a04dfaa43396e840b76f95d4acd967d2be5c6ae17b8",
+   "input": "9903ff000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "recipe": "one definite array of bound+excess-1 items of 0x00, so the item count with the array itself is bound+excess",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "trust-anchor-at-bound",
+   "op": "trust_anchor_from_der",
+   "bound": "webauthn_rp::MAX_CERTIFICATE",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R18 (TrustAnchor::from_der takes one DER certificate of at most MAX_CERTIFICATE bytes)",
+   "input_len": 8192,
+   "input_sha256": "aa742ae70e549b25804e3f31a2a1fadf3209db4c7664a9f3473dff99695b8693",
+   "recipe": "a self-signed P-256 certificate whose non-critical private extension is padded so the DER is exactly bound+excess bytes",
+   "expect": {
+    "ok": true,
+    "digest": "aa742ae70e549b25804e3f31a2a1fadf3209db4c7664a9f3473dff99695b8693"
+   }
+  },
+  {
+   "id": "rp-id-at-bound",
+   "op": "rp_id_parse",
+   "bound": "webauthn_rp::MAX_RP_ID",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R9 (an RP ID of at most MAX_RP_ID bytes in all)",
+   "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "recipe": "lowercase 'a' labels of at most 63 bytes joined by dots, bound+excess bytes in all",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "app-id-at-bound",
+   "op": "app_id_parse",
+   "bound": "webauthn_rp::MAX_APP_ID",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R10 (an AppID of at most MAX_APP_ID bytes)",
+   "input": "https://example.org/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "recipe": "https://example.org/ then 'a' bytes, bound+excess bytes in all",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "exclude-list-at-bound",
+   "op": "start_registration",
+   "bound": "webauthn_rp::MAX_LISTED_CREDENTIALS",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R31 (an exclude list over MAX_LISTED_CREDENTIALS)",
+   "exclude_credentials": [
+    "b1147682a768f838fe22036dd77d7606",
+    "d57a179a5bc3f33b3e77fb4852386c97",
+    "53f522d17fb579990ad0fd874ab1cb33",
+    "e79a3fcbdf03a6a80d30fad1953f3a0f",
+    "196f0d2ebf14bed4ec7ca5dbc2567cd4",
+    "9f910d07a78c63b52a5b79ad919580b9",
+    "134ee225f8ddd03cb4a3a3c5f83e9c74",
+    "d6fa150780a774d274725193849cd2c0",
+    "bc9df1b42de7dbd3e71abaeebd425f82",
+    "e52b4c7d71f9ecc8eabc53509320aaaf",
+    "2a045c162099f097eade312e03eb910c",
+    "f8f005dcf30345e548795becbe91be04",
+    "9b1089f2dce166193127b196e042a94a",
+    "8f6db6740f4caaaf470a0341f6806862",
+    "5c352ef6971f0ee786a9e4fba51467b5",
+    "847275dc02f30aa87e0b1dbeed394d60",
+    "a032d6cb1998f7a584c1815fed6076c0",
+    "97a7516df271ad5f210d26be942bbe74",
+    "256520752140cf80c5d6b936ad38647f",
+    "f06221dbf39c4831418479e9c2b4cf67",
+    "3f1212c63e34a9337a21ffd66e47b28a",
+    "43be6e5a37269124e8f2a16de1ebe528",
+    "53ef0bf567ef248a6d8c4b2326adc9e1",
+    "7de2487f09a8cdc532b37b397aad2bed",
+    "90430bdde5491b032fde1dba507185cc",
+    "d86ecdb63c10732f3d89f53fba2523fb",
+    "d5dbdc4ada593b9056220eaef13e4750",
+    "c71b6186f091e0285edaac50dfa78783",
+    "908d0e52eef7b185e2f9f7ca72ad5130",
+    "81d35e3d5f7811c7b83a130a1668bc30",
+    "76bbd31c8cd57be437d814487e55b426",
+    "4b67354e3809111979a0fa4207a434d0",
+    "c0251bd53a7888f7a6eb9d0a78ce62b0",
+    "236bbd827285db4826f649deb395db65",
+    "9f3735590e0350a6a5943375a75def69",
+    "49175d9f5d605775adc1933bc15387d8",
+    "776d5a732345bc04d4bae27cea920d95",
+    "0a1cfc6f2857c7e79b0275316a4c87c1",
+    "6426db36df3982394ba720bd9f16d5ae",
+    "85c5ee07a2ae874ddf22b290f1f7bafb",
+    "e058ae537fff61eda7aaac127928f52d",
+    "0a3b3747055f5198f03eb8019393a8a7",
+    "941d95917f50021a148dc89c695ec964",
+    "5fb69561fe07239a488f22709d3cffba",
+    "f218b0796d7a83d5c669c98d116fc901",
+    "b35c122836fc6670b5539969fe598e47",
+    "a3b3c6a1deb971a02dcff22100d89a08",
+    "2dbe76c381027c84974e2b16525a7eb2",
+    "1c665fade598452988e8f58b5357baea",
+    "452ae5b47c8b4b0e462fa5ca7e548fdf",
+    "57fc6a69f5220fd4779d4090f67059c2",
+    "3f56ac48041d4d46b7d6760a084a961e",
+    "e78864b80c226d0de4cf27b53cff2563",
+    "977bd925a2973301599d107c8c665741",
+    "04d721f7980ec44ffdcd9545fb6035b4",
+    "9efc2074537b290fe094468c1f2c72e4",
+    "e037c6f3ba96ec90f465337e1a5caba0",
+    "1e84baa7fbd1e426980c63ec162e428b",
+    "8eeca879617d0f8e4c64d06360452cde",
+    "6fe46c650c6919429a7ea8f0ea623b58",
+    "33c54ab32b9b83e9d1452cc710d114e4",
+    "3a003ad0667017f246690da280d6497e",
+    "2c930f48fc7dcae1c9b1905c9e77ae4d",
+    "882698e8df8f7f794b735d72e31169fb"
+   ],
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "allow-list-at-bound",
+   "op": "start_authentication",
+   "bound": "webauthn_rp::MAX_LISTED_CREDENTIALS",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R1 (an Allow::User list over MAX_LISTED_CREDENTIALS)",
+   "allow_credentials": [
+    "10ff9535065fc7a2614ba67e92a37bc6",
+    "019a9e87c9d47f776f920d5f147b1eef",
+    "2061f76a276f50ae24ff949f2647a79c",
+    "5ca18b89bddd480bef6732db5b06354f",
+    "363ece27e86c6fa3c6ccc7c239a4d3f6",
+    "6dc65c09977bfd66716dc61a82c86270",
+    "415d6d2e9c195c22e9d678541808e96d",
+    "30f995cf5844ef2b532fb88d1c0b0a1e",
+    "8de46e34c7a8688fe300a138e1facef3",
+    "fcb5edd30fe81b099474b7ac4862467f",
+    "fd6b9b5cb2242047d41c10a8e1194f35",
+    "d93fa14cfb9501b20bd83917018696e1",
+    "e37d062bdb6de720e0319238265d0273",
+    "3ae314e1d518f365199ec4678bf02c76",
+    "50aced5da4ecff7c671e58ccdedb30af",
+    "0f94ab793be0e72be9968bc572d48abe",
+    "5eb4d56f9c005bd1516b7353974add28",
+    "2203d1271e49297bfab7b55627424d3f",
+    "a678b60908206309d76bcb88b6b0bced",
+    "a8638472e41fba85f43359ffc969faeb",
+    "3045055faf4b85e633b0714ba8ebfee6",
+    "359634eb705b14ed68924866af5830da",
+    "d694d99d379479c9a4cefc7aa903db3f",
+    "fad244f728b30958a8c255f3d5df3265",
+    "f50fdcebfa28eb8906c3f09f86cabdf8",
+    "ff42d5465306e5fc68366fe0b84b4921",
+    "e9b16f7bc3e97ecc35b6f2cf9b955c8f",
+    "b4f846e91cdbe51c33832c5f359f2959",
+    "1d994062f8741ba6831c5a1b5f082441",
+    "bb1b585510355f77beef442816c4bfaa",
+    "781e56cedbbfbfcd9b286659ea33d498",
+    "0eff7c5d7dd8d10f63124c060ecaa55b",
+    "43fc05092398f35cb8b356532c014c60",
+    "1f03af7652f002fc44cb96b42dcb66d5",
+    "40feeb1b2bc089aba1e4177d80ef2903",
+    "5fd4e73a2b35db9e0686eaf40933648c",
+    "24083579be40770f880ac073d5bea8d7",
+    "a47a5547968fafb307d691a8160d6816",
+    "afa7e083358acf0a216977c5810fb780",
+    "700d3f3e2ee094e868724df7d89b84a7",
+    "d7341bf9cc212ade76e24851028609b9",
+    "9636c6321d035341fea28ba0af225e42",
+    "ee13aaa2dec0e4ae8fa78ff6fb781998",
+    "d729f68f229b9642b0ab7ea78ebb5685",
+    "05d7e8830e5a095366d63017fb3d47bc",
+    "24514d65b774576f9127702f0a7c5c87",
+    "c1dfae5e11a62c6670f557c3358ab27c",
+    "270ea0088cf5154b8ac542446c75de9d",
+    "24e59ad467b726462c2fddebaac0b3fc",
+    "5650424574c8c24554802e96492b6bbc",
+    "183fae46995e16dec734c71a924b72ab",
+    "ba2779ec5dfa38ede9d64a8378a98d3c",
+    "5f24b9781c707191251378f9777e72f2",
+    "cee2affaa61c864371fe609ca08e0fa4",
+    "25360024bf1f0e3fca4afa8040887d88",
+    "c37b3da4ac1fb1c511e045115ac4e7d6",
+    "9f2e319b3d047ced091f3a07f5bbabf8",
+    "5293239043c5df14211ffd70ed782bcb",
+    "3465ecf7d4c7ce4285cbc7724132d737",
+    "aa863474a69c70d0a7298c54da3b7271",
+    "1e280e6a168e1f11912ee107d998bed3",
+    "0093ccefa5c7fc8dd035fb5b7ec9df2c",
+    "750e285bc19c0627943cce558438bd8e",
+    "72a0528459e7a58f61b5c4bef41ec92e"
+   ],
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "prf-salt-at-bound",
+   "op": "start_registration",
+   "bound": "webauthn_rp::MAX_PRF_SALT",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R31 (a PRF salt over MAX_PRF_SALT)",
+   "extensions": {
+    "prf": {
+     "eval": {
+      "first": "07070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707"
+     }
+    }
+   },
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "origins-at-bound",
+   "op": "relying_party_build",
+   "bound": "webauthn_rp::MAX_ORIGINS",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R19 (more than MAX_ORIGINS origins and top origins together)",
+   "origins": [
+    "https://o0.example.org",
+    "https://o1.example.org",
+    "https://o2.example.org",
+    "https://o3.example.org",
+    "https://o4.example.org",
+    "https://o5.example.org",
+    "https://o6.example.org",
+    "https://o7.example.org",
+    "https://o8.example.org",
+    "https://o9.example.org",
+    "https://o10.example.org",
+    "https://o11.example.org",
+    "https://o12.example.org",
+    "https://o13.example.org",
+    "https://o14.example.org",
+    "https://o15.example.org",
+    "https://o16.example.org",
+    "https://o17.example.org",
+    "https://o18.example.org",
+    "https://o19.example.org",
+    "https://o20.example.org",
+    "https://o21.example.org",
+    "https://o22.example.org",
+    "https://o23.example.org",
+    "https://o24.example.org",
+    "https://o25.example.org",
+    "https://o26.example.org",
+    "https://o27.example.org",
+    "https://o28.example.org",
+    "https://o29.example.org",
+    "https://o30.example.org",
+    "https://o31.example.org"
+   ],
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "timeout-at-bound",
+   "op": "start_registration",
+   "bound": "webauthn_rp::MAX_TIMEOUT_SECS",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) (a timeout over MAX_TIMEOUT_SECS seconds)",
+   "timeout_secs": 600,
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "user-handle-at-bound",
+   "op": "user_handle_from_stored",
+   "bound": "webauthn_rp::MAX_USER_HANDLE",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and N16 (a stored handle is 1 to MAX_USER_HANDLE bytes)",
+   "input": "09090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "user-name-at-bound",
+   "op": "start_registration",
+   "bound": "webauthn_rp::MAX_NAME",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and N18 (name and display name are checked for length and emptiness only)",
+   "user": {
+    "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+    "display_name": "d"
+   },
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "signature-at-bound",
+   "op": "assertion_response",
+   "bound": "webauthn_rp::MAX_SIGNATURE",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) (AuthenticationResponse::new reads a signature of at most MAX_SIGNATURE bytes; it is not verified at construction)",
+   "signature": "05050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "large-blob-at-bound",
+   "op": "largeblob_result",
+   "bound": "webauthn_rp::MAX_LARGE_BLOB",
+   "excess": 0,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R127 (a blob past MAX_LARGE_BLOB is TooLarge)",
+   "input_len": 65536,
+   "input_sha256": "3af3f1d870212fe8fcfe6eb321fd14d009bccc953fce3f59f698f0c446a1a39a",
+   "recipe": "the byte 0x03 repeated bound+excess times, returned as the largeBlob `blob` after a Read request",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "attestation-object-one-past",
+   "op": "attestation_object",
+   "bound": "webauthn_rp::MAX_ATTESTATION_OBJECT",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R40 (the attestation object's size)",
+   "input_len": 65537,
+   "input_sha256": "e5f6d5d1b3286c95b0057ecada3e75d6aed7a58482483838964e48fa71cb0114",
+   "recipe": "a fmt none attestation object whose attStmt map holds one `pad` entry of zero bytes, the whole object exactly bound+excess bytes (shape only; the none rules are not applied)",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "authenticator-data-one-past",
+   "op": "authenticator_data",
+   "bound": "webauthn_rp::MAX_AUTHENTICATOR_DATA",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R4 (authenticator data's size)",
+   "input_len": 16385,
+   "input_sha256": "1659192a901829083e6d4eeadd8dc3891319dd30a2fab7505f3c2e9689e92d90",
+   "recipe": "authenticator data of UP|UV|ED whose extensions map holds one `pad` entry of zero bytes, the whole value exactly bound+excess bytes (shape only)",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "cbor-depth-one-past",
+   "op": "cbor_limit",
+   "bound": "webauthn_rp::MAX_CBOR_DEPTH",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R2 (CBOR nesting depth; the outer array is depth 1)",
+   "input_len": 18,
+   "input_sha256": "ccf764f7abf64e6cd763921453c30afdaa9f81355d385ea0d9e368bff1740579",
+   "input": "818181818181818181818181818181818100",
+   "recipe": "nested one-element arrays 0x81 ... 0x81 0x00 whose depth is bound+excess",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "cbor-items-one-past",
+   "op": "cbor_limit",
+   "bound": "webauthn_rp::MAX_CBOR_ITEMS",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R2 (CBOR item count, the array itself included)",
+   "input_len": 1027,
+   "input_sha256": "fdf38fc448b73cd360e2ddbf33b5bf234fb4f557660fe2390cd41fb572724a35",
+   "input": "99040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "recipe": "one definite array of bound+excess-1 items of 0x00, so the item count with the array itself is bound+excess",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "trust-anchor-one-past",
+   "op": "trust_anchor_from_der",
+   "bound": "webauthn_rp::MAX_CERTIFICATE",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R18 (TrustAnchor::from_der takes one DER certificate of at most MAX_CERTIFICATE bytes)",
+   "input_len": 8193,
+   "input_sha256": "12428b53d48d39ed3d519acc053170b22422466bc47013561971e38b47349d6c",
+   "recipe": "a self-signed P-256 certificate whose non-critical private extension is padded so the DER is exactly bound+excess bytes",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "rp-id-one-past",
+   "op": "rp_id_parse",
+   "bound": "webauthn_rp::MAX_RP_ID",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R9 (an RP ID of at most MAX_RP_ID bytes in all)",
+   "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "recipe": "lowercase 'a' labels of at most 63 bytes joined by dots, bound+excess bytes in all",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "app-id-one-past",
+   "op": "app_id_parse",
+   "bound": "webauthn_rp::MAX_APP_ID",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R10 (an AppID of at most MAX_APP_ID bytes)",
+   "input": "https://example.org/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "recipe": "https://example.org/ then 'a' bytes, bound+excess bytes in all",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "exclude-list-one-past",
+   "op": "start_registration",
+   "bound": "webauthn_rp::MAX_LISTED_CREDENTIALS",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R31 (an exclude list over MAX_LISTED_CREDENTIALS)",
+   "exclude_credentials": [
+    "b1147682a768f838fe22036dd77d7606",
+    "d57a179a5bc3f33b3e77fb4852386c97",
+    "53f522d17fb579990ad0fd874ab1cb33",
+    "e79a3fcbdf03a6a80d30fad1953f3a0f",
+    "196f0d2ebf14bed4ec7ca5dbc2567cd4",
+    "9f910d07a78c63b52a5b79ad919580b9",
+    "134ee225f8ddd03cb4a3a3c5f83e9c74",
+    "d6fa150780a774d274725193849cd2c0",
+    "bc9df1b42de7dbd3e71abaeebd425f82",
+    "e52b4c7d71f9ecc8eabc53509320aaaf",
+    "2a045c162099f097eade312e03eb910c",
+    "f8f005dcf30345e548795becbe91be04",
+    "9b1089f2dce166193127b196e042a94a",
+    "8f6db6740f4caaaf470a0341f6806862",
+    "5c352ef6971f0ee786a9e4fba51467b5",
+    "847275dc02f30aa87e0b1dbeed394d60",
+    "a032d6cb1998f7a584c1815fed6076c0",
+    "97a7516df271ad5f210d26be942bbe74",
+    "256520752140cf80c5d6b936ad38647f",
+    "f06221dbf39c4831418479e9c2b4cf67",
+    "3f1212c63e34a9337a21ffd66e47b28a",
+    "43be6e5a37269124e8f2a16de1ebe528",
+    "53ef0bf567ef248a6d8c4b2326adc9e1",
+    "7de2487f09a8cdc532b37b397aad2bed",
+    "90430bdde5491b032fde1dba507185cc",
+    "d86ecdb63c10732f3d89f53fba2523fb",
+    "d5dbdc4ada593b9056220eaef13e4750",
+    "c71b6186f091e0285edaac50dfa78783",
+    "908d0e52eef7b185e2f9f7ca72ad5130",
+    "81d35e3d5f7811c7b83a130a1668bc30",
+    "76bbd31c8cd57be437d814487e55b426",
+    "4b67354e3809111979a0fa4207a434d0",
+    "c0251bd53a7888f7a6eb9d0a78ce62b0",
+    "236bbd827285db4826f649deb395db65",
+    "9f3735590e0350a6a5943375a75def69",
+    "49175d9f5d605775adc1933bc15387d8",
+    "776d5a732345bc04d4bae27cea920d95",
+    "0a1cfc6f2857c7e79b0275316a4c87c1",
+    "6426db36df3982394ba720bd9f16d5ae",
+    "85c5ee07a2ae874ddf22b290f1f7bafb",
+    "e058ae537fff61eda7aaac127928f52d",
+    "0a3b3747055f5198f03eb8019393a8a7",
+    "941d95917f50021a148dc89c695ec964",
+    "5fb69561fe07239a488f22709d3cffba",
+    "f218b0796d7a83d5c669c98d116fc901",
+    "b35c122836fc6670b5539969fe598e47",
+    "a3b3c6a1deb971a02dcff22100d89a08",
+    "2dbe76c381027c84974e2b16525a7eb2",
+    "1c665fade598452988e8f58b5357baea",
+    "452ae5b47c8b4b0e462fa5ca7e548fdf",
+    "57fc6a69f5220fd4779d4090f67059c2",
+    "3f56ac48041d4d46b7d6760a084a961e",
+    "e78864b80c226d0de4cf27b53cff2563",
+    "977bd925a2973301599d107c8c665741",
+    "04d721f7980ec44ffdcd9545fb6035b4",
+    "9efc2074537b290fe094468c1f2c72e4",
+    "e037c6f3ba96ec90f465337e1a5caba0",
+    "1e84baa7fbd1e426980c63ec162e428b",
+    "8eeca879617d0f8e4c64d06360452cde",
+    "6fe46c650c6919429a7ea8f0ea623b58",
+    "33c54ab32b9b83e9d1452cc710d114e4",
+    "3a003ad0667017f246690da280d6497e",
+    "2c930f48fc7dcae1c9b1905c9e77ae4d",
+    "882698e8df8f7f794b735d72e31169fb",
+    "aecc622d78fdc0edaf9d9e2cfda3d821"
+   ],
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "allow-list-one-past",
+   "op": "start_authentication",
+   "bound": "webauthn_rp::MAX_LISTED_CREDENTIALS",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R1 (an Allow::User list over MAX_LISTED_CREDENTIALS)",
+   "allow_credentials": [
+    "10ff9535065fc7a2614ba67e92a37bc6",
+    "019a9e87c9d47f776f920d5f147b1eef",
+    "2061f76a276f50ae24ff949f2647a79c",
+    "5ca18b89bddd480bef6732db5b06354f",
+    "363ece27e86c6fa3c6ccc7c239a4d3f6",
+    "6dc65c09977bfd66716dc61a82c86270",
+    "415d6d2e9c195c22e9d678541808e96d",
+    "30f995cf5844ef2b532fb88d1c0b0a1e",
+    "8de46e34c7a8688fe300a138e1facef3",
+    "fcb5edd30fe81b099474b7ac4862467f",
+    "fd6b9b5cb2242047d41c10a8e1194f35",
+    "d93fa14cfb9501b20bd83917018696e1",
+    "e37d062bdb6de720e0319238265d0273",
+    "3ae314e1d518f365199ec4678bf02c76",
+    "50aced5da4ecff7c671e58ccdedb30af",
+    "0f94ab793be0e72be9968bc572d48abe",
+    "5eb4d56f9c005bd1516b7353974add28",
+    "2203d1271e49297bfab7b55627424d3f",
+    "a678b60908206309d76bcb88b6b0bced",
+    "a8638472e41fba85f43359ffc969faeb",
+    "3045055faf4b85e633b0714ba8ebfee6",
+    "359634eb705b14ed68924866af5830da",
+    "d694d99d379479c9a4cefc7aa903db3f",
+    "fad244f728b30958a8c255f3d5df3265",
+    "f50fdcebfa28eb8906c3f09f86cabdf8",
+    "ff42d5465306e5fc68366fe0b84b4921",
+    "e9b16f7bc3e97ecc35b6f2cf9b955c8f",
+    "b4f846e91cdbe51c33832c5f359f2959",
+    "1d994062f8741ba6831c5a1b5f082441",
+    "bb1b585510355f77beef442816c4bfaa",
+    "781e56cedbbfbfcd9b286659ea33d498",
+    "0eff7c5d7dd8d10f63124c060ecaa55b",
+    "43fc05092398f35cb8b356532c014c60",
+    "1f03af7652f002fc44cb96b42dcb66d5",
+    "40feeb1b2bc089aba1e4177d80ef2903",
+    "5fd4e73a2b35db9e0686eaf40933648c",
+    "24083579be40770f880ac073d5bea8d7",
+    "a47a5547968fafb307d691a8160d6816",
+    "afa7e083358acf0a216977c5810fb780",
+    "700d3f3e2ee094e868724df7d89b84a7",
+    "d7341bf9cc212ade76e24851028609b9",
+    "9636c6321d035341fea28ba0af225e42",
+    "ee13aaa2dec0e4ae8fa78ff6fb781998",
+    "d729f68f229b9642b0ab7ea78ebb5685",
+    "05d7e8830e5a095366d63017fb3d47bc",
+    "24514d65b774576f9127702f0a7c5c87",
+    "c1dfae5e11a62c6670f557c3358ab27c",
+    "270ea0088cf5154b8ac542446c75de9d",
+    "24e59ad467b726462c2fddebaac0b3fc",
+    "5650424574c8c24554802e96492b6bbc",
+    "183fae46995e16dec734c71a924b72ab",
+    "ba2779ec5dfa38ede9d64a8378a98d3c",
+    "5f24b9781c707191251378f9777e72f2",
+    "cee2affaa61c864371fe609ca08e0fa4",
+    "25360024bf1f0e3fca4afa8040887d88",
+    "c37b3da4ac1fb1c511e045115ac4e7d6",
+    "9f2e319b3d047ced091f3a07f5bbabf8",
+    "5293239043c5df14211ffd70ed782bcb",
+    "3465ecf7d4c7ce4285cbc7724132d737",
+    "aa863474a69c70d0a7298c54da3b7271",
+    "1e280e6a168e1f11912ee107d998bed3",
+    "0093ccefa5c7fc8dd035fb5b7ec9df2c",
+    "750e285bc19c0627943cce558438bd8e",
+    "72a0528459e7a58f61b5c4bef41ec92e",
+    "a61613a310c6c46d4210da250426bdfd"
+   ],
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "prf-salt-one-past",
+   "op": "start_registration",
+   "bound": "webauthn_rp::MAX_PRF_SALT",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R31 (a PRF salt over MAX_PRF_SALT)",
+   "extensions": {
+    "prf": {
+     "eval": {
+      "first": "0707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707"
+     }
+    }
+   },
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "origins-one-past",
+   "op": "relying_party_build",
+   "bound": "webauthn_rp::MAX_ORIGINS",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R19 (more than MAX_ORIGINS origins and top origins together)",
+   "origins": [
+    "https://o0.example.org",
+    "https://o1.example.org",
+    "https://o2.example.org",
+    "https://o3.example.org",
+    "https://o4.example.org",
+    "https://o5.example.org",
+    "https://o6.example.org",
+    "https://o7.example.org",
+    "https://o8.example.org",
+    "https://o9.example.org",
+    "https://o10.example.org",
+    "https://o11.example.org",
+    "https://o12.example.org",
+    "https://o13.example.org",
+    "https://o14.example.org",
+    "https://o15.example.org",
+    "https://o16.example.org",
+    "https://o17.example.org",
+    "https://o18.example.org",
+    "https://o19.example.org",
+    "https://o20.example.org",
+    "https://o21.example.org",
+    "https://o22.example.org",
+    "https://o23.example.org",
+    "https://o24.example.org",
+    "https://o25.example.org",
+    "https://o26.example.org",
+    "https://o27.example.org",
+    "https://o28.example.org",
+    "https://o29.example.org",
+    "https://o30.example.org",
+    "https://o31.example.org",
+    "https://o32.example.org"
+   ],
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "timeout-one-past",
+   "op": "start_registration",
+   "bound": "webauthn_rp::MAX_TIMEOUT_SECS",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) (a timeout over MAX_TIMEOUT_SECS seconds)",
+   "timeout_secs": 601,
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "user-handle-one-past",
+   "op": "user_handle_from_stored",
+   "bound": "webauthn_rp::MAX_USER_HANDLE",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and N16 (a stored handle is 1 to MAX_USER_HANDLE bytes)",
+   "input": "0909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "user-name-one-past",
+   "op": "start_registration",
+   "bound": "webauthn_rp::MAX_NAME",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and N18 (name and display name are checked for length and emptiness only)",
+   "user": {
+    "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+    "display_name": "d"
+   },
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "signature-one-past",
+   "op": "assertion_response",
+   "bound": "webauthn_rp::MAX_SIGNATURE",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) (AuthenticationResponse::new reads a signature of at most MAX_SIGNATURE bytes; it is not verified at construction)",
+   "signature": "0505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "large-blob-one-past",
+   "op": "largeblob_result",
+   "bound": "webauthn_rp::MAX_LARGE_BLOB",
+   "excess": 1,
+   "spec": "contract R1 (each bound is a public constant; input past it is TooLarge) and R127 (a blob past MAX_LARGE_BLOB is TooLarge)",
+   "input_len": 65537,
+   "input_sha256": "a2d785b1c2e47833ced5e881d43c45ab65f6f02abece86e87c0c12a446389bf3",
+   "recipe": "the byte 0x03 repeated bound+excess times, returned as the largeBlob `blob` after a Read request",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "trust-anchor-one-certificate",
+   "op": "trust_anchor_from_der",
+   "input": "308201973082013da00302010202087396b34a449a8c90300a06082a8648ce3d040302303f310b300906035504061302585831193017060355040a0c1044657269766564205465737420504b493115301306035504030c0c4465726976656420526f6f74301e170d3233313131343232313332305a170d3330303331373137343634305a303f310b300906035504061302585831193017060355040a0c1044657269766564205465737420504b493115301306035504030c0c4465726976656420526f6f743059301306072a8648ce3d020106082a8648ce3d03010703420004d34dfef704e0193822bf781931f968ba3b7e3e144220d4d573d326390a9c7e0e6723e879153579a0173a751fcc95f55e7326f58bb0ee7f088c003c2ace9ff477a3233021300f0603551d130101ff040530030101ff300e0603551d0f0101ff040403020106300a06082a8648ce3d04030203480030450221008efeeb9f54011ac0105224b851326970df79bf53f873db73a8ecc3b1692d00be0220517e30d723861440ec4b8aa01928c8ec2d5e55976921f3991dfdec9dbdf383a3",
+   "spec": "contract R18 (exactly one DER certificate; digest is the SHA-256 of that DER)",
+   "expect": {
+    "ok": true,
+    "digest": "aa578a8768697cd5a094de7568c62360d317a4623972c7ac7985b84b53628c47"
+   }
+  },
+  {
+   "id": "trust-anchor-two-certificates",
+   "op": "trust_anchor_from_der",
+   "input": "308201973082013da00302010202087396b34a449a8c90300a06082a8648ce3d040302303f310b300906035504061302585831193017060355040a0c1044657269766564205465737420504b493115301306035504030c0c4465726976656420526f6f74301e170d3233313131343232313332305a170d3330303331373137343634305a303f310b300906035504061302585831193017060355040a0c1044657269766564205465737420504b493115301306035504030c0c4465726976656420526f6f743059301306072a8648ce3d020106082a8648ce3d03010703420004d34dfef704e0193822bf781931f968ba3b7e3e144220d4d573d326390a9c7e0e6723e879153579a0173a751fcc95f55e7326f58bb0ee7f088c003c2ace9ff477a3233021300f0603551d130101ff040530030101ff300e0603551d0f0101ff040403020106300a06082a8648ce3d04030203480030450221008efeeb9f54011ac0105224b851326970df79bf53f873db73a8ecc3b1692d00be0220517e30d723861440ec4b8aa01928c8ec2d5e55976921f3991dfdec9dbdf383a3308201a330820149a003020102020900a311127cc14a8f85300a06082a8648ce3d040302303f310b300906035504061302585831193017060355040a0c1044657269766564205465737420504b493115301306035504030c0c4465726976656420526f6f74301e170d3233313131343232313332305a170d3330303331373137343634305a3047310b300906035504061302585831193017060355040a0c1044657269766564205465737420504b49311d301b06035504030c144465726976656420496e7465726d6564696174653059301306072a8648ce3d020106082a8648ce3d03010703420004c74f4b0a89d1eb455322a1b9d2be6e3afb9951a2af6fc44348c9c85c4c7fc176ac7648c8413f048135ce6aa2c2db71cb96395e53fb977f95b2d6ca67307ce3d4a326302430120603551d130101ff040830060101ff020100300e0603551d0f0101ff040403020106300a06082a8648ce3d040302034800304502203e136255fbb88abff3db17ef94e689ab0057983982f32242b53cfac4f881aa7d022100c1a1c9f5dc4aab58b8787c8b2cca2ac584dc1be9ddad9cdc3e7996715fd95c73",
+   "spec": "contract R18 (exactly one DER certificate, not a concatenation)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "trust-anchor-trailing-byte",
+   "op": "trust_anchor_from_der",
+   "input": "308201973082013da00302010202087396b34a449a8c90300a06082a8648ce3d040302303f310b300906035504061302585831193017060355040a0c1044657269766564205465737420504b493115301306035504030c0c4465726976656420526f6f74301e170d3233313131343232313332305a170d3330303331373137343634305a303f310b300906035504061302585831193017060355040a0c1044657269766564205465737420504b493115301306035504030c0c4465726976656420526f6f743059301306072a8648ce3d020106082a8648ce3d03010703420004d34dfef704e0193822bf781931f968ba3b7e3e144220d4d573d326390a9c7e0e6723e879153579a0173a751fcc95f55e7326f58bb0ee7f088c003c2ace9ff477a3233021300f0603551d130101ff040530030101ff300e0603551d0f0101ff040403020106300a06082a8648ce3d04030203480030450221008efeeb9f54011ac0105224b851326970df79bf53f873db73a8ecc3b1692d00be0220517e30d723861440ec4b8aa01928c8ec2d5e55976921f3991dfdec9dbdf383a300",
+   "spec": "contract R18 (exactly one DER certificate: nothing after it)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "trust-anchor-truncated",
+   "op": "trust_anchor_from_der",
+   "input": "308201973082013da00302010202087396b34a449a8c90300a06082a8648ce3d040302303f310b300906035504061302585831193017060355040a0c1044657269766564205465737420504b493115301306035504030c0c4465726976656420526f6f74301e170d3233313131343232313332305a170d3330303331373137343634305a303f310b300906035504061302585831193017060355040a0c1044657269766564205465737420504b493115301306035504030c0c4465726976656420526f6f743059301306072a8648ce3d020106082a8648ce3d03010703420004d34dfef704e0193822bf781931f968ba3b7e3e144220d4d573d326390a9c7e0e6723e879153579a0173a751fcc95f55e7326f58bb0ee7f088c003c2ace9ff477a3233021300f0603551d130101ff040530030101ff300e0603551d0f0101ff040403020106300a06082a8648ce3d04030203480030450221008efeeb9f54011ac0105224b851326970df79bf53f873db73a8ecc3b1692d00be0220517e30d723861440ec4b8aa01928c8ec2d5e55976921f3991dfdec9dbdf383",
+   "spec": "contract R18 and R3 (a DER length past the input)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "trust-anchor-empty",
+   "op": "trust_anchor_from_der",
+   "input": "",
+   "spec": "contract R1 (an empty value where one is required is Malformed)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "trust-anchor-pem-text",
+   "op": "trust_anchor_from_der",
+   "input": "2d2d2d2d2d424547494e2043455254494649434154452d2d2d2d2d0a",
+   "spec": "contract R18 (DER, not PEM)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "trust-anchor-not-a-certificate",
+   "op": "trust_anchor_from_der",
+   "input": "3003020101",
+   "spec": "contract R18 (a certificate)",
+   "expect": {
+    "ok": false
+   }
+  }
+ ]
+}
