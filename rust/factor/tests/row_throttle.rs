@@ -34,21 +34,32 @@ fn no_row_permits() -> Result<(), factor::Error> {
 }
 
 #[test]
-fn a_row_from_a_fast_clock_waits_at_most_one_cap() -> Result<(), Box<dyn std::error::Error>> {
+fn a_row_from_a_fast_clock_is_released() -> Result<(), Box<dyn std::error::Error>> {
     let t = Throttle::new(Backoff::new(
         FreeAttempts::new(2)?,
         Wait::new(60)?,
         Cap::new(3_600)?,
     ));
-    let (now, ahead) = (1_000u64, 1_000 + 100 * 365 * 86_400u64);
-    let mut bytes = vec![1, 0];
-    bytes.extend_from_slice(&9u32.to_be_bytes());
-    bytes.extend_from_slice(&ahead.to_be_bytes());
-    let Record::Attempts(a) = Record::decode(&bytes)? else {
-        return Err("not an attempts row".into());
+    let now = 1_000u64;
+    let at = |last: u64| -> Result<Closed, Box<dyn std::error::Error>> {
+        let mut bytes = vec![1, 0];
+        bytes.extend_from_slice(&9u32.to_be_bytes());
+        bytes.extend_from_slice(&last.to_be_bytes());
+        let Record::Attempts(a) = Record::decode(&bytes)? else {
+            return Err("not an attempts row".into());
+        };
+        let row = Row::new(&a, Version::new(7));
+        Ok(t.check(Some(row), UnixTime::new(now))
+            .map(drop)
+            .err()
+            .unwrap_or(Closed::Wait(UnixTime::new(0))))
     };
-    let row = Row::new(&a, Version::new(7));
-    let closed = Err(Closed::Wait(UnixTime::new(now + 3_600)));
-    assert_eq!(t.check(Some(row), UnixTime::new(now)).map(drop), closed);
+    // a `last` 100 years ahead is released at once; one cap ahead is a lagging clock and waits one cap
+    assert_eq!(
+        at(now + 100 * 365 * 86_400)?,
+        Closed::Wait(UnixTime::new(0))
+    );
+    assert_eq!(at(now + 3_600)?, Closed::Wait(UnixTime::new(now + 7_200)));
+    assert_eq!(at(now + 3_601)?, Closed::Wait(UnixTime::new(0)));
     Ok(())
 }

@@ -97,12 +97,16 @@ impl Backoff {
         Self { free, first, cap }
     }
 
+    fn faulted(self, last: UnixTime, now: UnixTime) -> bool {
+        last > now.saturating_add(self.cap.0)
+    }
+
     fn until(self, seen: Attempts, now: UnixTime) -> Option<UnixTime> {
         let doublings = seen.count.checked_sub(self.free.0)?;
         let wait = 2u64.saturating_pow(doublings).saturating_mul(self.first.0);
         let due = seen.last.saturating_add(wait.min(self.cap.0));
-        // a `last` ahead of `now` must not push the wait past one cap
-        Some(due.min(now.saturating_add(self.cap.0)))
+        // a `last` more than one cap ahead is a clock fault, released here and restamped by the next count
+        (!self.faulted(seen.last, now)).then_some(due)
     }
 }
 
@@ -128,7 +132,14 @@ impl Throttle {
             .and_then(|(p, (_, a))| p.until(a, now))
         {
             Some(until) if now < until => Err(Closed::Wait(until)),
-            _ => Ok(Permit { seen, at: now }),
+            _ => {
+                let faulted = |p: Backoff, a: &Attempts| p.faulted(a.last, now);
+                let seen = seen.map(|(v, a)| match self.policy {
+                    Some(p) if faulted(p, &a) => (v, Attempts { last: now, ..a }),
+                    _ => (v, a),
+                });
+                Ok(Permit { seen, at: now })
+            }
         }
     }
 
@@ -250,6 +261,35 @@ mod tests {
         );
         assert_eq!(check(t, &end, u64::MAX), Ok(()));
         assert_eq!(check(Throttle::unlimited(), &end, 0), Ok(()));
+        Ok(())
+    }
+
+    #[test]
+    fn a_faulted_row_is_restamped_to_the_present() -> Result<(), Error> {
+        let mut e = seeded(5);
+        let ahead = UnixTime::new(LAST.secs() + 100 * 365 * 86_400);
+        let r = row(9, ahead);
+        let permit = throttle()?.check(Some(seen(&r)), LAST);
+        let effect = permit.ok().map(|p| p.count(&mut e).build());
+        let put = Record::Attempts(Attempts {
+            count: 10,
+            last: LAST,
+        });
+        assert!(matches!(effect, Some(Ok(ef)) if ef.puts().all(|(_, rec, _)| *rec == put)));
+        Ok(())
+    }
+
+    #[test]
+    fn a_row_within_one_cap_ahead_keeps_its_stamp() -> Result<(), Error> {
+        let mut e = seeded(6);
+        let last = UnixTime::new(LAST.secs() + 3_600);
+        let r = row(0, last);
+        let effect = throttle()?
+            .check(Some(seen(&r)), LAST)
+            .ok()
+            .map(|p| p.count(&mut e).build());
+        let put = Record::Attempts(Attempts { count: 1, last });
+        assert!(matches!(effect, Some(Ok(ef)) if ef.puts().all(|(_, rec, _)| *rec == put)));
         Ok(())
     }
 
