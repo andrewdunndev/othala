@@ -1,0 +1,334 @@
+{
+ "source": "JOSE header rules; derived by tools/derive_jose.py from keys pinned under vectors/ (RFC 7515 A.1-A.4, RFC 7520 3 and 5.4, RFC 8037 A); one spec section per case in `spec`",
+ "cases": [
+  {
+   "id": "control-valid",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.8hYiNs4l2gWKk3tChISXhyUeB3Vl09RpsoWjhp0vboU",
+   "spec": "RFC 7515 5.2",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "unknown-member-ignored",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsIngtdW5yZWdpc3RlcmVkIjoxfQ.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.BcY7rShLFl1_G_hHP0Zm2Zxw6_PyaMexjF3sVUlC1II",
+   "spec": "RFC 7515 4 (unknown Header Parameters MUST be ignored)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "dup-alg-different",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsImFsZyI6Im5vbmUifQ.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.rTxUwAdA9uWHIz7-1MQlST-DwEDVCbQz3fO5ggW4Agg",
+   "spec": "RFC 7515 4 and 5.2 step 4 (names MUST be unique; this oracle rejects)",
+   "expect": {
+    "ok": false,
+    "kind": "DuplicateMember"
+   }
+  },
+  {
+   "id": "dup-alg-same",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsImFsZyI6IkhTMjU2In0.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.lJXIM410Swss3zp3lIQlsCBnBKEh6GpjEMfkNw6BN7s",
+   "spec": "RFC 7515 4 and 5.2 step 4",
+   "expect": {
+    "ok": false,
+    "kind": "DuplicateMember"
+   }
+  },
+  {
+   "id": "dup-typ",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.REYBrlPZspNzegdQEY3YLUK2DhILp4Vi7-1wOo868G8",
+   "spec": "RFC 7515 4 and 5.2 step 4",
+   "expect": {
+    "ok": false,
+    "kind": "DuplicateMember"
+   }
+  },
+  {
+   "id": "dup-escaped-name",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsIlx1MDA2MWxnIjoibm9uZSJ9.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.-MQNX3fnI4HOG-Y94LXn1uPlb4i428sKw_LgIO3Eg9U",
+   "spec": "RFC 7515 4 with RFC 8259 7 (\\u0061lg names alg)",
+   "expect": {
+    "ok": false,
+    "kind": "DuplicateMember"
+   }
+  },
+  {
+   "id": "alg-missing",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJ0eXAiOiJKV1QifQ.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.dSD_2OjgSISeaHs_UrTGM-mhVTL3Hl3yyGpMYYTKsvM",
+   "spec": "RFC 7515 4.1.1 (alg MUST be present)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "alg-not-string",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOjF9.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.UDH5IkYS9WZV0IwTnBi5O7tSWya_iWarwwgpKY8xPdo",
+   "spec": "RFC 7515 4.1.1 (a case-sensitive string)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "alg-case-differs",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJoczI1NiJ9.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.voghV2OvURxdjOpJ7mevUCAKn1hKdnkE95k7lNo98hQ",
+   "spec": "RFC 7515 4.1.1 (case-sensitive) and RFC 8725 3.1",
+   "expect": {
+    "ok": false,
+    "kind": "AlgMismatch"
+   }
+  },
+  {
+   "id": "alg-none-with-mac",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJub25lIn0.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.wgLnzaztVpvvIulY_1TUrm4n50ObtCPs_xYYUadgc_Q",
+   "spec": "RFC 7518 3.6 and RFC 8725 3.1",
+   "expect": {
+    "ok": false,
+    "kind": "AlgMismatch"
+   }
+  },
+  {
+   "id": "crit-unknown",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsImNyaXQiOlsiZXhwLXgiXSwiZXhwLXgiOjF9.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.AHf7BrsQwagoCSXG9r5shUAloVstC0g8APRzkNgNHrQ",
+   "spec": "RFC 7515 4.1.11 (not understood: the JWS is invalid)",
+   "expect": {
+    "ok": false,
+    "kind": "CriticalHeader"
+   }
+  },
+  {
+   "id": "crit-empty",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsImNyaXQiOltdfQ.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.UMG4HVyn3M0hTkxX1aaLQ0ARXO3dlwix1MHCXzg-Ars",
+   "spec": "RFC 7515 4.1.11 (MUST NOT be the empty list)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "crit-registered-name",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsImNyaXQiOlsiYWxnIl19.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.EJcsgF0kZpGKWmsIphyzlR4xFoyX6ooZ7LpeZhNYeAg",
+   "spec": "RFC 7515 4.1.11 (MUST NOT list names this spec defines)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "crit-name-absent",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsImNyaXQiOlsiZXhwLXgiXX0.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.Q37WKV10FAv8VGuFaEd0z152eoS57zXe1SSHZzLPw3Q",
+   "spec": "RFC 7515 4.1.11 (listed names MUST be present)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "crit-not-array",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsImNyaXQiOiJleHAteCJ9.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.60qkguy_CpwOtKHEgJKt32ROols7cNLBhC7IFxplg3k",
+   "spec": "RFC 7515 4.1.11 (an array)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "header-array",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "WyJhbGciLCJIUzI1NiJd.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.5lG8kOMXAGHbMcz7SwPMsO0Gmd1ykCV5lX2yWH7nRP8",
+   "spec": "RFC 7515 5.2 step 3 (a JSON object)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "header-not-json",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "e2FsZzpIUzI1Nn0.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.JM5Lhlbgh_5z8dtaT7wFoB_HxarwjM_ksmJ8svH7HC4",
+   "spec": "RFC 7515 5.2 step 3",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "b64-false-crit",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19.{\"iss\":\"joe\"}.4iw_oikij8eRkrlBE9cJNiI-hyhnuiWzpdfbsO_-UGQ",
+   "spec": "RFC 7797 3 and 6 with RFC 7515 4.1.11 (this oracle does not implement RFC 7797)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "b64-false-no-crit",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsImI2NCI6ZmFsc2V9.{\"iss\":\"joe\"}.x-Az7v0P6kviskKx4NDFwNouuxOj1mt8kgHJ-CO9yLg",
+   "spec": "RFC 7797 6 (b64 MUST be listed in crit)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "segment-padded",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.8hYiNs4l2gWKk3tChISXhyUeB3Vl09RpsoWjhp0vboU=",
+   "spec": "RFC 7515 2 (base64url without padding) and 7.1",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "four-segments",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.8hYiNs4l2gWKk3tChISXhyUeB3Vl09RpsoWjhp0vboU.8hYiNs4l2gWKk3tChISXhyUeB3Vl09RpsoWjhp0vboU",
+   "spec": "RFC 7515 7.1 (three parts)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "two-segments",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9",
+   "spec": "RFC 7515 7.1",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "whitespace-inside",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiJ9.\neyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.8hYiNs4l2gWKk3tChISXhyUeB3Vl09RpsoWjhp0vboU",
+   "spec": "RFC 7515 7.1 (no whitespace)",
+   "expect": {
+    "ok": false
+   }
+  }
+ ]
+}
