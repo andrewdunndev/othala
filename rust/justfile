@@ -121,13 +121,15 @@ mutants-changed base="origin/main":
         [ -n "$c" ] || continue
         tests=$(grep "^$c " <<< "$runs" | cut -d' ' -f2)
         if [ -n "$tests" ]; then scope=(--test-package "$tests"); else scope=(--test-workspace=true); fi
-        mkdir -p "{{target}}/mutants/$c"
+        rm -rf "{{target}}/mutants/$c"; mkdir -p "{{target}}/mutants/$c"
         if [ "$mode" = diff ]; then
             git diff --no-renames --relative "$mb" -- "$c/" > "{{target}}/mutants/$c.diff"
             sel=(--in-diff "{{target}}/mutants/$c.diff")
         else sel=(); fi
         cargo mutants --package "$c" "${scope[@]}" --no-shuffle "${sel[@]}" --output "{{target}}/mutants/$c" < /dev/null
-        jq -e '.missed == 0 and .timeout == 0' "{{target}}/mutants/$c/mutants.out/outcomes.json" > /dev/null || { echo "mutants-changed $c: a mutant was missed or timed out"; exit 1; }
+        out="{{target}}/mutants/$c/mutants.out/outcomes.json"
+        if [ "$mode" = diff ] && [ ! -f "$out" ]; then echo "mutants-changed $c: the diff holds no mutant"; continue; fi
+        jq -e '.missed == 0 and .timeout == 0' "$out" > /dev/null || { echo "mutants-changed $c: a mutant was missed or timed out"; exit 1; }
     done <<< "$plan"
     if grep -q '^jose ' <<< "$plan"; then just mutants-off; fi
 
