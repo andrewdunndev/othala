@@ -55,7 +55,7 @@ exposed() { # crate: the public items of it, in the scratch copy, that name the 
     rm -f "$j"
     (cd "$tmp" && cargo "+$nightly" rustdoc -p "$1" --lib --all-features -- -Z unstable-options --output-format json > /dev/null 2>&1 || true)
     [ -f "$j" ] || { echo "canary: rustdoc JSON of $1 failed to build" >&2; return 1; }
-    jq -r -f exposed.jq "$j"
+    jq -r -f canary/exposed.jq "$j"
 }
 api_names_expose() { # dir: public-api.txt lines naming Expose, other than base's two impls and the trait's own file
     local f
