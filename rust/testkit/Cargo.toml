@@ -1,0 +1,36 @@
+[package]
+name = "testkit"
+description = "Vector runner, seeded entropy, reference store, snapshot-race and store-conformance harnesses"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+base = { workspace = true, features = ["std", "rand_core"] }
+store.workspace = true
+rand_chacha.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+sha2.workspace = true
+toml.workspace = true
+
+# a harness reports a failed claim by panicking and reads its fixtures from disk, so those five are deny for its expects
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "forbid"
+unreachable_pub = "forbid"
+renamed_and_removed_lints = "forbid"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+indexing_slicing = "forbid"
+as_conversions = "forbid"
+print_stdout = "forbid"
+dbg_macro = "forbid"
+disallowed_methods = "deny"
+disallowed_types = "deny"
+disallowed_macros = "deny"

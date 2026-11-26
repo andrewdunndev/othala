@@ -1,0 +1,14 @@
+base base64ct
+base rand_core
+base serde
+base sha2
+base subtle
+base zeroize
+store base
+testkit base
+testkit rand_chacha
+testkit serde
+testkit serde_json
+testkit sha2
+testkit store
+testkit toml

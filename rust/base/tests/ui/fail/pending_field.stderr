@@ -1,0 +1,5 @@
+error[E0616]: field `verdict` of struct `base::Pending` is private
+  --> tests/ui/fail/pending_field.rs:13:7
+   |
+13 |     p.verdict
+   |       ^^^^^^^ private field

@@ -1,0 +1,5 @@
+error[E0451]: field `id` of struct `Receipt` is private
+ --> tests/ui/fail/receipt_fields.rs:7:23
+  |
+7 |     let _ = Receipt { id };
+  |                       ^^ private field

@@ -1,0 +1,23 @@
+[package]
+name = "base-fuzz"
+version = "0.0.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+base = { path = ".." }
+libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "b64url_decode"
+path = "fuzz_targets/b64url_decode.rs"
+test = false
+doc = false
+bench = false
+
+# its own workspace: the root lists base as a member, and a member path covers its subdirectories
+[workspace]

@@ -1,0 +1,14 @@
+error[E0599]: `base::Pending<u8, K, u8>` is not an iterator
+  --> tests/ui/fail/pending_verdict.rs:13:15
+   |
+13 |     let _ = p.map(|v| out = Some(v));
+   |               ^^^ `base::Pending<u8, K, u8>` is not an iterator
+   |
+  ::: src/effect.rs
+   |
+   | pub struct Pending<T, K, R> {
+   | --------------------------- doesn't satisfy `base::Pending<u8, K, u8>: Iterator`
+   |
+   = note: the following trait bounds were not satisfied:
+           `base::Pending<u8, K, u8>: Iterator`
+           which is required by `&mut base::Pending<u8, K, u8>: Iterator`

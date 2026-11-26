@@ -1,0 +1,33 @@
+[package]
+name = "store"
+description = "The in-memory reference store and the store-conformance cases; the one member that mints a Receipt"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+base.workspace = true
+
+[dev-dependencies]
+testkit.workspace = true
+
+# the workspace lints, but disallowed_methods at deny so the one receipt mint can expect it
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "forbid"
+unreachable_pub = "forbid"
+renamed_and_removed_lints = "forbid"
+
+[lints.clippy]
+unwrap_used = "forbid"
+expect_used = "forbid"
+panic = "forbid"
+indexing_slicing = "forbid"
+as_conversions = "forbid"
+print_stdout = "forbid"
+dbg_macro = "forbid"
+disallowed_methods = "deny"
+disallowed_types = "forbid"
+disallowed_macros = "forbid"

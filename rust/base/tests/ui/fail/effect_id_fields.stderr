@@ -1,0 +1,17 @@
+error[E0423]: cannot initialize a tuple struct which contains private fields
+ --> tests/ui/fail/effect_id_fields.rs:5:13
+  |
+5 |     let _ = EffectId([0; 16]);
+  |             ^^^^^^^^
+  |
+  = note: a struct named `EffectId` exists in another namespace
+note: constructor is not visible here due to private fields
+ --> src/effect.rs
+  |
+  | pub struct EffectId([u8; 16]);
+  |                     ^^^^^^^^ private field
+help: you might have meant to use the `merged` associated function
+  |
+5 -     let _ = EffectId([0; 16]);
+5 +     let _ = EffectId::merged(_, _);
+  |

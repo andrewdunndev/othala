@@ -1,0 +1,8 @@
+Secret<32>(redacted)
+SecretBytes(redacted)
+Holder { token: Secret<16>(redacted), key: SecretBytes(redacted) }
+Holder {
+    token: Secret<16>(redacted),
+    key: SecretBytes(redacted),
+}
+Pending { effect: EffectId([7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7]), .. }

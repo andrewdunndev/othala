@@ -1,0 +1,15 @@
+error: unused `base::Pending` that must be used
+  --> tests/ui/fail/pending_unused.rs:11:5
+   |
+11 |     base::Pending::new(1u8, e);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the lint level is defined here
+  --> tests/ui/fail/pending_unused.rs:1:9
+   |
+ 1 | #![deny(unused_must_use)]
+   |         ^^^^^^^^^^^^^^^
+help: use `let _ = ...` to ignore the resulting value
+   |
+11 |     let _ = base::Pending::new(1u8, e);
+   |     +++++++

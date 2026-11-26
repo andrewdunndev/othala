@@ -1,0 +1,15 @@
+[package]
+name = "wipe"
+description = "Probes that base wipes the storage it owns; they need unsafe, so this dev-only member is outside the workspace lints"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dev-dependencies]
+base.workspace = true
+
+# the probes read freed memory; the rest of the workspace forbids unsafe
+[lints.rust]
+unsafe_code = "allow"

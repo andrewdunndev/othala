@@ -212,6 +212,51 @@ check-purity:
   script:
     - just purity
 
+# check-rust: every gate of rust/justfile that holds on a merge (rust/base/CONTRACT.md),
+# on the catalog's ci-rust image; the MSRV and pinned-nightly toolchains and
+# cargo-deny are added at job start. Mutants and fuzz run on a schedule only.
+.rust:
+  stage: verify
+  image: registry.gitlab.com/dunn.dev/pipeline/ci-rust:4.16.1@sha256:3ff8f71ade7e88629d3d1e24a7e6479b30c4d78dadac97ca6a9a4379c4a15ff4
+  variables:
+    CARGO_HOME: "$CI_PROJECT_DIR/.cargo-home"
+  cache:
+    key: rust-$CI_JOB_NAME
+    paths:
+      - .cargo-home/registry
+      - rust/target
+  before_script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - cd rust
+    - rustup toolchain install
+    - rustup toolchain install 1.89.0 nightly-2026-11-24 --profile minimal
+    - cargo install --locked cargo-deny@0.22.1
+
+check-rust:
+  extends: .rust
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - rust/**/*
+        - .gitlab-ci.yml
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
+  script:
+    - just lock fmt lint canary twins test doc wasm thumb msrv deny deps api
+
+check-rust-scheduled:
+  extends: .rust
+  timeout: 3h
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+  script:
+    - cargo install --locked cargo-mutants@27.1.0 cargo-fuzz@0.13.1
+    - just mutants rows
+    - rustup toolchain install nightly --profile minimal
+    - just fuzz
+
 # check-portal: `just setup` (npm ci without install scripts in portal, e2e and
 # site), then `just check`: astro check, tsc over e2e and site, vitest (src and
 # scripts), the manifest lint, and a well-formedness parse of the tracked

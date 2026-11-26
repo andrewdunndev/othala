@@ -1,0 +1,8 @@
+# Every skip carries its reason and is counted by `just rows`.
+exclude_re = [
+  # the reference store's unguarded-write tripwire: no builder, merge or lift yields such an effect, so no test reaches it
+  "replace \\|\\| with && in <impl Store<K, R> for MemStore<K, R>>::apply",
+]
+additional_cargo_args = ["--all-features"]
+# the trybuild ledger proves signatures, which mutants do not change
+additional_cargo_test_args = ["--", "--skip", "ledger"]
