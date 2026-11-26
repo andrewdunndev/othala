@@ -12,6 +12,10 @@ all: lock fmt lint canary twins test doc wasm thumb msrv deny deps api mutants r
 lock:
     cargo metadata --locked --format-version 1 > /dev/null
 
+# one line per oracle row, then per-milestone totals
+score:
+    ../primitives/score.sh
+
 fmt:
     cargo fmt --all --check
 
