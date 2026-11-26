@@ -3,9 +3,7 @@
     reason = "fields are read by the bodies factor-02 and factor-06 land"
 )]
 
-use alloc::vec::Vec;
-
-use zeroize::Zeroizing;
+use base::SecretBytes;
 
 /// The HMAC hash of an authenticator.
 #[non_exhaustive]
@@ -43,8 +41,8 @@ pub enum Skew {
     One,
 }
 
-/// An authenticator's shared secret: 16 to 64 bytes, wiped on drop.
-pub struct OtpKey(Zeroizing<Vec<u8>>);
+/// An authenticator's shared secret: 16 to 64 bytes, wiped on drop by base.
+pub struct OtpKey(SecretBytes);
 
 /// An RFC 6238 authenticator with T0 at the epoch; the host stores it, and its last step is a row of its own.
 pub struct Totp {
@@ -59,11 +57,8 @@ pub struct Totp {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TotpStep(u64);
 
-/// A code as presented: six or eight ASCII digits, wiped on drop.
-pub struct OtpCode {
-    digits: Zeroizing<[u8; 8]>,
-    len: Digits,
-}
+/// A code as presented: six or eight ASCII digits, wiped on drop by base.
+pub struct OtpCode(SecretBytes);
 
 /// A code matched a step after the last one accepted.
 #[derive(Debug)]

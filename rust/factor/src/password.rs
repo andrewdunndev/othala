@@ -5,10 +5,10 @@
 
 use alloc::string::String;
 
-use zeroize::Zeroizing;
+use base::SecretBytes;
 
-/// A password as presented at login: 1 byte to 4,096 bytes, wiped on drop.
-pub struct Password(Zeroizing<String>);
+/// A password as presented at login: 1 byte to 4,096 bytes of UTF-8, wiped on drop by base.
+pub struct Password(SecretBytes);
 
 /// Which NIST SP 800-63B-4 minimum a new password meets.
 #[non_exhaustive]

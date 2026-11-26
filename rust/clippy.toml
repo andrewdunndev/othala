@@ -38,8 +38,6 @@ disallowed-methods = [
   { path = "std::fs::create_dir_all", reason = "files belong to the shells" },
   { path = "std::fs::rename", reason = "files belong to the shells" },
   { path = "std::fs::copy", reason = "files belong to the shells" },
-  { path = "base::Secret::expose", reason = "the one secret read; only the store member", allow-invalid = true },
-  { path = "base::SecretBytes::expose", reason = "the one secret read; only the store member", allow-invalid = true },
   { path = "base::Effect::host_applied", reason = "the one Receipt mint; only the store member", allow-invalid = true },
 ]
 disallowed-macros = [

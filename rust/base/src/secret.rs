@@ -42,7 +42,8 @@ impl<const N: usize> Secret<N> {
         decode_exact(text).map(Self)
     }
 
-    /// The single greppable read; a lint forbids it in every published crate.
+    /// The single greppable read, only under the `expose` feature.
+    #[cfg(feature = "expose")]
     pub const fn expose(&self) -> &[u8; N] {
         &self.0
     }
@@ -64,7 +65,8 @@ impl SecretBytes {
         Self(bytes)
     }
 
-    /// The single greppable read; a lint forbids it in every published crate.
+    /// The single greppable read, only under the `expose` feature.
+    #[cfg(feature = "expose")]
     pub fn expose(&self) -> &[u8] {
         &self.0
     }
@@ -221,7 +223,7 @@ mod tests {
         let mut e = Counting(0);
         let s = Secret::<4>::generate(&mut e);
         assert_eq!(e.0, 4);
-        assert_eq!(s.expose(), &[1, 2, 3, 4]);
+        assert_eq!(&s.0, &[1, 2, 3, 4]);
     }
 
     #[test]
@@ -246,6 +248,7 @@ mod tests {
         assert_eq!(SecretBytes::new(bytes.to_vec()).digest().as_bytes(), &want);
     }
 
+    #[cfg(feature = "expose")]
     #[test]
     fn exposes_what_it_holds() {
         assert_eq!(SecretBytes::new(vec![1, 2]).expose(), &[1, 2]);

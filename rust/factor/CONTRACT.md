@@ -168,14 +168,15 @@ Recovery codes (NIST SP 800-63B-4 3.1.2)
 - O14 The host's `FreeAttempts` covers the factors one login presents, since a match counts too and only a completed login resets: othala-core's configuration test.
 - O15 The host confirms a candidate with `Totp::confirm`, applying its effect, before it stores the authenticator: othala-core's settings-flow test.
 - O16 The host consumes a superseded recovery set's rows in the effect that installs the new set (base `Pending::join`): othala-core's settings-flow test.
+- O17 Only `otp`, `password` and `recovery` call base's `expose`, the modules `gates.json` `expose` names, so `Cargo.toml` may enable `base/expose` (R-j): review checks the modules; `just canary` fails an enable that `gates.json` does not declare (base O13).
 
 ## Build
 - B1 `no_std` + `alloc` on wasm32-unknown-unknown and thumbv7em-none-eabi with no features; the one feature, `std`, links std and base's `std` and changes no behaviour, and no algorithm or policy is a feature: `just wasm`, `just thumb` (`gates.json` `targets`).
 - B2 MSRV 1.89 against the committed lock: `just msrv`, `just lock`.
-- B3 The runtime dependencies are exactly argon2 (`alloc`, `password-hash`, `zeroize`; no `getrandom`, no `std`), base, hmac, sha1, sha2, subtle and zeroize (D6): `just deps` over `deps.txt`, `just deny` over `gates.json` `allow`.
+- B3 The runtime dependencies are exactly argon2 (`alloc`, `password-hash`, `zeroize`; no `getrandom`, no `std`), base (with `expose`), hmac, sha1, sha2 and subtle (D6): `just deps` over `deps.txt`, `just deny` over `gates.json` `allow`.
 - B4 The public API is the committed snapshot: `just api` over `public-api.txt`.
 - B5 The ledger runs every case on disk and pins 29 cases and 29 twins, so a glob that matched nothing cannot pass: `just ledger` (`CASES` in `tests/ledger.rs`), `just twins`.
-- B6 Every workspace deny-list lint is `forbid` here, so no module calls base's `expose` or `host_applied` or allows a lint: `just canary`, `just lint`. Secret bytes the crate must compute over live in its own `zeroize`-wiped fields.
+- B6 Every workspace deny-list lint is `forbid` here, so no module calls base's `host_applied` or allows a lint: `just canary`, `just lint`. The crate keeps no secret buffer of its own: `OtpKey`, `OtpCode`, `Password` and `RecoveryCode` wrap base `SecretBytes`, which base wipes (base R32) (R-j): api, review.
 - B7 `src/` is mutated with a factor floor and `missed == 0`: `gates.json` `mutants`, landing with its floor [factor-10].
 - B8 The fuzz targets `record_decode`, `otp_code_parse`, `phc_parse` and `recovery_code_parse` live in `factor/fuzz` with their corpora replayed [factor-04, factor-10].
 
@@ -190,7 +191,7 @@ Recovery codes (NIST SP 800-63B-4 3.1.2)
 - N8 `RecoveryMatch` carries no remaining count: codes are rows of their own, and the host counts them if it lists them.
 
 ## Refinements of architecture section 2
-`check` returns `Closed::Wait(until)`, never a lock (R-g). `Totp::verify` takes no `now`: the permit's time is its one clock. `password_verify` takes the host's `&Phc` and `Cost`, and `recovery_verify` the one row under `RecoveryCode::key`, not the whole set. `recovery_generate` returns its codes inside a `Pending`, so they leave only once their rows commit. `Rehash::Needed` carries the new `Phc`. `OtpKey` holds its bytes in a factor-owned wiped buffer and leaves as a base `SecretBytes`, since base forbids `expose` in published crates (base O13).
+`check` returns `Closed::Wait(until)`, never a lock (R-g). `Totp::verify` takes no `now`: the permit's time is its one clock. `password_verify` takes the host's `&Phc` and `Cost`, and `recovery_verify` the one row under `RecoveryCode::key`, not the whole set. `recovery_generate` returns its codes inside a `Pending`, so they leave only once their rows commit. `Rehash::Needed` carries the new `Phc`. `OtpKey` holds its bytes in a base `SecretBytes` and leaves as one; factor reads secret bytes through base's `expose` only in the modules O17 names (R-j).
 
 ## Module map
 | Item | File | Lands | Rows and checks |
