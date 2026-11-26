@@ -19,7 +19,7 @@ impl Attempts {
     }
 }
 
-/// How many attempts after a reset wait for nothing: 0 to 10.
+/// How many attempts after a reset wait for nothing: 1 to 10.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FreeAttempts(u32);
 
@@ -71,9 +71,9 @@ const fn within<T: Copy>(ok: bool, value: T) -> Result<T, Error> {
 }
 
 impl FreeAttempts {
-    /// Accepts 0 to 10.
+    /// Accepts 1 to 10.
     pub const fn new(attempts: u32) -> Result<Self, Error> {
-        within(attempts <= 10, Self(attempts))
+        within(matches!(attempts, 1..=10), Self(attempts))
     }
 }
 
@@ -97,10 +97,12 @@ impl Backoff {
         Self { free, first, cap }
     }
 
-    fn until(self, seen: Attempts) -> Option<UnixTime> {
+    fn until(self, seen: Attempts, now: UnixTime) -> Option<UnixTime> {
         let doublings = seen.count.checked_sub(self.free.0)?;
         let wait = 2u64.saturating_pow(doublings).saturating_mul(self.first.0);
-        Some(seen.last.saturating_add(wait.min(self.cap.0)))
+        let due = seen.last.saturating_add(wait.min(self.cap.0));
+        // a `last` ahead of `now` must not push the wait past one cap
+        Some(due.min(now.saturating_add(self.cap.0)))
     }
 }
 
@@ -120,7 +122,11 @@ impl Throttle {
     /// A permit, or the time from which one is issued; the wait is decided here at `now`, never by a store expiry.
     pub fn check(&self, attempts: Option<Row<&Attempts>>, now: UnixTime) -> Result<Permit, Closed> {
         let seen = attempts.map(|row| (row.version(), **row.record()));
-        match self.policy.zip(seen).and_then(|(p, (_, a))| p.until(a)) {
+        match self
+            .policy
+            .zip(seen)
+            .and_then(|(p, (_, a))| p.until(a, now))
+        {
             Some(until) if now < until => Err(Closed::Wait(until)),
             _ => Ok(Permit { seen, at: now }),
         }
@@ -142,7 +148,7 @@ impl Permit {
         let next = |count: u32| {
             Record::Attempts(Attempts {
                 count,
-                last: self.at,
+                last: self.seen.map_or(self.at, |(_, a)| a.last.max(self.at)),
             })
         };
         match self.seen {
@@ -250,8 +256,8 @@ mod tests {
     #[test]
     fn verdicts_only_increment() {
         let (mut store, mut e) = (Mem::new(), seeded(3));
-        for (count, now) in [(1, 10), (2, 20), (3, 5)] {
-            let last = UnixTime::new(now);
+        for (count, now, stamp) in [(1, 10, 10), (2, 20, 20), (3, 5, 20)] {
+            let last = UnixTime::new(stamp);
             assert_eq!(
                 verdict(&mut store, &mut e, now),
                 Some(Attempts { count, last })

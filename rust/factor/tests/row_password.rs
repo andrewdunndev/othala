@@ -342,31 +342,43 @@ fn foreign(
 fn rehash_only_when_below_the_cost_given() -> Result<(), Boxed> {
     let c = cost(19_456, 2, 1)?;
     let salt16 = [7; 16];
+    let base = "$argon2id$v=19$m=19456,t=2,p=1$";
     for (stored, needed) in [
+        (foreign("pw-for-rehash", (19_456, 2, 1), &salt16, 32)?, None),
+        (foreign("pw-for-rehash", (47_104, 3, 2), &salt16, 32)?, None),
         (
-            foreign("pw-for-rehash", (19_456, 2, 1), &salt16, 32)?,
-            false,
+            foreign("pw-for-rehash", (12_288, 2, 1), &salt16, 32)?,
+            Some(base),
         ),
         (
-            foreign("pw-for-rehash", (47_104, 3, 2), &salt16, 32)?,
-            false,
+            foreign("pw-for-rehash", (19_456, 1, 1), &salt16, 32)?,
+            Some(base),
         ),
-        (foreign("pw-for-rehash", (12_288, 2, 1), &salt16, 32)?, true),
-        (foreign("pw-for-rehash", (19_456, 1, 1), &salt16, 32)?, true),
         (
             foreign("pw-for-rehash", (19_456, 2, 1), &[7; 15], 32)?,
-            true,
+            Some(base),
         ),
-        (foreign("pw-for-rehash", (19_456, 2, 1), &salt16, 31)?, true),
+        (
+            foreign("pw-for-rehash", (19_456, 2, 1), &salt16, 31)?,
+            Some(base),
+        ),
+        (
+            foreign("pw-for-rehash", (65_536, 1, 1), &salt16, 32)?,
+            Some("$argon2id$v=19$m=65536,t=2,p=1$"),
+        ),
+        (
+            foreign("pw-for-rehash", (19_456, 1, 4), &salt16, 32)?,
+            Some("$argon2id$v=19$m=19456,t=2,p=4$"),
+        ),
     ] {
         let (hit, _) = verify(&stored, "pw-for-rehash", c)?;
         let Ok(hit) = hit else {
             return Err("rejected".into());
         };
         match (hit.rehash(), needed) {
-            (Rehash::Current, false) => {}
-            (Rehash::Needed(new), true) => {
-                assert!(new.as_str().starts_with("$argon2id$v=19$m=19456,t=2,p=1$"));
+            (Rehash::Current, None) => {}
+            (Rehash::Needed(new), Some(prefix)) => {
+                assert!(new.as_str().starts_with(prefix), "{}", new.as_str());
                 assert!(
                     Argon2::default()
                         .verify_password(b"pw-for-rehash", new.as_str())

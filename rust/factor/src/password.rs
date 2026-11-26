@@ -266,7 +266,7 @@ impl PasswordMatch {
 }
 
 /// Matches `password` against `stored` at the stored parameters and counts the attempt; the stored hash is
-/// rehashed at `cost` when any of its costs or sizes is below it.
+/// rehashed at the larger of its own and `cost` in each dimension when any of its costs or sizes is below `cost`.
 pub fn password_verify(
     permit: Permit,
     password: &Password,
@@ -299,7 +299,12 @@ pub fn password_verify(
         || tag < TAG_LEN;
     // computed whether or not it matched, so an `Err` never tells the two apart
     let fresh = if below {
-        Some(hash(password, cost, e)?)
+        let top = Cost {
+            memory: Memory(params.m_cost().max(cost.memory.0)),
+            passes: Passes(params.t_cost().max(cost.passes.0)),
+            lanes: Lanes(params.p_cost().max(cost.lanes.0)),
+        };
+        Some(hash(password, top, e)?)
     } else {
         None
     };

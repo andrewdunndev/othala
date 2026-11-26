@@ -7,6 +7,7 @@ use hmac::{Hmac, KeyInit, Mac};
 use sha1::Sha1;
 use sha2::{Sha256, Sha512};
 use subtle::ConstantTimeEq;
+use zeroize::Zeroizing;
 
 use crate::{Effect, Error, ErrorKind, Key, Pending, Permit, Record, Rejected};
 
@@ -68,10 +69,10 @@ impl OtpKey {
     }
 }
 
-fn mac<M: Mac + KeyInit>(key: &[u8], counter: u64) -> Option<Vec<u8>> {
+fn mac<M: Mac + KeyInit>(key: &[u8], counter: u64) -> Option<Zeroizing<Vec<u8>>> {
     let mut mac = <M as KeyInit>::new_from_slice(key).ok()?;
     mac.update(&counter.to_be_bytes());
-    Some(mac.finalize().into_bytes().to_vec())
+    Some(Zeroizing::new(mac.finalize().into_bytes().to_vec()))
 }
 
 /// RFC 4226 5.3: HMAC of the counter, dynamic truncation, modulo `10^digits`.
@@ -82,7 +83,7 @@ pub(crate) fn hotp(key: &OtpKey, alg: OtpAlg, counter: u64, digits: Digits) -> u
         OtpAlg::Sha256 => mac::<Hmac<Sha256>>(key, counter),
         OtpAlg::Sha512 => mac::<Hmac<Sha512>>(key, counter),
     };
-    let word = tag.as_deref().and_then(|t| {
+    let word = tag.as_ref().and_then(|t| {
         let offset = usize::from(t.last()? & 0x0f);
         let bytes = t.get(offset..)?.first_chunk::<4>()?;
         Some(u32::from_be_bytes(*bytes) & 0x7fff_ffff)
@@ -211,13 +212,13 @@ impl Totp {
     }
 
     /// The code's digits for `step`, zero-padded, in the front of the array.
-    fn text(&self, step: u64) -> ([u8; 8], usize) {
+    fn text(&self, step: u64) -> (Zeroizing<[u8; 8]>, usize) {
         let width = match self.digits {
             Digits::Six => 6,
             Digits::Eight => 8,
         };
         let mut value = hotp(&self.key, self.alg, step, self.digits);
-        let mut text = [b'0'; 8];
+        let mut text = Zeroizing::new([b'0'; 8]);
         for slot in text.iter_mut().take(width).rev() {
             *slot = b'0' + u8::try_from(value % 10).unwrap_or_default();
             value /= 10;

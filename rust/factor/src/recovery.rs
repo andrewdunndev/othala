@@ -4,6 +4,7 @@ use core::fmt;
 use base::{Digest, Entropy, Row, SecretBytes};
 use sha2::{Digest as _, Sha256};
 use subtle::ConstantTimeEq;
+use zeroize::Zeroizing;
 
 use crate::{Error, ErrorKind, Key, Pending, Permit, Record, Rejected};
 
@@ -79,7 +80,7 @@ impl RecoveryCode {
         }
         let mut symbols = 0;
         let (mut acc, mut bits) = (0u32, 0u32);
-        let mut bytes = Vec::with_capacity(CODE_BYTES);
+        let mut bytes = Zeroizing::new(Vec::with_capacity(CODE_BYTES));
         for b in text.bytes().filter(|b| !matches!(b, b'-' | b' ')) {
             let v = value(b).ok_or(err(ErrorKind::Malformed))?;
             symbols += 1;
@@ -91,7 +92,7 @@ impl RecoveryCode {
             }
         }
         if symbols == SYMBOLS {
-            Ok(Self(SecretBytes::new(bytes)))
+            Ok(Self(SecretBytes::new(core::mem::take(&mut *bytes))))
         } else {
             Err(err(ErrorKind::Malformed))
         }

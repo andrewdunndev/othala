@@ -116,6 +116,21 @@ fn crockford_text() -> Result<(), Boxed> {
     ] {
         assert_eq!(text(same).ok().as_deref(), Some(shown), "{same}");
     }
+    // together these two cover all 32 symbols; the digests are of bytes worked out from the Crockford table
+    for (shown, sha) in [
+        (
+            "012345-6789AB-CDEFGH-JKMNPQ",
+            "dcde05f1ee8715148c2f9ab49b1eeaa0cb9b5b374aae2481f0b6352d8febfb98",
+        ),
+        (
+            "RSTVWX-YZ0123-456789-ABCDEF",
+            "b868c7a19ecc048a9ebae3c702e327d0559a4af4f132d1da06916cdf969d0dd8",
+        ),
+    ] {
+        let code = RecoveryCode::parse(shown)?;
+        assert_eq!(code.key(), Key::Recovery(digest(sha).ok_or("digest")?));
+        assert_eq!(code.display().to_string(), shown);
+    }
     assert_eq!(
         text("ZZZZZZ-ZZZZZZ-ZZZZZZ-ZZZZZZ").ok().as_deref(),
         Some("ZZZZZZ-ZZZZZZ-ZZZZZZ-ZZZZZZ")
