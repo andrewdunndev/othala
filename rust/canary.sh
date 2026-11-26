@@ -3,7 +3,11 @@
 # each of canary/levels.rs and canary/lints.rs to each crate's src/lib.rs and require each `want:` line's error; copy canary/paths.rs into its tests/
 # and require the set of paths clippy names to be the set clippy.toml lists.
 set -euo pipefail
-[ $# -gt 0 ] || set -- $(./crates.sh | jq -r 'select(.published) | .name')
+if [ $# -eq 0 ]; then
+    published=$(./crates.sh | jq -r 'select(.published) | .name')
+    # shellcheck disable=SC2086 # one crate name per line
+    set -- $published
+fi
 [ $# -gt 0 ] || { echo "canary: no published crate"; exit 1; }
 here=$(pwd -P)
 mkdir -p "$here/target"

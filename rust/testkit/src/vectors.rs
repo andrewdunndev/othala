@@ -8,9 +8,19 @@
 )]
 use std::collections::BTreeMap;
 
+pub use figures::{Example, Figure, Figures, figures};
+pub use json::Json;
+pub use sections::{Appendix, Block, Section, sections};
+pub use wycheproof::{Expected, Group, Jwk, KeyMaterial, Test, wycheproof};
+
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use sha2::{Digest as _, Sha256};
+
+mod figures;
+mod json;
+mod sections;
+mod wycheproof;
 
 const SOURCES: &str = include_str!("../../vectors/SOURCES.toml");
 
@@ -25,6 +35,7 @@ pub enum Outcome {
 }
 
 /// The counts a run asserted.
+#[must_use]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Tally {
     total: usize,
@@ -40,6 +51,11 @@ impl Tally {
     /// Cases checked against the crate.
     pub const fn checked(&self) -> usize {
         self.checked
+    }
+
+    /// Cases the check reported as outside the crate.
+    pub const fn not_applicable(&self) -> usize {
+        self.total - self.checked
     }
 }
 
@@ -108,7 +124,25 @@ fn run_against<C: DeserializeOwned>(
     mut check: impl FnMut(&C) -> Outcome,
 ) -> Tally {
     let path = vector.path;
+    let declared = verified(sources, vector);
     let file: File<C> = serde_json::from_str(vector.json).expect("vector file decodes");
+    assert_eq!(
+        file.cases.len(),
+        declared,
+        "{path}: cases in file against SOURCES.toml"
+    );
+    let checked = file
+        .cases
+        .iter()
+        .filter(|c| check(c) == Outcome::Checked)
+        .count();
+    floored(path, declared, checked, floor)
+}
+
+/// The case count `SOURCES.toml` declares for `vector`, once the file is listed exactly once and its SHA-256 matches;
+/// every reader calls this before it parses a byte.
+fn verified(sources: &str, vector: Vector) -> usize {
+    let path = vector.path;
     let sources: Sources = toml::from_str(sources).expect("SOURCES.toml decodes");
     let listed: Vec<&Listed> = sources
         .source
@@ -119,12 +153,6 @@ fn run_against<C: DeserializeOwned>(
     let &[listed] = listed.as_slice() else {
         panic!("{path}: listed {} times in SOURCES.toml", listed.len());
     };
-    let declared = listed.cases;
-    assert_eq!(
-        file.cases.len(),
-        declared,
-        "{path}: cases in file against SOURCES.toml"
-    );
     let sha256: String = Sha256::digest(vector.json)
         .iter()
         .map(|b| format!("{b:02x}"))
@@ -133,19 +161,15 @@ fn run_against<C: DeserializeOwned>(
         sha256, listed.sha256,
         "{path}: SHA-256 of the file against SOURCES.toml"
     );
-    let checked = file
-        .cases
-        .iter()
-        .filter(|c| check(c) == Outcome::Checked)
-        .count();
+    listed.cases
+}
+
+fn floored(path: &str, total: usize, checked: usize, floor: usize) -> Tally {
     assert!(
         floor > 0 && checked >= floor,
         "{path}: {checked} cases checked, floor {floor}"
     );
-    Tally {
-        total: declared,
-        checked,
-    }
+    Tally { total, checked }
 }
 
 #[cfg(test)]
@@ -155,7 +179,10 @@ mod tests {
     const SOURCES: &str = r#"
 [source."a"]
 url = "https://example.invalid/a"
-files = [ { path = "a/three.json", sha256 = "70aee6cd93f55814211815ffaf84781c23aba9af5a837dd67bf03a55aa280d92", cases = 3 } ]
+files = [
+  { path = "a/three.json", sha256 = "70aee6cd93f55814211815ffaf84781c23aba9af5a837dd67bf03a55aa280d92", cases = 3 },
+  { path = "a/two.json", sha256 = "c7e2143498869350e5bded715e0f1e0824ff8e7bbbb4ec15201341280b7f6d34", cases = 3 },
+]
 [source."b"]
 notes = "a source with no files"
 "#;
@@ -164,6 +191,12 @@ notes = "a source with no files"
     #[derive(serde::Deserialize)]
     struct Case {
         n: u8,
+    }
+
+    #[test]
+    fn not_applicable_is_the_rest() {
+        let t = run_against(SOURCES, Vector::new("a/three.json", THREE), 1, odd);
+        assert_eq!(t.not_applicable(), 1);
     }
 
     fn odd(c: &Case) -> Outcome {
@@ -183,7 +216,7 @@ notes = "a source with no files"
     #[test]
     #[should_panic(expected = "a/three.json: 2 cases checked, floor 3")]
     fn floor_counts_only_checked_cases() {
-        run_against(SOURCES, Vector::new("a/three.json", THREE), 3, odd);
+        run_against(SOURCES, Vector::new("a/three.json", THREE), 3, odd).total();
     }
 
     #[test]
@@ -194,32 +227,33 @@ notes = "a source with no files"
             Vector::new("a/three.json", THREE),
             1,
             |_: &Case| Outcome::NotApplicable,
-        );
+        )
+        .total();
     }
 
     #[test]
     #[should_panic(expected = "floor 0")]
     fn zero_floor_fails() {
-        run_against(SOURCES, Vector::new("a/three.json", THREE), 0, odd);
+        run_against(SOURCES, Vector::new("a/three.json", THREE), 0, odd).total();
     }
 
     #[test]
     #[should_panic(expected = "cases in file against SOURCES.toml")]
     fn total_mismatch_fails() {
         let two = r#"{ "cases": [ { "n": 1 }, { "n": 3 } ] }"#;
-        run_against(SOURCES, Vector::new("a/three.json", two), 1, odd);
+        run_against(SOURCES, Vector::new("a/two.json", two), 1, odd).total();
     }
 
     #[test]
     #[should_panic(expected = "a/three.json: SHA-256 of the file against SOURCES.toml")]
     fn altered_file_fails() {
         let altered = r#"{ "cases": [ { "n": 1 }, { "n": 2 }, { "n": 5 } ] }"#;
-        run_against(SOURCES, Vector::new("a/three.json", altered), 1, odd);
+        run_against(SOURCES, Vector::new("a/three.json", altered), 1, odd).total();
     }
 
     #[test]
     #[should_panic(expected = "listed 0 times")]
     fn unlisted_file_fails() {
-        run_against(SOURCES, Vector::new("a/other.json", THREE), 1, odd);
+        run_against(SOURCES, Vector::new("a/other.json", THREE), 1, odd).total();
     }
 }

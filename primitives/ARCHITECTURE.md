@@ -25,7 +25,7 @@ Claims ledger: each claim is tagged by what carries it, and section 4 gives the 
 pub struct UnixTime(u64);  // seconds; From<SystemTime> only behind std
 pub trait Entropy { fn fill(&mut self, out: &mut [u8]); }  // the only way randomness enters (D11)
 pub struct Secret<const N: usize>; pub struct SecretBytes;  // SecretBytes: imported TOTP and HS keys
-impl Secret<N> { generate(e: &mut impl Entropy) -> Self; expose(&self) -> &[u8; N]; ct_eq(&self, &Self) -> bool; digest(&self) -> Digest /*SHA-256*/ }  // expose is the single greppable read
+impl Secret<N> { generate(e: &mut impl Entropy) -> Self; expose(&self) -> &[u8; N] /*behind the base feature `expose` (R-j)*/; ct_eq(&self, &Self) -> bool; digest(&self) -> Digest /*SHA-256*/ }  // expose is the single greppable read, and exists only behind base/expose, which a crate enables only if its gates.json declares `expose` (R-j)
 pub struct Digest([u8; 32]);  // Eq, Ord, Hash, Serialize: safe to store and index
 pub fn b64url_encode(&[u8]) -> String; pub fn b64url_decode(&str) -> Result<Vec<u8>, Error>;  // Malformed on padding or a non-canonical tail
 pub enum ErrorKind { Malformed, Overlap, TooLarge, Empty, ScopeChanged, SpansDomains, WrongReceipt }
@@ -340,3 +340,19 @@ Each function lands with the item whose row it turns green.
 - W-S7 and W-S8 as stated.
 
 **R-i** The score runs jose rows with every feature on, plus one run with every feature off (rows that must refuse with features off).
+
+The rulings R-j to R-o were added on 2026-11-26. Where a ruling differs from sections 2 to 5, the ruling supersedes the section (R-f, R-g and R-m are known cases).
+
+**R-j** Secret exposure is confined per crate, by the compiler. `Secret::expose` and `SecretBytes::expose` exist only behind a base feature `expose`, and are no longer in clippy.toml's disallowed list. A crate may read secret bytes only if its Cargo.toml enables `base/expose` and its gates.json declares `"expose": ["<module>", ...]`. The canary fails if the cargo metadata feature graph enables `expose` for a crate whose gates.json does not declare it. Within the crate, the named modules are an Obligation that review checks, named in its CONTRACT. Crates never keep their own secret buffers: imported OTP and HS keys are `SecretBytes`. User-supplied inputs (a password, an OTP code, a recovery code) are crate types that wrap `SecretBytes`.
+
+**R-k** HOTP verification with a stored counter (look-ahead, resync) is a non-goal. HOTP is the primitive under TOTP. Row tests count the oracle's hotp_verify and hotp_resync cases as not applicable, under the total assertion.
+
+**R-l** A row may be a `--lib` filter where the claim needs crate-internal code: R34's Argon2id mapping, and HOTP before TOTP lands.
+
+**R-m** Lockout cap floor is 1 h. othala-core carries an Obligation to alert on a subject's sustained backoff. NIST 800-63B-4 3.2.2 is met on rate, not by disabling; CONTRACT N6 states this.
+
+**R-n** CBOR key order. The strict reader enforces CTAP2 canonical order on authenticator-produced CBOR: the credential public key and extensions inside authData, and attStmt. The outer attestationObject map, which a client may re-encode (none conveyance), is read order-tolerant. It still refuses duplicate keys, indefinite lengths and non-shortest integers.
+
+**R-o** A -01 item may land derives (Debug, Clone, PartialEq, Hash, Eq) on bodiless types. Placeholder fields carry no meaning until the item that adds a constructor lands, and that item owns the derive's correctness.
+
+Tracked: the canary's check of the cargo metadata feature graph for R-j is item base-expose.

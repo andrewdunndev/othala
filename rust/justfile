@@ -38,17 +38,25 @@ test:
     cargo test --workspace --all-features
 
 doc:
-    RUSTDOCFLAGS="-D warnings" cargo doc $(./crates.sh | jq -r 'select(.doc) | "-p \(.name)"') --all-features --no-deps
+    #!/usr/bin/env bash
+    set -euo pipefail
+    pkgs=$(./crates.sh | jq -r 'select(.doc) | "-p \(.name)"')
+    # shellcheck disable=SC2086 # pkgs is a -p flag list
+    RUSTDOCFLAGS="-D warnings" cargo doc $pkgs --all-features --no-deps
 
 ledger:
-    for c in $(./crates.sh | jq -r 'select(.ui) | .name'); do cargo test -p "$c" --all-features --test ledger; done
+    #!/usr/bin/env bash
+    set -euo pipefail
+    crates=$(./crates.sh | jq -r 'select(.ui) | .name')
+    for c in $crates; do cargo test -p "$c" --all-features --test ledger; done
 
 # each Type case and its compiling twin differ in one line and in one token; no twin without a case
 twins:
     #!/usr/bin/env bash
     set -euo pipefail
     tok() { grep -oE '[A-Za-z_][A-Za-z0-9_]*|[0-9]+|[^[:space:][:alnum:]_]' "$1"; }
-    for c in $(./crates.sh | jq -r 'select(.ui) | .name'); do
+    crates=$(./crates.sh | jq -r 'select(.ui) | .name')
+    for c in $crates; do
         for t in "$c"/tests/ui/pass/*.rs; do [ -f "$c/tests/ui/fail/${t##*/}" ] || { echo "$t: no fail case"; exit 1; }; done
         for f in "$c"/tests/ui/fail/*.rs; do
             t=$c/tests/ui/pass/${f##*/}
@@ -59,7 +67,7 @@ twins:
         done
     done
 
-# each run reaches its gates.json floor with none missed or timed out, so a filter that empties it fails; skips are in .cargo/mutants.toml
+# each run catches at least its gates.json floor (unviable mutants do not count) with none missed or timed out, so a filter that empties it fails; skips are in .cargo/mutants.toml
 mutants crate="":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -69,7 +77,7 @@ mutants crate="":
         if [ -n "$tests" ]; then scope=(--test-package "$tests"); else scope=(--test-workspace=true); fi
         mkdir -p "{{target}}/mutants/$c"
         cargo mutants --package "$c" "${scope[@]}" --no-shuffle --output "{{target}}/mutants/$c" < /dev/null
-        jq -e --argjson floor "$floor" '.total_mutants >= $floor and .missed == 0 and .timeout == 0' \
+        jq -e --argjson floor "$floor" '.caught >= $floor and .missed == 0 and .timeout == 0' \
             "{{target}}/mutants/$c/mutants.out/outcomes.json" > /dev/null || { echo "mutants $c: under the floor of $floor, or missed or timed out"; exit 1; }
     done <<< "$runs"
 
@@ -103,7 +111,8 @@ deny:
 deps:
     #!/usr/bin/env bash
     set -euo pipefail
-    for c in $(./crates.sh | jq -r .name); do
+    crates=$(./crates.sh | jq -r .name)
+    for c in $crates; do
         cargo tree --locked -p "$c" -e normal --all-features --depth 1 --prefix none --format '{p}' | tail -n +2 | cut -d' ' -f1 | sort -u |
             diff <(cat "$c/deps.txt" 2> /dev/null) - || { echo "deps $c: not what $c/deps.txt lists"; exit 1; }
     done
@@ -112,7 +121,8 @@ deps:
 api nightly="nightly-2026-11-24":
     #!/usr/bin/env bash
     set -euo pipefail
-    for c in $(./crates.sh | jq -r 'select(.api) | .name'); do
+    crates=$(./crates.sh | jq -r 'select(.api) | .name')
+    for c in $crates; do
         cargo +{{nightly}} rustdoc -p "$c" --all-features -- -Z unstable-options --output-format json
         jq -r -f api.jq "{{target}}/doc/${c//-/_}.json" > "$c/public-api.txt"
         git ls-files --error-unmatch "$c/public-api.txt" > /dev/null
