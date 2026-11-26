@@ -6,7 +6,7 @@
 # vectors [SOURCES.toml source names], allow [crates its graph adds to deny.toml's bans.allow],
 # expose [src modules that read secrets, R-j; a member with a direct dependency on the expose crate, base apart, must name them, and the canary checks both ways].
 set -euo pipefail
-# the one rule for a mutants floor: a crate with a mutants key names a non-negative integer, spelled as digits only;
+# the one rule for a mutants floor: a crate with a mutants key names a non-negative integer, spelled as digits only (and, below, not 0 when the crate has a src/);
 # `crates.sh --floor` applies it to one gates.json on stdin (exit 0 when it holds), for the recipes that read other revisions
 floor_ok='def floor_ok: if has("mutants") then (.mutants | type == "object") and (.mutants.floor | tojson | test("^[0-9]+$")) else true end;'
 if [ "${1:-}" = "--floor" ]; then exec jq -e "$floor_ok floor_ok" > /dev/null; fi
@@ -16,7 +16,11 @@ cargo metadata --locked --no-deps --format-version 1 | jq -r '.packages[] | "\(.
         dir=$(basename "$(dirname "$manifest")")
         [ "$dir" = "$name" ] || { echo "crates: member $name lives in $dir/; a member's directory is its name" >&2; exit 1; }
         [ -f "$name/gates.json" ] || { echo "crates: $name has no gates.json" >&2; exit 1; }
-        jq -ce --arg name "$name" "$floor_ok"'(keys - ["published", "doc", "ui", "api", "targets", "mutants", "vectors", "allow", "expose"]) as $bad
+        src=false
+        [ -d "$name/src" ] && src=true
+        jq -ce --arg name "$name" --argjson src "$src" "$floor_ok"'(keys - ["published", "doc", "ui", "api", "targets", "mutants", "vectors", "allow", "expose"]) as $bad
             | if $bad != [] then error("crates: \($name)/gates.json: unknown \($bad)") else . end
-            | if floor_ok then . + {name: $name} else error("crates: \($name)/gates.json: mutants.floor must be a non-negative integer") end' "$name/gates.json"
+            | if floor_ok | not then error("crates: \($name)/gates.json: mutants.floor must be a non-negative integer")
+              elif $src and has("mutants") and .mutants.floor == 0 then error("crates: \($name)/gates.json: mutants.floor 0 gates nothing in a crate with a src/ directory")
+              else . + {name: $name} end' "$name/gates.json"
     done

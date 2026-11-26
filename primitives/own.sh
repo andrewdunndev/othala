@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # `own.sh ITEM`: fail when this branch's diff from main names a path outside ITEM's globs (rust/Cargo.lock and each rust/*/public-api.txt excepted: both are regenerated at integration and checked by their gates) or
-# an oracle path (OWN_MAIN overrides origin/main). Globs and oracle patterns are bash patterns over repo-root paths, where * also crosses /.
+# an oracle path (OWN_MAIN overrides origin/main); an item p0-oracle-* is the one exception: it writes rust/vectors/* and nothing else. Globs and oracle patterns are bash patterns over repo-root paths, where * also crosses /.
 # The queue is read from the merge base, never the branch, so a branch cannot widen its own globs; CI runs the base's own.sh.
 # It judges commits only, merge base against HEAD, so an LFS-filtered checkout cannot read as a change; uncommitted edits are ignored.
 set -euo pipefail
@@ -13,7 +13,11 @@ if git cat-file -e "$base:$q" 2> /dev/null; then queue=$(git show "$base:$q"); e
 jq -e --arg id "$item" 'any(.items[]; .id == $id)' <<< "$queue" > /dev/null || { echo "own: no item $item in $q at ${base:0:8}"; exit 1; }
 mapfile -t globs < <(jq -r --arg id "$item" '.items[] | select(.id == $id) | .globs[]' <<< "$queue")
 mapfile -t oracle < <(jq -r '.oracle[]' <<< "$queue")
-if [ "$item" = p0-spine ]; then
+if [[ $item == p0-oracle-* ]]; then
+    # an oracle item writes rust/vectors/* and nothing else: the one oracle pattern it lifts is that directory; expected-fail and exam paths stay oracle
+    mapfile -t oracle < <(printf '%s\n' "${oracle[@]}" | grep -vxF 'rust/vectors/*' || true)
+    globs=('rust/vectors/*')
+elif [ "$item" = p0-spine ]; then
     # p0-spine owns primitives/*, rows.json included; every other item treats rows.json as oracle
     mapfile -t oracle < <(printf '%s\n' "${oracle[@]}" | grep -vxF primitives/rows.json || true)
 else

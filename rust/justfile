@@ -6,7 +6,7 @@ target := env("CARGO_TARGET_DIR", "target")
 default:
     @just --list
 
-all: lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api mutants rows
+all: floor-rule gate-selftest lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api mutants rows
 
 # a manifest change without its lock change fails here, before anything builds
 lock:
@@ -75,28 +75,52 @@ mutants-pin:
 deny-pin:
     @sed -n 's|^"github:EmbarkStudios/cargo-deny" = "\([0-9][0-9.]*\)"$|\1|p' ../mise.toml
 
-# the floor rule (floor.jq) accepts digits-only floors and refuses every other spelling, null and a missing floor
+# the floor rule: crates.sh run on real crates' gates.json (CRATES_SH overrides the script, for gate-selftest's evasions) refuses a null, a fractional and a 0 floor, and --floor refuses every non-digit spelling
 floor-rule: (tool-pins "jq")
     #!/usr/bin/env bash
     set -euo pipefail
+    crates=${CRATES_SH:-./crates.sh}
     bad=0
     for f in 0 23 100; do
-        echo "{\"mutants\": {\"floor\": $f}}" | ./crates.sh --floor || { echo "floor-rule: refused good floor $f"; bad=1; }
+        echo "{\"mutants\": {\"floor\": $f}}" | $crates --floor || { echo "floor-rule: refused good floor $f"; bad=1; }
     done
     for f in 1e2 23.0 -0 null false 0.5 -1 '"5"' '[]' '{}'; do
-        echo "{\"mutants\": {\"floor\": $f}}" | ./crates.sh --floor && { echo "floor-rule: accepted bad floor $f"; bad=1; }
+        echo "{\"mutants\": {\"floor\": $f}}" | $crates --floor && { echo "floor-rule: accepted bad floor $f"; bad=1; }
     done
-    echo '{"mutants": {"tests": ["a"]}}' | ./crates.sh --floor && { echo "floor-rule: accepted a missing floor"; bad=1; }
-    echo '{"mutants": 5}' | ./crates.sh --floor && { echo "floor-rule: accepted a non-object mutants"; bad=1; }
-    echo '{"doc": true}' | ./crates.sh --floor || { echo "floor-rule: refused a crate with no mutants key"; bad=1; }
-    # crates.sh itself must carry the rule
-    grep -q 'if floor_ok then' crates.sh || { echo "floor-rule: crates.sh does not apply floor_ok"; bad=1; }
+    echo '{"mutants": {"tests": ["a"]}}' | $crates --floor && { echo "floor-rule: accepted a missing floor"; bad=1; }
+    echo '{"mutants": 5}' | $crates --floor && { echo "floor-rule: accepted a non-object mutants"; bad=1; }
+    echo '{"doc": true}' | $crates --floor || { echo "floor-rule: refused a crate with no mutants key"; bad=1; }
+    # the normal path, planted in a real crate's gates.json (one with a mutants key and a src/), restored on exit
+    victim=$(./crates.sh | jq -r 'select(.mutants) | .name' | while read -r c; do [ -d "$c/src" ] && { echo "$c"; break; }; done)
+    [ -n "$victim" ] || { echo "floor-rule: no crate with a mutants floor and a src/ to plant in"; exit 1; }
+    gates=$victim/gates.json
+    bak=$(mktemp)
+    cp -p "$gates" "$bak"
+    trap 'cat "$bak" > "$gates"; rm -f "$bak"' EXIT
+    plant() { # a jq filter over gates.json, the rc 0 or 1 wanted, then a regex the refusal must match
+        jq "$1" "$bak" > "$gates"
+        local out rc
+        out=$($crates 2>&1 > /dev/null) && rc=0 || rc=$?
+        if [ "$2" = ok ]; then
+            [ "$rc" = 0 ] || { echo "floor-rule: $crates refused $victim with $1: $out"; bad=1; }
+        elif [ "$rc" = 0 ] || ! grep -Eq "$3" <<< "$out"; then
+            echo "floor-rule: $crates did not refuse $victim with $1 (rc $rc: $out)"
+            bad=1
+        fi
+    }
+    plant '.' ok
+    plant '.mutants.floor = 7' ok
+    plant '.mutants.floor = null' refuse 'mutants\.floor must be a non-negative integer'
+    plant '.mutants.floor = 0.5' refuse 'mutants\.floor must be a non-negative integer'
+    plant 'del(.mutants.floor)' refuse 'mutants\.floor must be a non-negative integer'
+    plant '.mutants.floor = 0' refuse 'mutants\.floor 0 gates nothing'
     exit $bad
 
-# the installed cargo-mutants, cargo-deny and jq must be the versions ../mise.toml pins; CI installs by the same pin and is graded here
+# the installed cargo-mutants, cargo-deny and jq must be the versions ../mise.toml (TOOL_PINS_FILE overrides it, for gate-selftest) pins; CI installs by the same pin and is graded here
 tool-pins *tools="cargo-mutants jq cargo-deny":
     #!/usr/bin/env bash
     set -euo pipefail
+    pins=${TOOL_PINS_FILE:-../mise.toml}
     for t in {{tools}}; do
         case "$t" in
             cargo-mutants) key='"github:sourcefrog\/cargo-mutants"'; have=$(cargo mutants --version | sed -n 's/^cargo-mutants \([0-9][0-9.]*\).*/\1/p') ;;
@@ -104,10 +128,47 @@ tool-pins *tools="cargo-mutants jq cargo-deny":
             jq) key='jq'; have=$(jq --version | sed -n 's/^jq-\([0-9][0-9.]*\).*/\1/p') ;;
             *) echo "tool-pins: unknown tool $t"; exit 1 ;;
         esac
-        want=$(sed -n "s/^$key = \"\([0-9][0-9.]*\)\"\$/\1/p" ../mise.toml)
-        [ -n "$want" ] || { echo "tool-pins: ../mise.toml has no pin for $t"; exit 1; }
+        want=$(sed -n "s/^$key = \"\([0-9][0-9.]*\)\"\$/\1/p" "$pins")
+        [ -n "$want" ] || { echo "tool-pins: $pins has no pin for $t"; exit 1; }
         [ "$want" = "$have" ] || { echo "$t ${have:-unknown} is installed, mise.toml pins $want"; exit 1; }
     done
+
+# every gate's self-plants, each of which must be caught with its specific refusal: own.sh's oracle admission, the floor rule and its evasions, tool-pins drift, and the canary's own plants
+gate-selftest: (tool-pins "jq")
+    #!/usr/bin/env bash
+    set -euo pipefail
+    bad=0
+    ../primitives/own-plants.sh || bad=1
+    {{just_executable()}} floor-rule || bad=1
+    # evasions of the floor rule in a copy of crates.sh: floor-rule must say no to each
+    plant=$(mktemp ./.crates-plant.XXXXXX)
+    pins=$(mktemp)
+    trap 'rm -f "$plant" "$pins"' EXIT
+    evade() { # a name, then a sed script that turns crates.sh into the evasion
+        sed "$2" crates.sh > "$plant"
+        if cmp -s crates.sh "$plant"; then echo "gate-selftest: the $1 evasion did not change crates.sh"; bad=1; return; fi
+        chmod +x "$plant"
+        if out=$(CRATES_SH=$plant {{just_executable()}} floor-rule 2>&1); then echo "gate-selftest: floor-rule passed a crates.sh with the $1 evasion"; bad=1
+        elif ! grep -q 'floor-rule: ' <<< "$out"; then echo "gate-selftest: floor-rule failed the $1 evasion without naming a refusal: $out"; bad=1; fi
+    }
+    evade 'floor_ok shadow' '/^floor_ok=/a floor_ok="$floor_ok"'"'"'def floor_ok: true;'"'"
+    evade 'dead branch' 's/if floor_ok | not then/if (floor_ok | not) and false then/'
+    evade 'floor 0' 's/elif \$src and has/elif false and $src and has/'
+    evade 'no floor rule' 's/if floor_ok | not then/if false then/'
+    # a pin that differs from the installed tool, or is missing, is refused for each tool CI installs before this recipe
+    for t in jq cargo-deny; do
+        case "$t" in jq) key='jq' ;; cargo-deny) key='"github:EmbarkStudios/cargo-deny"' ;; esac
+        sed "s|^$key = \"[0-9][0-9.]*\"\$|$key = \"0.0.1\"|" ../mise.toml > "$pins"
+        cmp -s ../mise.toml "$pins" && { echo "gate-selftest: the $t pin was not planted"; bad=1; continue; }
+        out=$(TOOL_PINS_FILE=$pins {{just_executable()}} tool-pins "$t" 2>&1) && { echo "gate-selftest: tool-pins passed a drifted $t pin"; bad=1; continue; }
+        grep -q "^$t [0-9.]* is installed, mise.toml pins 0.0.1" <<< "$out" || { echo "gate-selftest: tool-pins refused a drifted $t pin with: $out"; bad=1; }
+        grep -v "^$key = " ../mise.toml > "$pins"
+        out=$(TOOL_PINS_FILE=$pins {{just_executable()}} tool-pins "$t" 2>&1) && { echo "gate-selftest: tool-pins passed a missing $t pin"; bad=1; continue; }
+        grep -q "has no pin for $t" <<< "$out" || { echo "gate-selftest: tool-pins refused a missing $t pin with: $out"; bad=1; }
+    done
+    ./canary.sh || bad=1
+    [ "$bad" = 0 ] || { echo "gate-selftest: a plant went uncaught"; exit 1; }
+    echo "gate-selftest: every plant was caught"
 
 # each run catches at least its gates.json floor (unviable mutants do not count) with none missed or timed out, so a filter that empties it fails; skips are in .cargo/mutants.toml
 mutants crate="": (tool-pins "cargo-mutants" "jq")
