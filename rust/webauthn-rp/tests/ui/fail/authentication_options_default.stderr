@@ -1,0 +1,5 @@
+error[E0599]: no associated function or constant named `default` found for struct `AuthenticationOptions` in the current scope
+ --> tests/ui/fail/authentication_options_default.rs:4:36
+  |
+4 |     let _ = AuthenticationOptions::default;
+  |                                    ^^^^^^^ associated function or constant not found in `AuthenticationOptions`

@@ -1,0 +1,7 @@
+error[E0277]: the trait bound `RegistrationCeremony: From<CreationOptions>` is not satisfied
+ --> tests/ui/fail/options_carry_no_state.rs:4:7
+  |
+4 |     o.into()
+  |       ^^^^ the trait `From<CreationOptions>` is not implemented for `RegistrationCeremony`
+  |
+  = note: required for `CreationOptions` to implement `Into<RegistrationCeremony>`

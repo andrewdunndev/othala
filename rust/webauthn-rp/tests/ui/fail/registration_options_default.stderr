@@ -1,0 +1,5 @@
+error[E0599]: no associated function or constant named `default` found for struct `RegistrationOptions` in the current scope
+ --> tests/ui/fail/registration_options_default.rs:4:34
+  |
+4 |     let _ = RegistrationOptions::default;
+  |                                  ^^^^^^^ associated function or constant not found in `RegistrationOptions`
