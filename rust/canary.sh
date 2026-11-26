@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# `canary.sh CRATE...`: in a copy of this tree inside target/, so every cargo config and env var applies, append
+# `canary.sh [CRATE...]` (default: every crate its gates.json marks published): in a copy of this tree inside target/, so every cargo config and env var applies, append
 # each of canary/levels.rs and canary/lints.rs to each crate's src/lib.rs and require each `want:` line's error; copy canary/paths.rs into its tests/
 # and require the set of paths clippy names to be the set clippy.toml lists.
 set -euo pipefail
-[ $# -gt 0 ] || { echo "canary: no crates named"; exit 1; }
+[ $# -gt 0 ] || set -- $(./crates.sh | jq -r 'select(.published) | .name')
+[ $# -gt 0 ] || { echo "canary: no published crate"; exit 1; }
 here=$(pwd -P)
 mkdir -p "$here/target"
 tmp=$(mktemp -d "$here/target/canary.XXXXXX")
@@ -12,7 +13,7 @@ find . -mindepth 1 -maxdepth 1 ! -name target ! -name 'mutants.out*' -exec cp -a
 errors() { # crate, then cargo args: code<TAB>file<TAB>line<TAB>message per error
     local c=$1
     shift
-    (cd "$tmp" && CARGO_TARGET_DIR="$here/target" cargo clippy -p "$c" --all-features "$@" --message-format=json 2> /dev/null || true) |
+    (cd "$tmp" && CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$here/target}" cargo clippy -p "$c" --all-features "$@" --message-format=json 2> /dev/null || true) |
         jq -r 'select(.reason == "compiler-message" and .message.level == "error")
             | .message as $m | $m.spans[] | select(.is_primary)
             | "\($m.code.code // "")\t\(.file_name)\t\(.line_start)\t\($m.message)"' | sort -u
