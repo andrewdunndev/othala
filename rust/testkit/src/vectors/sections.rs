@@ -1,7 +1,7 @@
 //! RFC section files (`{"sections":[...]}`): one case per top-level appendix, its subsections beneath it.
 use serde::Deserialize;
 
-use super::{Json, SOURCES, Vector, verified};
+use super::{Json, Outcome, SOURCES, Tally, Vector, floored, verified};
 
 /// One paragraph or figure of an RFC section.
 #[derive(Clone, Debug, Deserialize)]
@@ -39,13 +39,19 @@ struct File {
     sections: Vec<Section>,
 }
 
-/// The appendices of an RFC section file. Panics unless the file has the SHA-256 and the case count `SOURCES.toml`
-/// lists, and every section is an appendix or sits under one.
-pub fn sections(vector: Vector) -> Vec<Appendix> {
-    sections_against(SOURCES, vector)
+/// Runs `check` over every appendix of an RFC section file; each call reports one [`Outcome`]. Panics unless the file
+/// has the SHA-256 and the case count `SOURCES.toml` lists, every section is an appendix or sits under one, and at
+/// least `floor` (nonzero) appendices were checked.
+pub fn sections(vector: Vector, floor: usize, check: impl FnMut(&Appendix) -> Outcome) -> Tally {
+    sections_against(SOURCES, vector, floor, check)
 }
 
-fn sections_against(sources: &str, vector: Vector) -> Vec<Appendix> {
+fn sections_against(
+    sources: &str,
+    vector: Vector,
+    floor: usize,
+    mut check: impl FnMut(&Appendix) -> Outcome,
+) -> Tally {
     let path = vector.path;
     let declared = verified(sources, vector);
     let file: File = serde_json::from_str(vector.json).expect("vector file decodes");
@@ -80,13 +86,18 @@ fn sections_against(sources: &str, vector: Vector) -> Vec<Appendix> {
     );
     let held: usize = appendices.iter().map(|a| 1 + a.subsections.len()).sum();
     assert_eq!(held, total, "{path}: every section lands in an appendix");
-    appendices
+    let checked = appendices
+        .iter()
+        .filter(|a| check(a) == Outcome::Checked)
+        .count();
+    floored(path, appendices.len(), checked, floor)
 }
 
 #[cfg(test)]
 mod tests {
     use super::sections_against;
     use crate::vector;
+    use crate::vectors::Outcome;
     use crate::vectors::Vector;
 
     const SOURCES: &str = r#"
@@ -116,59 +127,88 @@ files = [
             .replace("ORPHAN", &hex(ORPHAN))
     }
 
+    fn all(_: &super::Appendix) -> Outcome {
+        Outcome::Checked
+    }
+
     #[test]
     fn subsections_nest_under_their_appendix() {
-        let a = sections_against(&sources(), Vector::new("s/ok.json", OK));
-        assert_eq!(a.len(), 1);
-        let first = a
-            .first()
-            .map(|a| (a.section.section.as_str(), a.subsections.len()));
-        assert_eq!(first, Some(("A.1", 1)));
+        let mut seen = Vec::new();
+        let t = sections_against(&sources(), Vector::new("s/ok.json", OK), 1, |a| {
+            seen.push((a.section.section.clone(), a.subsections.len()));
+            Outcome::Checked
+        });
+        assert_eq!(seen, [("A.1".to_owned(), 1)]);
+        assert_eq!((t.total(), t.checked(), t.not_applicable()), (1, 1, 0));
+    }
+
+    #[test]
+    #[should_panic(expected = "s/ok.json: 0 cases checked, floor 1")]
+    fn all_not_applicable_fails() {
+        sections_against(&sources(), Vector::new("s/ok.json", OK), 1, |_| {
+            Outcome::NotApplicable
+        })
+        .total();
+    }
+
+    #[test]
+    #[should_panic(expected = "s/ok.json: 1 cases checked, floor 2")]
+    fn floor_above_the_file_fails() {
+        sections_against(&sources(), Vector::new("s/ok.json", OK), 2, all).total();
+    }
+
+    #[test]
+    #[should_panic(expected = "floor 0")]
+    fn zero_floor_fails() {
+        sections_against(&sources(), Vector::new("s/ok.json", OK), 0, all).total();
     }
 
     #[test]
     #[should_panic(expected = "section A.2.1 has no appendix before it")]
     fn orphan_subsection_fails() {
-        sections_against(&sources(), Vector::new("s/orphan.json", ORPHAN));
+        sections_against(&sources(), Vector::new("s/orphan.json", ORPHAN), 1, all).total();
     }
 
     #[test]
     #[should_panic(expected = "SHA-256 of the file against SOURCES.toml")]
     fn altered_file_fails() {
-        sections_against(&sources(), Vector::new("s/ok.json", ORPHAN));
+        sections_against(&sources(), Vector::new("s/ok.json", ORPHAN), 1, all).total();
     }
 
     // every section file in rust/vectors, with its appendices and the blocks in them
     #[test]
     fn rfc7515_appendix_a4_a7() {
-        let a = sections_against(super::SOURCES, vector!("rfc7515/appendix-a4-a7.json"));
-        let shape: Vec<_> = a
-            .iter()
-            .map(|a| (a.section.section.as_str(), a.subsections.len()))
-            .collect();
-        assert_eq!(shape, [("A.4", 2), ("A.5", 0), ("A.6", 4), ("A.7", 0)]);
-        let blocks: usize = a
-            .iter()
-            .map(|a| {
-                a.section.blocks.len() + a.subsections.iter().map(|s| s.blocks.len()).sum::<usize>()
-            })
-            .sum();
+        let (mut shape, mut blocks) = (Vec::new(), 0);
+        let t = sections_against(
+            super::SOURCES,
+            vector!("rfc7515/appendix-a4-a7.json"),
+            4,
+            |a| {
+                shape.push((a.section.section.clone(), a.subsections.len()));
+                blocks += a.section.blocks.len()
+                    + a.subsections.iter().map(|s| s.blocks.len()).sum::<usize>();
+                Outcome::Checked
+            },
+        );
+        let want = [("A.4", 2), ("A.5", 0), ("A.6", 4), ("A.7", 0)];
+        assert_eq!(shape, want.map(|(n, c)| (n.to_owned(), c)));
         assert_eq!(blocks, 55);
+        assert_eq!((t.total(), t.not_applicable()), (4, 0));
     }
 
     #[test]
     fn rfc8037_appendix_a() {
-        let a = sections_against(super::SOURCES, vector!("rfc8037/appendix-a.json"));
-        let shape: Vec<_> = a.iter().map(|a| a.section.section.as_str()).collect();
+        let (mut shape, mut blocks, mut json, mut nested) = (Vec::new(), 0, 0, false);
+        let t = sections_against(super::SOURCES, vector!("rfc8037/appendix-a.json"), 7, |a| {
+            shape.push(a.section.section.clone());
+            nested |= !a.subsections.is_empty();
+            blocks += a.section.blocks.len();
+            json += a.section.blocks.iter().filter(|b| b.json.is_some()).count();
+            Outcome::Checked
+        });
         assert_eq!(shape, ["A.1", "A.2", "A.3", "A.4", "A.5", "A.6", "A.7"]);
-        assert!(a.iter().all(|a| a.subsections.is_empty()));
-        let blocks: usize = a.iter().map(|a| a.section.blocks.len()).sum();
-        assert_eq!(blocks, 72);
-        let json = a
-            .iter()
-            .flat_map(|a| &a.section.blocks)
-            .filter(|b| b.json.is_some())
-            .count();
-        assert_eq!(json, 11);
+        assert!(!nested);
+        assert_eq!((blocks, json), (72, 11));
+        assert_eq!((t.total(), t.not_applicable()), (7, 0));
     }
 }

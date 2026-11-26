@@ -1,0 +1,12 @@
+error[E0423]: cannot initialize a tuple struct which contains private fields
+ --> tests/ui/fail/browser_binding_fields.rs:5:13
+  |
+5 |     let _ = BrowserBinding(d);
+  |             ^^^^^^^^^^^^^^
+  |
+  = note: a struct named `BrowserBinding` exists in another namespace
+note: constructor is not visible here due to private fields
+ --> src/secret.rs
+  |
+  | pub struct BrowserBinding(Digest);
+  |                           ^^^^^^ private field

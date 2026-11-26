@@ -20,7 +20,7 @@ pub struct SecretBytes(Vec<u8>);
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Digest([u8; 32]);
 
-/// Ties a ceremony to the browser holding its cookie secret: safe to store, compared in constant time.
+/// Ties a ceremony to a browser through the secret it is built from: safe to store, compared in constant time.
 #[derive(Clone, Copy, Debug)]
 pub struct BrowserBinding(Digest);
 
@@ -42,12 +42,6 @@ impl<const N: usize> Secret<N> {
         decode_exact(text).map(Self)
     }
 
-    /// The single greppable read, only under the `expose` feature.
-    #[cfg(feature = "expose")]
-    pub const fn expose(&self) -> &[u8; N] {
-        &self.0
-    }
-
     /// Constant-time equality.
     pub fn ct_eq(&self, other: &Self) -> bool {
         self.0.as_slice().ct_eq(other.0.as_slice()).into()
@@ -59,16 +53,26 @@ impl<const N: usize> Secret<N> {
     }
 }
 
+impl<const N: usize> expose::Expose for Secret<N> {
+    type Bytes = [u8; N];
+
+    fn expose(&self) -> &[u8; N] {
+        &self.0
+    }
+}
+
+impl expose::Expose for SecretBytes {
+    type Bytes = [u8];
+
+    fn expose(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 impl SecretBytes {
     /// Takes ownership of imported key bytes.
     pub const fn new(bytes: Vec<u8>) -> Self {
         Self(bytes)
-    }
-
-    /// The single greppable read, only under the `expose` feature.
-    #[cfg(feature = "expose")]
-    pub fn expose(&self) -> &[u8] {
-        &self.0
     }
 
     /// Constant-time equality over equal lengths; unequal lengths are unequal.
@@ -205,6 +209,7 @@ mod tests {
     use alloc::string::ToString;
     use alloc::vec;
     use alloc::vec::Vec;
+    use expose::Expose as _;
     use sha2::{Digest as _, Sha256};
 
     struct Counting(u8);
@@ -248,7 +253,6 @@ mod tests {
         assert_eq!(SecretBytes::new(bytes.to_vec()).digest().as_bytes(), &want);
     }
 
-    #[cfg(feature = "expose")]
     #[test]
     fn exposes_what_it_holds() {
         assert_eq!(SecretBytes::new(vec![1, 2]).expose(), &[1, 2]);
@@ -314,6 +318,14 @@ mod tests {
         );
         assert_ne!(BrowserBinding::from(&a).0, a.digest());
         assert_ne!(BrowserBinding::from(&a), BrowserBinding::from(&b));
+    }
+
+    #[test]
+    fn browser_binding_eq_sees_the_last_byte() {
+        let mut bytes = [7u8; 32];
+        let a = BrowserBinding(Digest::from_bytes(bytes));
+        bytes[31] ^= 1;
+        assert_ne!(a, BrowserBinding(Digest::from_bytes(bytes)));
     }
 
     #[cfg(feature = "serde")]
