@@ -1,5 +1,9 @@
 //! Row `cbor`: the oracle's `cbor.json` through the strict reader and the ES256 COSE parser, which no public constructor reaches before webauthn-04.
 //! The reader and parser are compiled into this crate from `src/`, so a mutant of either fails here.
+#![expect(
+    dead_code,
+    reason = "the parts of the readers the public constructors reach"
+)]
 extern crate alloc;
 use webauthn_rp::{MAX_CBOR_DEPTH, MAX_CBOR_ITEMS};
 

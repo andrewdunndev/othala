@@ -1,11 +1,6 @@
 //! COSE keys and algorithms (R5; L3 5.8.5, 6.5.1); ES256 with webauthn-02, the other algorithms with webauthn-08.
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "read by the authenticator data parser, webauthn-04"
-    )
-)]
+use p256::ecdsa::signature::Verifier;
+use p256::ecdsa::{Signature, VerifyingKey};
 use p256::elliptic_curve::sec1::FromSec1Point;
 use p256::{AffinePoint, Sec1Point};
 
@@ -28,7 +23,6 @@ pub enum CoseAlgorithm {
 
 /// A credential public key, checked against its algorithm's curve or modulus bounds when parsed.
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[expect(dead_code, reason = "ES384, EdDSA and RS256 are built by webauthn-08")]
 pub(crate) enum CoseKey {
     /// EC2 P-256, uncompressed coordinates.
     Es256 { x: [u8; 32], y: [u8; 32] },
@@ -79,6 +73,32 @@ impl CoseKey {
     }
 }
 
+impl CoseKey {
+    /// The algorithm this key signs under.
+    pub(crate) const fn algorithm(&self) -> CoseAlgorithm {
+        match self {
+            Self::Es256 { .. } => CoseAlgorithm::Es256,
+            Self::Es384 { .. } => CoseAlgorithm::Es384,
+            Self::EdDsa(_) => CoseAlgorithm::EdDsa,
+            Self::Rs256 { .. } => CoseAlgorithm::Rs256,
+        }
+    }
+
+    /// Verifies `signature` over `message`: ES256 as strict DER, high S accepted; anything else is `Signature`.
+    pub(crate) fn verify(&self, message: &[u8], signature: &[u8]) -> Result<(), Error> {
+        let bad = Error::new(ErrorKind::Signature);
+        match self {
+            Self::Es256 { x, y } => {
+                let key =
+                    VerifyingKey::from_sec1_bytes(&[&[4][..], x, y].concat()).map_err(|_| bad)?;
+                let signature = Signature::from_der(signature).map_err(|_| bad)?;
+                key.verify(message, &signature).map_err(|_| bad)
+            }
+            _ => Err(Error::new(ErrorKind::Algorithm)),
+        }
+    }
+}
+
 const fn malformed() -> Error {
     Error::new(ErrorKind::Malformed)
 }
@@ -105,9 +125,13 @@ mod tests {
 
     use p256::elliptic_curve::sec1::ToSec1Point;
 
-    use super::CoseKey;
+    use super::{CoseAlgorithm, CoseKey};
     use crate::cbor::Value;
     use crate::error::{Error, ErrorKind};
+
+    fn bad_key<T>(_: T) -> Error {
+        Error::new(ErrorKind::Malformed)
+    }
 
     fn point() -> Result<([u8; 32], [u8; 32]), Error> {
         let bad = Error::new(ErrorKind::Malformed);
@@ -171,6 +195,88 @@ mod tests {
         let off_curve = y.map(|b| b ^ 1);
         assert_eq!(kind(key(&x, &off_curve, 6)), malformed);
         assert_eq!(kind(key(&x, &y, 34)), Some(ErrorKind::Algorithm));
+        Ok(())
+    }
+
+    #[test]
+    fn es256_signatures_are_strict_der_and_the_algorithm_is_reported() -> Result<(), Error> {
+        use p256::ecdsa::signature::Signer;
+        use p256::ecdsa::{Signature, SigningKey};
+        let secret = SigningKey::from_slice(&[1; 32]).map_err(bad_key)?;
+        let (x, y) = point()?;
+        let key = CoseKey::Es256 { x, y };
+        assert_eq!(key.algorithm(), CoseAlgorithm::Es256);
+        let signature: Signature = secret.sign(b"message");
+        let der = signature.to_der();
+        assert_eq!(key.verify(b"message", der.as_bytes()), Ok(()));
+        let refused = |m: &[u8], s: &[u8]| key.verify(m, s).err().map(|e| e.kind());
+        assert_eq!(
+            refused(b"messagf", der.as_bytes()),
+            Some(ErrorKind::Signature)
+        );
+        assert_eq!(
+            refused(b"message", &signature.to_bytes()),
+            Some(ErrorKind::Signature),
+            "raw, not DER"
+        );
+        assert_eq!(
+            refused(
+                b"message",
+                der.as_bytes()
+                    .get(..der.as_bytes().len() - 1)
+                    .unwrap_or(&[])
+            ),
+            Some(ErrorKind::Signature)
+        );
+        assert_eq!(refused(b"message", &[]), Some(ErrorKind::Signature));
+        let (r, s) = signature.split_scalars();
+        let high = Signature::from_scalars(
+            r,
+            p256::NonZeroScalar::new(-*s)
+                .into_option()
+                .ok_or_else(|| bad_key(()))?,
+        )
+        .map_err(bad_key)?;
+        assert_eq!(
+            key.verify(b"message", high.to_der().as_bytes()),
+            Ok(()),
+            "high S is accepted"
+        );
+        let other = CoseKey::Es256 {
+            x: [1; 32],
+            y: [1; 32],
+        };
+        assert_eq!(
+            other
+                .verify(b"message", der.as_bytes())
+                .err()
+                .map(|e| e.kind()),
+            Some(ErrorKind::Signature)
+        );
+        let algorithms = [
+            (
+                CoseKey::Es384 {
+                    x: [0; 48],
+                    y: [0; 48],
+                },
+                CoseAlgorithm::Es384,
+            ),
+            (CoseKey::EdDsa([0; 32]), CoseAlgorithm::EdDsa),
+            (
+                CoseKey::Rs256 {
+                    n: vec![],
+                    e: vec![],
+                },
+                CoseAlgorithm::Rs256,
+            ),
+        ];
+        for (key, algorithm) in algorithms {
+            assert_eq!(key.algorithm(), algorithm);
+            assert_eq!(
+                key.verify(b"m", der.as_bytes()).err().map(|e| e.kind()),
+                Some(ErrorKind::Algorithm)
+            );
+        }
         Ok(())
     }
 }

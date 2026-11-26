@@ -1,12 +1,19 @@
-//! User entities, per-call ceremony options and the client options they produce (R11 to R14); bodies with webauthn-04 and webauthn-05.
+//! User entities, per-call ceremony options and the client options they produce (R11 to R14).
+use core::fmt;
+
+use base::Entropy;
 
 use crate::cose::CoseAlgorithm;
+use crate::error::{Error, ErrorKind};
 use crate::extensions::{AuthenticationExtensions, RegistrationExtensions};
 use crate::policy::RpId;
 use crate::record::CredentialId;
 use crate::trust::Format;
 use alloc::string::String;
+use alloc::string::ToString;
 use alloc::vec::Vec;
+
+use crate::{MAX_NAME, MAX_TIMEOUT_SECS, MAX_USER_HANDLE};
 
 /// An opaque user handle: 32 bytes from `Entropy`, or a stored handle read back.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -188,4 +195,326 @@ pub struct RequestOptions {
     pub(crate) rp_id: RpId,
     pub(crate) allow: Vec<CredentialDescriptor>,
     pub(crate) options: AuthenticationOptions,
+}
+
+impl UserHandle {
+    /// Draw a new handle: 32 bytes of `Entropy`.
+    pub fn generate(e: &mut impl Entropy) -> Self {
+        let mut bytes = [0; 32];
+        e.fill(&mut bytes);
+        Self(bytes.to_vec())
+    }
+
+    /// Read a handle back from storage; empty is `Malformed`, longer than `MAX_USER_HANDLE` is `TooLarge`.
+    pub fn from_stored(bytes: &[u8]) -> Result<Self, Error> {
+        bounded(bytes.len(), MAX_USER_HANDLE, 1)?;
+        Ok(Self(bytes.to_vec()))
+    }
+
+    /// The handle's bytes.
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+// `least` to `most` inclusive: past `most` is `TooLarge`, short of `least` is `Malformed`
+fn bounded(len: usize, most: usize, least: usize) -> Result<(), Error> {
+    if len > most {
+        Err(Error::new(ErrorKind::TooLarge))
+    } else if len < least {
+        Err(Error::new(ErrorKind::Malformed))
+    } else {
+        Ok(())
+    }
+}
+
+impl UserName {
+    /// Parse a user name.
+    pub fn parse(text: &str) -> Result<Self, Error> {
+        bounded(text.len(), MAX_NAME, 1).map(|()| Self(text.to_string()))
+    }
+
+    /// The name as text.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl DisplayName {
+    /// Parse a display name.
+    pub fn parse(text: &str) -> Result<Self, Error> {
+        bounded(text.len(), MAX_NAME, 0).map(|()| Self(text.to_string()))
+    }
+
+    /// The name as text.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl UserEntity {
+    /// Name the user.
+    pub fn new(handle: UserHandle, name: UserName, display_name: DisplayName) -> Self {
+        Self {
+            handle,
+            name,
+            display_name,
+        }
+    }
+
+    /// The user's handle.
+    pub fn handle(&self) -> &UserHandle {
+        &self.handle
+    }
+}
+
+impl fmt::Debug for UserName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("UserName(redacted)")
+    }
+}
+
+impl fmt::Debug for DisplayName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("DisplayName(redacted)")
+    }
+}
+
+impl fmt::Debug for UserEntity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("UserEntity(redacted)")
+    }
+}
+
+const TRANSPORTS: [(Transport, &str); 6] = [
+    (Transport::Usb, "usb"),
+    (Transport::Nfc, "nfc"),
+    (Transport::Ble, "ble"),
+    (Transport::SmartCard, "smart-card"),
+    (Transport::Hybrid, "hybrid"),
+    (Transport::Internal, "internal"),
+];
+
+impl Transport {
+    /// The L3 5.8.4 name.
+    pub fn as_str(&self) -> &'static str {
+        TRANSPORTS
+            .iter()
+            .find(|(t, _)| t == self)
+            .map_or("", |(_, name)| name)
+    }
+
+    /// Read a name back; any other text is `Malformed`.
+    pub fn parse(text: &str) -> Result<Self, Error> {
+        TRANSPORTS
+            .iter()
+            .find(|(_, name)| *name == text)
+            .map(|(t, _)| *t)
+            .ok_or(Error::new(ErrorKind::Malformed))
+    }
+}
+
+impl CredentialDescriptor {
+    /// Name a credential and the transports it was registered with; a repeated transport is kept once.
+    pub fn new(id: CredentialId, transports: &[Transport]) -> Self {
+        let mut kept: Vec<Transport> = Vec::new();
+        for t in transports {
+            if !kept.contains(t) {
+                kept.push(*t);
+            }
+        }
+        Self {
+            id,
+            transports: kept,
+        }
+    }
+
+    /// The credential id.
+    pub fn id(&self) -> &CredentialId {
+        &self.id
+    }
+
+    /// The transports, without repeats.
+    pub fn transports(&self) -> &[Transport] {
+        &self.transports
+    }
+}
+
+impl Timeout {
+    /// Zero is `Malformed`, past `MAX_TIMEOUT_SECS` is `TooLarge`.
+    pub fn from_secs(secs: u32) -> Result<Self, Error> {
+        match secs {
+            0 => Err(Error::new(ErrorKind::Malformed)),
+            1..=MAX_TIMEOUT_SECS => Ok(Self(secs)),
+            _ => Err(Error::new(ErrorKind::TooLarge)),
+        }
+    }
+
+    /// The timeout in seconds.
+    pub fn secs(&self) -> u32 {
+        self.0
+    }
+}
+
+impl AuthenticationOptions {
+    /// User verification is always chosen by the caller.
+    pub fn new(user_verification: Requirement, timeout: Timeout) -> Self {
+        Self {
+            user_verification,
+            timeout,
+            hints: Vec::new(),
+            extensions: AuthenticationExtensions::default(),
+        }
+    }
+
+    /// Add a user-agent hint, in order.
+    pub fn hint(mut self, hint: Hint) -> Self {
+        self.hints.push(hint);
+        self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::format;
+    use alloc::vec;
+
+    use super::{
+        AuthenticationOptions, CredentialDescriptor, DisplayName, Hint, Requirement, Timeout,
+        Transport, UserEntity, UserHandle, UserName,
+    };
+    use crate::error::ErrorKind;
+    use crate::record::CredentialId;
+    use crate::{MAX_NAME, MAX_TIMEOUT_SECS, MAX_USER_HANDLE};
+
+    fn kind<T>(r: Result<T, crate::error::Error>) -> Option<ErrorKind> {
+        r.err().map(|e| e.kind())
+    }
+
+    #[test]
+    fn user_handles_are_32_drawn_bytes_or_1_to_64_stored() {
+        let handle = UserHandle::generate(&mut testkit::seeded(1));
+        assert_eq!(handle.as_bytes().len(), 32);
+        assert_ne!(handle, UserHandle::generate(&mut testkit::seeded(2)));
+        assert_eq!(handle, UserHandle::generate(&mut testkit::seeded(1)));
+        assert_eq!(
+            kind(UserHandle::from_stored(&[])),
+            Some(ErrorKind::Malformed)
+        );
+        assert_eq!(
+            UserHandle::from_stored(&[7]).map(|h| h.as_bytes().to_vec()),
+            Ok(vec![7])
+        );
+        assert!(UserHandle::from_stored(&[0; MAX_USER_HANDLE]).is_ok());
+        assert_eq!(
+            kind(UserHandle::from_stored(&[0; MAX_USER_HANDLE + 1])),
+            Some(ErrorKind::TooLarge)
+        );
+    }
+
+    #[test]
+    fn names_are_bounded_and_never_printed() {
+        assert_eq!(kind(UserName::parse("")), Some(ErrorKind::Malformed));
+        assert_eq!(UserName::parse("a").as_ref().map(UserName::as_str), Ok("a"));
+        assert!(UserName::parse(&"a".repeat(MAX_NAME)).is_ok());
+        assert_eq!(
+            kind(UserName::parse(&"a".repeat(MAX_NAME + 1))),
+            Some(ErrorKind::TooLarge)
+        );
+        assert_eq!(
+            DisplayName::parse("").as_ref().map(DisplayName::as_str),
+            Ok("")
+        );
+        assert_eq!(
+            DisplayName::parse("Ada").as_ref().map(DisplayName::as_str),
+            Ok("Ada")
+        );
+        assert!(DisplayName::parse(&"a".repeat(MAX_NAME)).is_ok());
+        assert_eq!(
+            kind(DisplayName::parse(&"a".repeat(MAX_NAME + 1))),
+            Some(ErrorKind::TooLarge)
+        );
+        let entity = UserEntity::new(
+            UserHandle(vec![1]),
+            UserName("secret-name".into()),
+            DisplayName("secret-display".into()),
+        );
+        assert_eq!(entity.handle().as_bytes(), &[1]);
+        let shown = format!("{entity:?} {:?} {:?}", entity.name, entity.display_name);
+        assert!(!shown.contains("secret"), "{shown}");
+        assert_eq!(
+            shown,
+            "UserEntity(redacted) UserName(redacted) DisplayName(redacted)"
+        );
+    }
+
+    #[test]
+    fn transports_have_their_l3_names() {
+        let all = [
+            Transport::Usb,
+            Transport::Nfc,
+            Transport::Ble,
+            Transport::SmartCard,
+            Transport::Hybrid,
+            Transport::Internal,
+        ];
+        let names = ["usb", "nfc", "ble", "smart-card", "hybrid", "internal"];
+        for (t, name) in all.into_iter().zip(names) {
+            assert_eq!(t.as_str(), name);
+            assert_eq!(Transport::parse(name), Ok(t));
+        }
+        for other in ["", "USB", "usb ", "cable"] {
+            assert_eq!(kind(Transport::parse(other)), Some(ErrorKind::Malformed));
+        }
+    }
+
+    #[test]
+    fn descriptors_keep_each_transport_once_in_order() -> Result<(), crate::error::Error> {
+        let d = CredentialDescriptor::new(
+            CredentialId::from_bytes(b"c")?,
+            &[
+                Transport::Nfc,
+                Transport::Usb,
+                Transport::Nfc,
+                Transport::Usb,
+                Transport::Ble,
+            ],
+        );
+        assert_eq!(
+            d.transports(),
+            &[Transport::Nfc, Transport::Usb, Transport::Ble]
+        );
+        assert_eq!(d.id().as_bytes(), b"c");
+        Ok(())
+    }
+
+    #[test]
+    fn timeouts_are_1_to_the_maximum() {
+        assert_eq!(kind(Timeout::from_secs(0)), Some(ErrorKind::Malformed));
+        assert_eq!(Timeout::from_secs(1).map(|t| t.secs()), Ok(1));
+        assert_eq!(
+            Timeout::from_secs(MAX_TIMEOUT_SECS).map(|t| t.secs()),
+            Ok(MAX_TIMEOUT_SECS)
+        );
+        assert_eq!(
+            kind(Timeout::from_secs(MAX_TIMEOUT_SECS + 1)),
+            Some(ErrorKind::TooLarge)
+        );
+    }
+
+    #[test]
+    fn authentication_options_collect_hints_in_order() -> Result<(), crate::error::Error> {
+        let o = AuthenticationOptions::new(Requirement::Required, Timeout::from_secs(5)?)
+            .hint(Hint::Hybrid)
+            .hint(Hint::SecurityKey);
+        assert_eq!(
+            (o.user_verification, o.timeout.secs(), o.hints),
+            (
+                Requirement::Required,
+                5,
+                vec![Hint::Hybrid, Hint::SecurityKey]
+            )
+        );
+        Ok(())
+    }
 }

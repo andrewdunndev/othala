@@ -1,5 +1,9 @@
 //! Row `client_data`: the oracle's `client-data.json` through the bounded reader, `Origin` and `RpId`; no public constructor reaches the reader before webauthn-04.
 //! The reader is compiled into this crate from `src/`, so a mutant of it fails here.
+#![expect(
+    dead_code,
+    reason = "the parts of the readers the public constructors reach"
+)]
 extern crate alloc;
 use webauthn_rp::{MAX_CLIENT_DATA_DEPTH, MAX_CLIENT_DATA_JSON};
 

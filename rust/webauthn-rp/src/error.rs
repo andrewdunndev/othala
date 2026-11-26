@@ -92,6 +92,13 @@ impl Error {
     pub(crate) const fn new(kind: ErrorKind) -> Self {
         Self { kind, step: None }
     }
+
+    pub(crate) const fn at(kind: ErrorKind, step: SpecStep) -> Self {
+        Self {
+            kind,
+            step: Some(step),
+        }
+    }
 }
 
 impl fmt::Display for Error {
@@ -133,5 +140,9 @@ mod tests {
             Some(SpecStep::Authentication(3))
         );
         assert_eq!(Error::new(ErrorKind::Type).spec_step(), None);
+        assert_eq!(
+            Error::at(ErrorKind::Type, SpecStep::Registration(2)),
+            at(Some(SpecStep::Registration(2)))
+        );
     }
 }

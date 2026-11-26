@@ -1,8 +1,4 @@
 //! The bounded clientDataJSON reader (R6, R7).
-#![cfg_attr(
-    not(test),
-    expect(dead_code, reason = "read by the ceremonies, webauthn-04")
-)]
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::str;

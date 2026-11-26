@@ -223,6 +223,7 @@ impl Debug for Attestation
 impl Debug for AttestationType
 impl Debug for AuthenticationCeremony
 impl Debug for AuthenticationOptions
+impl Debug for AuthenticationResponse
 impl Debug for Backup
 impl Debug for BackupState
 impl Debug for Conveyance
@@ -234,6 +235,7 @@ impl Debug for CredentialDescriptor
 impl Debug for CredentialId
 impl Debug for CrossOrigin
 impl Debug for Discoverability
+impl Debug for DisplayName
 impl Debug for Error
 impl Debug for ErrorKind
 impl Debug for Format
@@ -255,6 +257,7 @@ impl Debug for Record
 impl Debug for Registered
 impl Debug for RegistrationCeremony
 impl Debug for RegistrationOptions
+impl Debug for RegistrationResponse
 impl Debug for RelatedOrigins
 impl Debug for RelyingParty
 impl Debug for RelyingPartyBuilder
@@ -271,7 +274,9 @@ impl Debug for TrustDecision
 impl Debug for TrustPolicy
 impl Debug for TrustQuery
 impl Debug for UnsolicitedExtensions
+impl Debug for UserEntity
 impl Debug for UserHandle
+impl Debug for UserName
 impl Debug for UserVerification
 impl Display for Error
 impl Eq for Aaguid
@@ -396,6 +401,7 @@ impl PartialOrd for CredentialId
 impl PartialOrd for Key
 impl PartialOrd for Transport
 impl PartialOrd for UserHandle
+impl StoreKey for Key
 impl StructuralPartialEq for Aaguid
 impl StructuralPartialEq for AppId
 impl StructuralPartialEq for AppIdUsed
@@ -446,12 +452,51 @@ impl StructuralPartialEq for UserEntity
 impl StructuralPartialEq for UserHandle
 impl StructuralPartialEq for UserName
 impl StructuralPartialEq for UserVerification
+method Aaguid::as_bytes const fn(self: &Self) -> &[u8; 16]
+method Aaguid::from_bytes const fn(bytes: [u8; 16]) -> Self
+method Assertion::backup fn(self: &Self) -> Backup
+method Assertion::counter fn(self: &Self) -> Counter
+method Assertion::credential_id fn(self: &Self) -> &CredentialId
+method Assertion::user fn(self: &Self) -> &UserHandle
+method Assertion::user_verification fn(self: &Self) -> AssertionVerification
+method AuthenticationCeremony::from_row fn<R>(row: &Row<R>, record: impl FnOnce(&R) -> Option<&Record>) -> Result<Row<Self>, Error>
+method AuthenticationOptions::hint fn(self: Self, hint: Hint) -> Self
+method AuthenticationOptions::new fn(user_verification: Requirement, timeout: Timeout) -> Self
+method AuthenticationResponse::locate fn(self: &Self) -> Lookup
+method AuthenticationResponse::new fn(raw_id: &[u8], client_data_json: &[u8], authenticator_data: &[u8], signature: &[u8], user_handle: Option<&[u8]>) -> Result<Self, Error>
+method Credential::aaguid fn(self: &Self) -> Aaguid
+method Credential::algorithm fn(self: &Self) -> CoseAlgorithm
+method Credential::attestation fn(self: &Self) -> &Attestation
+method Credential::backup fn(self: &Self) -> Backup
+method Credential::descriptor fn(self: &Self) -> CredentialDescriptor
+method Credential::from_row fn<R>(row: &Row<R>, record: impl FnOnce(&R) -> Option<&Record>) -> Result<Row<Self>, Error>
+method Credential::id fn(self: &Self) -> &CredentialId
+method Credential::sign_count fn(self: &Self) -> u32
+method Credential::transports fn(self: &Self) -> &[Transport]
+method Credential::user fn(self: &Self) -> &UserHandle
+method Credential::uv_initialized fn(self: &Self) -> UserVerification
+method CredentialDescriptor::id fn(self: &Self) -> &CredentialId
+method CredentialDescriptor::new fn(id: CredentialId, transports: &[Transport]) -> Self
+method CredentialDescriptor::transports fn(self: &Self) -> &[Transport]
+method CredentialId::as_bytes fn(self: &Self) -> &[u8]
+method CredentialId::from_bytes fn(bytes: &[u8]) -> Result<Self, Error>
+method DisplayName::as_str fn(self: &Self) -> &str
+method DisplayName::parse fn(text: &str) -> Result<Self, Error>
 method Error::kind fn(self: &Self) -> ErrorKind
 method Error::spec_step fn(self: &Self) -> Option<SpecStep>
+method Lookup::ceremony fn(self: &Self) -> &Key
+method Lookup::credential fn(self: &Self) -> &Key
+method Lookup::user fn(self: &Self) -> Option<&UserHandle>
 method Origin::as_str fn(self: &Self) -> &str
 method Origin::parse fn(text: &str) -> Result<Self, Error>
+method Record::decode fn(bytes: &[u8]) -> Result<Self, Error>
+method Record::encode fn(self: &Self) -> Vec<u8>
+method RegistrationCeremony::from_row fn<R>(row: &Row<R>, record: impl FnOnce(&R) -> Option<&Record>) -> Result<Row<Self>, Error>
 method RelyingParty::builder fn(id: RpId, name: DisplayName, origin: Origin, counter: CounterPolicy) -> RelyingPartyBuilder
+method RelyingParty::confirm_user_verification fn(self: &Self, stored: &Row<Credential>, e: &mut impl Entropy) -> Effect
+method RelyingParty::finish_authentication fn(self: &Self, state: Row<AuthenticationCeremony>, stored: Row<Credential>, response: &AuthenticationResponse, browser: &BrowserBinding, now: UnixTime, e: &mut impl Entropy) -> Verdict<Assertion>
 method RelyingParty::id fn(self: &Self) -> &RpId
+method RelyingParty::start_authentication fn(self: &Self, allow: Allow<'_>, opts: &AuthenticationOptions, browser: &BrowserBinding, now: UnixTime, e: &mut impl Entropy) -> Result<(RequestOptions, Effect), Error>
 method RelyingPartyBuilder::android_key fn(self: Self, policy: KeyEnforcement) -> Self
 method RelyingPartyBuilder::build fn(self: Self) -> Result<RelyingParty, Error>
 method RelyingPartyBuilder::cross_origin fn(self: Self, policy: CrossOrigin) -> Self
@@ -460,6 +505,17 @@ method RelyingPartyBuilder::trust fn(self: Self, policy: TrustPolicy) -> Self
 method RelyingPartyBuilder::unsolicited fn(self: Self, policy: UnsolicitedExtensions) -> Self
 method RpId::as_str fn(self: &Self) -> &str
 method RpId::parse fn(text: &str) -> Result<Self, Error>
+method Timeout::from_secs fn(secs: u32) -> Result<Self, Error>
+method Timeout::secs fn(self: &Self) -> u32
+method Transport::as_str fn(self: &Self) -> &'static str
+method Transport::parse fn(text: &str) -> Result<Self, Error>
+method UserEntity::handle fn(self: &Self) -> &UserHandle
+method UserEntity::new fn(handle: UserHandle, name: UserName, display_name: DisplayName) -> Self
+method UserHandle::as_bytes fn(self: &Self) -> &[u8]
+method UserHandle::from_stored fn(bytes: &[u8]) -> Result<Self, Error>
+method UserHandle::generate fn(e: &mut impl Entropy) -> Self
+method UserName::as_str fn(self: &Self) -> &str
+method UserName::parse fn(text: &str) -> Result<Self, Error>
 struct Aaguid
 struct AppId
 struct Assertion
