@@ -147,100 +147,121 @@ const VERSION: u8 = 1;
 const REGISTRATION: u8 = 0;
 const AUTHENTICATION: u8 = 1;
 const CREDENTIAL: u8 = 2;
-const REQUIREMENTS: [Requirement; 3] = [
-    Requirement::Required,
-    Requirement::Preferred,
-    Requirement::Discouraged,
-];
-const RESIDENT_KEYS: [ResidentKey; 3] = [
-    ResidentKey::Required,
-    ResidentKey::Preferred,
-    ResidentKey::Discouraged,
-];
-const ATTACHMENTS: [Attachment; 2] = [Attachment::Platform, Attachment::CrossPlatform];
-const CONVEYANCES: [Conveyance; 4] = [
-    Conveyance::None,
-    Conveyance::Indirect,
-    Conveyance::Direct,
-    Conveyance::Enterprise,
-];
-const HINTS: [Hint; 3] = [Hint::SecurityKey, Hint::ClientDevice, Hint::Hybrid];
-const MEDIATIONS: [Mediation; 2] = [Mediation::Optional, Mediation::Conditional];
-const TRANSPORTS: [Transport; 6] = [
-    Transport::Usb,
-    Transport::Nfc,
-    Transport::Ble,
-    Transport::SmartCard,
-    Transport::Hybrid,
-    Transport::Internal,
-];
-const ALGORITHMS: [CoseAlgorithm; 4] = [
-    CoseAlgorithm::Es256,
-    CoseAlgorithm::Es384,
-    CoseAlgorithm::EdDsa,
-    CoseAlgorithm::Rs256,
-];
-const FORMATS: [Format; 6] = [
-    Format::None,
-    Format::Packed,
-    Format::Tpm,
-    Format::AndroidKey,
-    Format::Apple,
-    Format::FidoU2f,
-];
-const KINDS: [AttestationType; 6] = [
-    AttestationType::None,
-    AttestationType::SelfAttestation,
-    AttestationType::Basic,
-    AttestationType::AttCa,
-    AttestationType::AnonCa,
-    AttestationType::Uncertain,
-];
-const TRUSTS: [Trust; 2] = [Trust::Anchored, Trust::Unanchored];
-const LARGE_BLOBS: [LargeBlobRequest; 2] =
-    [LargeBlobRequest::Required, LargeBlobRequest::Preferred];
-
-// each table's order is its stable encoding
-fn put_pick<T: PartialEq>(out: &mut Vec<u8>, table: &[T], value: &T) {
-    out.push(
-        table
-            .iter()
-            .position(|t| t == value)
-            .and_then(|i| u8::try_from(i).ok())
-            .unwrap_or(u8::MAX),
-    );
+// each variant's tag is its stable encoding; an unmapped variant fails the match to compile
+macro_rules! tagged {
+    ($table:ident: $ty:ty = [$($variant:path = $tag:literal),+ $(,)?]) => {
+        impl Tag for $ty {
+            fn tag(&self) -> u8 {
+                match self {
+                    $($variant => $tag,)+
+                }
+            }
+        }
+        const $table: &[$ty] = &[$($variant),+];
+    };
 }
 
-fn put_bytes(out: &mut Vec<u8>, bytes: &[u8]) {
-    out.extend_from_slice(&u32::try_from(bytes.len()).unwrap_or(u32::MAX).to_be_bytes());
+trait Tag {
+    fn tag(&self) -> u8;
+}
+
+tagged!(REQUIREMENTS: Requirement = [
+    Requirement::Required = 0,
+    Requirement::Preferred = 1,
+    Requirement::Discouraged = 2,
+]);
+tagged!(RESIDENT_KEYS: ResidentKey = [
+    ResidentKey::Required = 0,
+    ResidentKey::Preferred = 1,
+    ResidentKey::Discouraged = 2,
+]);
+tagged!(ATTACHMENTS: Attachment = [Attachment::Platform = 0, Attachment::CrossPlatform = 1]);
+tagged!(CONVEYANCES: Conveyance = [
+    Conveyance::None = 0,
+    Conveyance::Indirect = 1,
+    Conveyance::Direct = 2,
+    Conveyance::Enterprise = 3,
+]);
+tagged!(HINTS: Hint = [Hint::SecurityKey = 0, Hint::ClientDevice = 1, Hint::Hybrid = 2]);
+tagged!(MEDIATIONS: Mediation = [Mediation::Optional = 0, Mediation::Conditional = 1]);
+tagged!(TRANSPORTS: Transport = [
+    Transport::Usb = 0,
+    Transport::Nfc = 1,
+    Transport::Ble = 2,
+    Transport::SmartCard = 3,
+    Transport::Hybrid = 4,
+    Transport::Internal = 5,
+]);
+tagged!(ALGORITHMS: CoseAlgorithm = [
+    CoseAlgorithm::Es256 = 0,
+    CoseAlgorithm::Es384 = 1,
+    CoseAlgorithm::EdDsa = 2,
+    CoseAlgorithm::Rs256 = 3,
+]);
+tagged!(FORMATS: Format = [
+    Format::None = 0,
+    Format::Packed = 1,
+    Format::Tpm = 2,
+    Format::AndroidKey = 3,
+    Format::Apple = 4,
+    Format::FidoU2f = 5,
+]);
+tagged!(KINDS: AttestationType = [
+    AttestationType::None = 0,
+    AttestationType::SelfAttestation = 1,
+    AttestationType::Basic = 2,
+    AttestationType::AttCa = 3,
+    AttestationType::AnonCa = 4,
+    AttestationType::Uncertain = 5,
+]);
+tagged!(TRUSTS: Trust = [Trust::Anchored = 0, Trust::Unanchored = 1]);
+tagged!(LARGE_BLOBS: LargeBlobRequest = [
+    LargeBlobRequest::Required = 0,
+    LargeBlobRequest::Preferred = 1,
+]);
+tagged!(VERIFICATIONS: UserVerification = [
+    UserVerification::Verified = 0,
+    UserVerification::PresenceOnly = 1,
+]);
+
+fn put_pick<T: Tag>(out: &mut Vec<u8>, value: &T) -> Result<(), Error> {
+    out.push(value.tag());
+    Ok(())
+}
+
+fn put_bytes(out: &mut Vec<u8>, bytes: &[u8]) -> Result<(), Error> {
+    let len = u32::try_from(bytes.len()).map_err(|_| Error::new(ErrorKind::TooLarge))?;
+    out.extend_from_slice(&len.to_be_bytes());
     out.extend_from_slice(bytes);
+    Ok(())
 }
 
-fn put_opt<T>(out: &mut Vec<u8>, value: Option<&T>, put: impl FnOnce(&mut Vec<u8>, &T)) {
+fn put_opt<T>(
+    out: &mut Vec<u8>,
+    value: Option<&T>,
+    put: impl FnOnce(&mut Vec<u8>, &T) -> Result<(), Error>,
+) -> Result<(), Error> {
     out.push(u8::from(value.is_some()));
-    if let Some(v) = value {
-        put(out, v);
-    }
+    value.map_or(Ok(()), |v| put(out, v))
 }
 
 // a list length is one byte; a longer list is refused, not clamped
 fn put_list<T>(
     out: &mut Vec<u8>,
     values: &[T],
-    put: impl Fn(&mut Vec<u8>, &T),
+    put: impl Fn(&mut Vec<u8>, &T) -> Result<(), Error>,
 ) -> Result<(), Error> {
     out.push(u8::try_from(values.len()).map_err(|_| Error::new(ErrorKind::TooLarge))?);
-    values.iter().for_each(|v| put(out, v));
-    Ok(())
+    values.iter().try_for_each(|v| put(out, v))
 }
 
-fn put_eval(out: &mut Vec<u8>, eval: &PrfEval) {
-    put_bytes(out, &eval.first);
-    put_opt(out, eval.second.as_ref(), |o, s| put_bytes(o, s));
+fn put_eval(out: &mut Vec<u8>, eval: &PrfEval) -> Result<(), Error> {
+    put_bytes(out, &eval.first)?;
+    put_opt(out, eval.second.as_ref(), |o, s| put_bytes(o, s))
 }
 
-fn put_key(out: &mut Vec<u8>, key: &CoseKey) {
-    put_pick(out, &ALGORITHMS, &key.algorithm());
+fn put_key(out: &mut Vec<u8>, key: &CoseKey) -> Result<(), Error> {
+    put_pick(out, &key.algorithm())?;
     match key {
         CoseKey::Es256 { x, y } => [x.as_slice(), y]
             .iter()
@@ -249,64 +270,73 @@ fn put_key(out: &mut Vec<u8>, key: &CoseKey) {
             .iter()
             .for_each(|c| out.extend_from_slice(c)),
         CoseKey::EdDsa(point) => out.extend_from_slice(point),
-        CoseKey::Rs256 { n, e } => [n, e].iter().for_each(|c| put_bytes(out, c)),
+        CoseKey::Rs256 { n, e } => return [n, e].iter().try_for_each(|c| put_bytes(out, c)),
     }
+    Ok(())
 }
 
 fn put_registration_options(out: &mut Vec<u8>, o: &RegistrationOptions) -> Result<(), Error> {
-    put_pick(out, &REQUIREMENTS, &o.user_verification);
-    put_pick(out, &RESIDENT_KEYS, &o.resident_key);
+    put_pick(out, &o.user_verification)?;
+    put_pick(out, &o.resident_key)?;
     out.extend_from_slice(&o.timeout.0.to_be_bytes());
-    put_list(out, &o.algorithms, |o, a| put_pick(o, &ALGORITHMS, a))?;
-    put_opt(out, o.attachment.as_ref(), |o, a| {
-        put_pick(o, &ATTACHMENTS, a)
-    });
-    put_pick(out, &CONVEYANCES, &o.conveyance);
-    put_list(out, &o.formats, |o, f| put_pick(o, &FORMATS, f))?;
-    put_list(out, &o.hints, |o, h| put_pick(o, &HINTS, h))?;
-    put_pick(out, &MEDIATIONS, &o.mediation);
+    put_list(out, &o.algorithms, put_pick)?;
+    put_opt(out, o.attachment.as_ref(), put_pick)?;
+    put_pick(out, &o.conveyance)?;
+    put_list(out, &o.formats, put_pick)?;
+    put_list(out, &o.hints, put_pick)?;
+    put_pick(out, &o.mediation)?;
     let e = &o.extensions;
     out.push(u8::from(e.cred_props));
     put_opt(out, e.prf.as_ref(), |o, p| match p {
-        PrfRequest::Enable => o.push(0),
+        PrfRequest::Enable => {
+            o.push(0);
+            Ok(())
+        }
         PrfRequest::Eval(eval) => {
             o.push(1);
-            put_eval(o, eval);
+            put_eval(o, eval)
         }
-    });
-    put_opt(out, e.large_blob.as_ref(), |o, l| {
-        put_pick(o, &LARGE_BLOBS, l)
-    });
+    })?;
+    put_opt(out, e.large_blob.as_ref(), put_pick)?;
     put_opt(out, e.app_id_exclude.as_ref(), |o, a| {
         put_bytes(o, a.0.as_bytes())
-    });
-    Ok(())
+    })
 }
 
 fn put_authentication_options(out: &mut Vec<u8>, o: &AuthenticationOptions) -> Result<(), Error> {
-    put_pick(out, &REQUIREMENTS, &o.user_verification);
+    put_pick(out, &o.user_verification)?;
     out.extend_from_slice(&o.timeout.0.to_be_bytes());
-    put_list(out, &o.hints, |o, h| put_pick(o, &HINTS, h))?;
+    put_list(out, &o.hints, put_pick)?;
     let e = &o.extensions;
-    put_opt(out, e.app_id.as_ref(), |o, a| put_bytes(o, a.0.as_bytes()));
-    put_opt(out, e.prf.as_ref(), put_eval);
+    put_opt(out, e.app_id.as_ref(), |o, a| put_bytes(o, a.0.as_bytes()))?;
+    put_opt(out, e.prf.as_ref(), put_eval)?;
     put_list(out, &e.prf_by_credential, |o, (id, eval)| {
-        put_bytes(o, &id.0);
-        put_eval(o, eval);
+        put_bytes(o, &id.0)?;
+        put_eval(o, eval)
     })?;
     put_opt(out, e.large_blob.as_ref(), |o, l| match l {
-        LargeBlobOp::Read => o.push(0),
+        LargeBlobOp::Read => {
+            o.push(0);
+            Ok(())
+        }
         LargeBlobOp::Write(blob) => {
             o.push(1);
-            put_bytes(o, blob);
+            put_bytes(o, blob)
         }
-    });
-    Ok(())
+    })
 }
 
 impl Record {
-    /// The row's bytes, version-tagged; a list past 255 entries is `TooLarge`.
+    /// The row's bytes, version-tagged; a list past 255 entries or a row past `MAX_RECORD` is `TooLarge`.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
+        let out = self.encode_unbounded()?;
+        if out.len() > MAX_RECORD {
+            return Err(Error::new(ErrorKind::TooLarge));
+        }
+        Ok(out)
+    }
+
+    fn encode_unbounded(&self) -> Result<Vec<u8>, Error> {
         let mut out = alloc::vec![VERSION];
         match self {
             Self::Registration(c) => {
@@ -314,7 +344,7 @@ impl Record {
                 out.extend_from_slice(c.challenge.as_bytes());
                 out.extend_from_slice(c.browser.as_bytes());
                 out.extend_from_slice(&c.deadline.secs().to_be_bytes());
-                put_bytes(&mut out, &c.user.0);
+                put_bytes(&mut out, &c.user.0)?;
                 put_registration_options(&mut out, &c.options)?;
             }
             Self::Authentication(c) => {
@@ -322,38 +352,39 @@ impl Record {
                 out.extend_from_slice(c.challenge.as_bytes());
                 out.extend_from_slice(c.browser.as_bytes());
                 out.extend_from_slice(&c.deadline.secs().to_be_bytes());
-                put_opt(&mut out, c.user.as_ref(), |o, u| put_bytes(o, &u.0));
+                put_opt(&mut out, c.user.as_ref(), |o, u| put_bytes(o, &u.0))?;
                 put_list(&mut out, &c.allowed, |o, d| {
-                    o.extend_from_slice(d.as_bytes())
+                    o.extend_from_slice(d.as_bytes());
+                    Ok(())
                 })?;
                 put_authentication_options(&mut out, &c.options)?;
             }
             Self::Credential(c) => {
                 out.push(CREDENTIAL);
-                put_bytes(&mut out, &c.id.0);
-                put_key(&mut out, &c.public_key);
+                put_bytes(&mut out, &c.id.0)?;
+                put_key(&mut out, &c.public_key)?;
                 out.extend_from_slice(&c.sign_count.to_be_bytes());
-                put_pick(
-                    &mut out,
-                    &[UserVerification::Verified, UserVerification::PresenceOnly],
-                    &c.uv_initialized,
-                );
-                put_list(&mut out, &c.transports, |o, t| put_pick(o, &TRANSPORTS, t))?;
+                put_pick(&mut out, &c.uv_initialized)?;
+                put_list(&mut out, &c.transports, put_pick)?;
                 out.push(match c.backup {
                     Backup::SingleDevice => 0,
                     Backup::MultiDevice(BackupState::NotBackedUp) => 1,
                     Backup::MultiDevice(BackupState::BackedUp) => 2,
                 });
-                put_bytes(&mut out, &c.user.0);
+                put_bytes(&mut out, &c.user.0)?;
                 out.extend_from_slice(&c.aaguid.0);
                 let a = &c.attestation;
-                put_pick(&mut out, &FORMATS, &a.format);
-                put_pick(&mut out, &KINDS, &a.kind);
-                put_pick(&mut out, &TRUSTS, &a.trust);
-                put_list(&mut out, &a.chain, |o, d| o.extend_from_slice(d.as_bytes()))?;
+                put_pick(&mut out, &a.format)?;
+                put_pick(&mut out, &a.kind)?;
+                put_pick(&mut out, &a.trust)?;
+                put_list(&mut out, &a.chain, |o, d| {
+                    o.extend_from_slice(d.as_bytes());
+                    Ok(())
+                })?;
                 put_opt(&mut out, a.anchor.as_ref(), |o, d| {
-                    o.extend_from_slice(d.as_bytes())
-                });
+                    o.extend_from_slice(d.as_bytes());
+                    Ok(())
+                })?;
             }
         }
         Ok(out)
@@ -432,7 +463,7 @@ impl<'a> In<'a> {
     }
 
     fn key(&mut self) -> Result<CoseKey, Error> {
-        Ok(match self.pick(&ALGORITHMS)? {
+        Ok(match self.pick(ALGORITHMS)? {
             CoseAlgorithm::Es256 => CoseKey::Es256 {
                 x: self.array()?,
                 y: self.array()?,
@@ -451,15 +482,15 @@ impl<'a> In<'a> {
 
     fn registration_options(&mut self) -> Result<RegistrationOptions, Error> {
         Ok(RegistrationOptions {
-            user_verification: self.pick(&REQUIREMENTS)?,
-            resident_key: self.pick(&RESIDENT_KEYS)?,
+            user_verification: self.pick(REQUIREMENTS)?,
+            resident_key: self.pick(RESIDENT_KEYS)?,
             timeout: self.timeout()?,
-            algorithms: self.list(|i| i.pick(&ALGORITHMS))?,
-            attachment: self.opt(|i| i.pick(&ATTACHMENTS))?,
-            conveyance: self.pick(&CONVEYANCES)?,
-            formats: self.list(|i| i.pick(&FORMATS))?,
-            hints: self.list(|i| i.pick(&HINTS))?,
-            mediation: self.pick(&MEDIATIONS)?,
+            algorithms: self.list(|i| i.pick(ALGORITHMS))?,
+            attachment: self.opt(|i| i.pick(ATTACHMENTS))?,
+            conveyance: self.pick(CONVEYANCES)?,
+            formats: self.list(|i| i.pick(FORMATS))?,
+            hints: self.list(|i| i.pick(HINTS))?,
+            mediation: self.pick(MEDIATIONS)?,
             extensions: RegistrationExtensions {
                 cred_props: match self.u8()? {
                     0 => false,
@@ -471,7 +502,7 @@ impl<'a> In<'a> {
                     1 => i.eval().map(PrfRequest::Eval),
                     _ => Err(corrupt()),
                 })?,
-                large_blob: self.opt(|i| i.pick(&LARGE_BLOBS))?,
+                large_blob: self.opt(|i| i.pick(LARGE_BLOBS))?,
                 app_id_exclude: self.opt(|i| i.text().map(AppId))?,
             },
         })
@@ -479,9 +510,9 @@ impl<'a> In<'a> {
 
     fn authentication_options(&mut self) -> Result<AuthenticationOptions, Error> {
         Ok(AuthenticationOptions {
-            user_verification: self.pick(&REQUIREMENTS)?,
+            user_verification: self.pick(REQUIREMENTS)?,
             timeout: self.timeout()?,
-            hints: self.list(|i| i.pick(&HINTS))?,
+            hints: self.list(|i| i.pick(HINTS))?,
             extensions: AuthenticationExtensions {
                 app_id: self.opt(|i| i.text().map(AppId))?,
                 prf: self.opt(Self::eval)?,
@@ -503,9 +534,8 @@ impl<'a> In<'a> {
             id: CredentialId::from_bytes(self.bytes()?).map_err(|_| corrupt())?,
             public_key: self.key()?,
             sign_count: self.u32()?,
-            uv_initialized: self
-                .pick(&[UserVerification::Verified, UserVerification::PresenceOnly])?,
-            transports: self.list(|i| i.pick(&TRANSPORTS))?,
+            uv_initialized: self.pick(VERIFICATIONS)?,
+            transports: self.list(|i| i.pick(TRANSPORTS))?,
             backup: self.pick(&[
                 Backup::SingleDevice,
                 Backup::MultiDevice(BackupState::NotBackedUp),
@@ -514,9 +544,9 @@ impl<'a> In<'a> {
             user: self.user()?,
             aaguid: Aaguid(self.array()?),
             attestation: Attestation {
-                format: self.pick(&FORMATS)?,
-                kind: self.pick(&KINDS)?,
-                trust: self.pick(&TRUSTS)?,
+                format: self.pick(FORMATS)?,
+                kind: self.pick(KINDS)?,
+                trust: self.pick(TRUSTS)?,
                 chain: self.list(Self::digest)?,
                 anchor: self.opt(Self::digest)?,
             },
@@ -1155,11 +1185,7 @@ mod tests {
 
         fn registration(handle: UserHandle) -> impl Strategy<Value = Record> {
             (
-                (
-                    pick(&ALGORITHMS, 300),
-                    pick(&FORMATS, 300),
-                    pick(&HINTS, 300),
-                ),
+                (pick(ALGORITHMS, 300), pick(FORMATS, 300), pick(HINTS, 300)),
                 (
                     any::<bool>(),
                     prop::option::of(prop_oneof![
@@ -1206,15 +1232,16 @@ mod tests {
 
         fn authentication() -> impl Strategy<Value = Record> {
             (
-                pick(&HINTS, 300),
+                pick(HINTS, 300),
                 prop::collection::vec(any::<u8>(), 0..300),
+                prop::collection::vec(any::<u16>(), 0..300),
                 prop::option::of(eval()),
                 prop::option::of(prop_oneof![
                     Just(LargeBlobOp::Read),
                     prop::collection::vec(any::<u8>(), 0..4).prop_map(LargeBlobOp::Write)
                 ]),
             )
-                .prop_map(|(hints, allowed, prf, large_blob)| {
+                .prop_map(|(hints, allowed, by_credential, prf, large_blob)| {
                     let mut options = AuthenticationOptions::new(
                         Requirement::Preferred,
                         Timeout::from_secs(30).unwrap_or(Timeout(30)),
@@ -1222,9 +1249,9 @@ mod tests {
                     options.hints = hints;
                     options.extensions.prf = prf;
                     options.extensions.large_blob = large_blob;
-                    options.extensions.prf_by_credential = allowed
+                    options.extensions.prf_by_credential = by_credential
                         .iter()
-                        .filter_map(|b| CredentialId::from_bytes(&[*b]).ok())
+                        .filter_map(|b| CredentialId::from_bytes(&b.to_be_bytes()).ok())
                         .map(|id| {
                             (
                                 id,
@@ -1248,14 +1275,14 @@ mod tests {
 
         fn credential(handle: UserHandle, id: CredentialId) -> impl Strategy<Value = Record> {
             (
-                pick(&TRANSPORTS, 300),
+                pick(TRANSPORTS, 300),
                 prop::collection::vec(any::<u8>(), 0..300),
                 any::<u32>(),
                 0..3_u8,
                 (
-                    prop::sample::select(&FORMATS[..]),
-                    prop::sample::select(&KINDS[..]),
-                    prop::sample::select(&TRUSTS[..]),
+                    prop::sample::select(FORMATS),
+                    prop::sample::select(KINDS),
+                    prop::sample::select(TRUSTS),
                 ),
             )
                 .prop_map(
@@ -1304,9 +1331,8 @@ mod tests {
 
         #[test]
         fn record_round_trip() -> Result<(), Box<TestError<Record>>> {
-            let (Ok(handle), Ok(id)) = (user(), CredentialId::from_bytes(b"id")) else {
-                return Ok(());
-            };
+            let id = CredentialId::from_bytes(b"id").map_err(|e| fail(e.kind()))?;
+            let handle = user().map_err(|e| fail(e.kind()))?;
             let config = ProptestConfig {
                 cases: 512,
                 rng_seed: RngSeed::Fixed(0x5eed_0002),
@@ -1320,20 +1346,27 @@ mod tests {
             ];
             TestRunner::new(config)
                 .run(&rows, |record| {
+                    let over_list = widest(&record) > 255;
+                    let unbounded = record.encode_unbounded();
+                    prop_assert_eq!(unbounded.is_err(), over_list);
+                    let too_big = over_list || unbounded.is_ok_and(|b| b.len() > crate::MAX_RECORD);
                     match record.encode() {
-                        // the start paths refuse a row past MAX_RECORD, so only smaller rows must read back
-                        Ok(bytes) if bytes.len() <= crate::MAX_RECORD => {
+                        Ok(bytes) => {
+                            prop_assert!(!too_big);
                             prop_assert_eq!(Record::decode(&bytes), Ok(record));
                         }
-                        Ok(_) => {}
                         Err(e) => {
+                            prop_assert!(too_big);
                             prop_assert_eq!(e.kind(), ErrorKind::TooLarge);
-                            prop_assert!(widest(&record) > 255);
                         }
                     }
                     Ok(())
                 })
                 .map_err(Box::new)
+        }
+
+        fn fail(kind: ErrorKind) -> Box<TestError<Record>> {
+            Box::new(TestError::Abort(alloc::format!("setup: {kind:?}").into()))
         }
     }
 }

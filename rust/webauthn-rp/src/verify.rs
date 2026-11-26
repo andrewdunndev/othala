@@ -21,7 +21,7 @@ use crate::record::{
 };
 use crate::response::{AuthenticationResponse, RegistrationResponse, sha256, split};
 use crate::trust::{Attestation, Format, Trust, TrustSource};
-use crate::{Effect, MAX_LISTED_CREDENTIALS, MAX_RECORD, Pending, Verdict};
+use crate::{Effect, MAX_LISTED_CREDENTIALS, Pending, Verdict};
 
 /// A verified registration; made only by `finish_registration`.
 #[derive(Debug)]
@@ -154,9 +154,7 @@ impl RelyingParty {
             user: user.handle.clone(),
             options: opts.clone(),
         });
-        if record.encode()?.len() > MAX_RECORD {
-            return Err(Error::new(ErrorKind::TooLarge));
-        }
+        record.encode()?;
         let creation = CreationOptions {
             challenge,
             rp_id: self.id.clone(),
@@ -347,9 +345,7 @@ impl RelyingParty {
             allowed: listed.iter().map(|d| sha256(d.id.as_bytes())).collect(),
             options: opts.clone(),
         });
-        if record.encode()?.len() > MAX_RECORD {
-            return Err(Error::new(ErrorKind::TooLarge));
-        }
+        record.encode()?;
         let request = RequestOptions {
             challenge,
             rp_id: self.id.clone(),

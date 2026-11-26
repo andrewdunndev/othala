@@ -66,7 +66,13 @@ pub(crate) fn cases() {
     let all = sections();
     assert_eq!(all.len(), 4);
     // a renamed phase would skip a section and still pass
-    assert_eq!(all.iter().filter(|s| check(s)).count(), 4);
+    let checked: Vec<&str> = all
+        .iter()
+        .filter(|s| check(s))
+        .map(|s| s.section.as_str())
+        .collect();
+    assert_eq!(checked.len(), 4);
+    assert!(checked.contains(&"16.2"), "section 16.2 was not checked");
 }
 
 fn check(s: &Section) -> bool {
