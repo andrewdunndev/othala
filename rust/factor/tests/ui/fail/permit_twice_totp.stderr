@@ -1,0 +1,9 @@
+error[E0382]: use of moved value: `a`
+ --> tests/ui/fail/permit_twice_totp.rs:5:22
+  |
+3 | fn twice(t: &Totp, a: Permit, b: Permit, c: &OtpCode, e: &mut impl base::Entropy) {
+  |                    - move occurs because `a` has type `factor::Permit`, which does not implement the `Copy` trait
+4 |     let _ = t.verify(a, c, None, e);
+  |                      - value moved here
+5 |     let _ = t.verify(a, c, None, e);
+  |                      ^ value used here after move

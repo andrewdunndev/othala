@@ -133,11 +133,11 @@ impl Throttle {
 }
 
 impl Permit {
+    pub(crate) const fn time(&self) -> UnixTime {
+        self.at
+    }
+
     /// Every verdict's effect starts here: the count one higher, guarded at the version this permit saw.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "the verifiers factor-06 to -08 land call it")
-    )]
     pub(crate) fn count(self, e: &mut impl Entropy) -> Builder<Key, Record> {
         let next = |count: u32| {
             Record::Attempts(Attempts {

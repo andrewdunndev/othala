@@ -89,6 +89,8 @@ impl Debug for Memory
 impl Debug for Minimum
 impl Debug for NewPassword
 impl Debug for OtpAlg
+impl Debug for OtpCode
+impl Debug for OtpKey
 impl Debug for OtpMatch
 impl Debug for Passes
 impl Debug for Password
@@ -102,6 +104,7 @@ impl Debug for RecoveryMatch
 impl Debug for Rejected
 impl Debug for Skew
 impl Debug for Throttle
+impl Debug for Totp
 impl Debug for TotpStep
 impl Debug for Wait
 impl Display for Error
@@ -201,8 +204,13 @@ method FreeAttempts::new const fn(attempts: u32) -> Result<Self, Error>
 method Lanes::new const fn(lanes: u32) -> Self
 method Memory::kib const fn(kib: u32) -> Self
 method NewPassword::new fn(text: &str, minimum: Minimum) -> Result<Self, Error>
+method OtpCode::parse fn(text: &str) -> Result<Self, Error>
+method OtpKey::export fn(self: &Self) -> SecretBytes
+method OtpKey::generate fn(alg: OtpAlg, e: &mut impl Entropy) -> Self
 method OtpKey::import fn(key: Vec<u8>) -> Result<Self, Error>
+method OtpMatch::step const fn(self: &Self) -> u64
 method Passes::new const fn(passes: u32) -> Self
+method Period::new const fn(secs: u32) -> Result<Self, Error>
 method Phc::as_str fn(self: &Self) -> &str
 method Record::decode fn(bytes: &[u8]) -> Result<Self, Error>
 method Record::encode fn(self: &Self) -> Vec<u8>
@@ -210,6 +218,9 @@ method Throttle::check fn(self: &Self, attempts: Option<Row<&Attempts>>, now: Un
 method Throttle::new const fn(policy: Backoff) -> Self
 method Throttle::reset fn(attempts: Row<&Attempts>, e: &mut impl Entropy) -> Effect
 method Throttle::unlimited const fn() -> Self
+method Totp::confirm fn(self: &Self, code: &OtpCode, now: UnixTime, last: Option<Row<&TotpStep>>, e: &mut impl Entropy) -> Result<Effect, Rejected>
+method Totp::new const fn(key: OtpKey, alg: OtpAlg, digits: Digits, period: Period, skew: Skew) -> Self
+method Totp::verify fn(self: &Self, permit: Permit, code: &OtpCode, last: Option<Row<&TotpStep>>, e: &mut impl Entropy) -> Result<Pending<Result<OtpMatch, Rejected>>, Error>
 method Wait::new const fn(secs: u64) -> Result<Self, Error>
 struct Attempts
 struct Backoff

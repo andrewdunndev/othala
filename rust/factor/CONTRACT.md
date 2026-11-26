@@ -98,7 +98,7 @@ pub fn recovery_verify(permit: Permit, code: &RecoveryCode, stored: Option<Row<&
 - T6 `Totp`, which holds its key, has no `Clone` or `PartialEq`: ui:totp_clone, ui:totp_eq (E0277 each), api.
 - T7 `Phc` has no `PartialEq`, so no hash is compared with `==` (R-g), and no `Display`, so a hash reaches text only through `as_str`: ui:phc_eq, ui:phc_display (E0277 each), api.
 - T8 `Permit` has no public constructor or field, so only `Throttle::check` issues one: ui:permit_forge (E0451), api.
-- T9 `Permit` is not `Clone`, and each verifier takes it by value, so one permit pays for one verify: ui:permit_clone (E0277), api; the by-value cases land with each verifier, ui:permit_twice [factor-06, -07, -08] (E0382).
+- T9 `Permit` is not `Clone`, and each verifier takes it by value, so one permit pays for one verify: ui:permit_clone (E0277), api; the by-value cases land with each verifier, ui:permit_twice_totp [factor-06], ui:permit_twice_password [factor-07], ui:permit_twice_recovery [factor-08] (E0382 each).
 - T10 `OtpMatch`, `PasswordMatch` and `RecoveryMatch` are made only inside their verifiers: ui:otp_match_forge, ui:password_match_forge (E0451 each), ui:recovery_match_forge (E0423), api.
 - T11 `Attempts`, `TotpStep` and `RecoveryHash` have no public constructor or field, so a stored value enters only through a verdict or `Record::decode`: ui:attempts_forge (E0451), ui:totp_step_forge, ui:recovery_hash_forge (E0423 each), api.
 - T12 `Error` has no public constructor or field: ui:error_forge (E0451), api.
@@ -126,7 +126,7 @@ Throttle (F1: verdicts only increment; the session effect does the one reset; op
 
 HOTP and TOTP (RFC 4226, RFC 6238)
 - R13 `hotp` (HMAC, dynamic truncation, modulo `10^digits`) agrees with RFC 4226 appendix D: vec:rfc4226/hotp.json (10 cases) in unit:otp::rfc4226 (row m3.rfc4226.hotp), mutants:otp [factor-02]; of vec:factor-derived/hotp.json (10 cases) only the values its cases name are this check's, since its `hotp_verify` and `hotp_resync` ops have no subject here (N5).
-- R14 `OtpKey::import` is `WeakKey` under 16 bytes (RFC 4226 R6) and `TooLarge` over 64; `generate` draws 20, 32 or 64 bytes for SHA-1, SHA-256 or SHA-512; `export` is the key byte for byte: unit:otp::tests::key_bounds [factor-02, generate and export factor-06].
+- R14 `OtpKey::import` is `WeakKey` under 16 bytes (RFC 4226 R6) and `TooLarge` over 64; `generate` draws 20, 32 or 64 bytes for SHA-1, SHA-256 or SHA-512; `export` is the key byte for byte: unit:otp::tests::key_bounds, unit:otp::tests::generate_draws_the_hash_size_and_export_returns_it [factor-02, generate and export factor-06].
 - R15 `Totp::verify` agrees with RFC 6238 appendix B for SHA-1, SHA-256 and SHA-512 and with the file's window and `last_step` cases (window 0 is `Skew::Exact`, 1 is `Skew::One`): vec:rfc6238/totp.json (45 cases) in row:rfc6238 (rows m3.rfc6238.*), vec:factor-derived/totp.json (23 cases) [factor-06].
 - R16 The step is the permit's time divided by the period, T0 at the epoch, so one attempt has one clock; candidates are `T - skew ..= T + skew`, saturating at 0: row:rfc6238, mutants:otp [factor-06].
 - R17 A code that matches only candidates at or before the last accepted step is `Rejected::Replayed` (RFC 6238 5.2 MUST), counted; a match takes the earliest candidate after the last, and the accepted step strictly increases over any sequence of applied verdicts: row:rfc6238, vec:factor-derived/totp.json (23 cases), prop:accepted_step_strictly_increases [factor-06, prop factor-09].
@@ -175,7 +175,7 @@ Recovery codes (NIST SP 800-63B-4 3.1.2)
 - B2 MSRV 1.89 against the committed lock: `just msrv`, `just lock`.
 - B3 The runtime dependencies are exactly argon2 (`alloc`, `password-hash`, `zeroize`; no `getrandom`, no `std`), base (with `expose`), hmac, sha1, sha2 and subtle (D6): `just deps` over `deps.txt`, `just deny` over `gates.json` `allow`.
 - B4 The public API is the committed snapshot: `just api` over `public-api.txt`.
-- B5 The ledger runs every case on disk and pins 29 cases and 29 twins, so a glob that matched nothing cannot pass: `just ledger` (`CASES` in `tests/ledger.rs`), `just twins`.
+- B5 The ledger runs every case on disk and pins 30 cases and 30 twins, so a glob that matched nothing cannot pass: `just ledger` (`CASES` in `tests/ledger.rs`), `just twins`.
 - B6 Every workspace deny-list lint is `forbid` here, so no module calls base's `host_applied` or allows a lint: `just canary`, `just lint`. The crate keeps no secret buffer of its own: `OtpKey`, `OtpCode`, `Password` and `RecoveryCode` wrap base `SecretBytes`, which base wipes (base R32) (R-j): api, review.
 - B7 `src/` is mutated with a factor floor and `missed == 0`: `gates.json` `mutants`, landing with its floor [factor-10].
 - B8 The fuzz targets `record_decode`, `otp_code_parse`, `phc_parse` and `recovery_code_parse` live in `factor/fuzz` with their corpora replayed [factor-04, factor-10].
@@ -201,7 +201,7 @@ Recovery codes (NIST SP 800-63B-4 3.1.2)
 | factor-03 | `src/throttle.rs`, `tests/row_throttle.rs` | the throttle | m3.inv.throttle-schedule, m3.inv.reset-only (R7 to R11) |
 | factor-04 | `src/store.rs`, `tests/row_record.rs`, `tests/golden/`, `fuzz/` | the record codec | m3-factor-record (R5, B8) |
 | factor-05 | `src/password.rs` | `argon2id`, costs, `NewPassword`, `password_hash` | m3.rfc9106.argon2id (R22 to R25) |
-| factor-06 | `src/otp.rs`, `tests/row_rfc6238.rs` | TOTP and its last step | m3.rfc6238.* (R15 to R21) |
+| factor-06 | `src/otp.rs`, `src/throttle.rs` (permit time), `tests/row_rfc6238.rs`, `tests/row_rfc6238_window.rs`, `tests/common/` | TOTP and its last step | m3-factor-rfc6238, m3-factor-rfc6238-window (R15 to R21) |
 | factor-07 | `src/password.rs`, `tests/row_password.rs` | `Password`, `Phc::parse`, verify and rehash | R26 to R28 |
 | factor-08 | `src/recovery.rs`, `tests/row_recovery.rs` | recovery codes | R30 to R33 |
 | factor-09 | `src/store.rs`, `tests/props.rs`, `tests/race.rs` | invariants | R3, R4, R6, R12, R17, R29, R33, O2, O3 |
