@@ -1,13 +1,13 @@
 error[E0277]: the trait bound `Mine: jose::alg::sealed::Alg` is not satisfied
- --> tests/ui/fail/sealed_alg.rs:7:20
+ --> tests/ui/fail/sealed_alg.rs:8:14
   |
-7 | impl jose::Alg for Mine {
-  |                    ^^^^ unsatisfied trait bound
+8 | impl Alg for Mine {
+  |              ^^^^ unsatisfied trait bound
   |
 help: the trait `jose::alg::sealed::Alg` is not implemented for `Mine`
- --> tests/ui/fail/sealed_alg.rs:6:1
+ --> tests/ui/fail/sealed_alg.rs:7:1
   |
-6 | struct Mine;
+7 | struct Mine;
   | ^^^^^^^^^^^
   = note: `Mine` implements similarly named trait `Alg`, but not `jose::alg::sealed::Alg`
 note: required by a bound in `Alg`

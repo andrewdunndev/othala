@@ -1,4 +1,5 @@
-#![allow(dead_code)]
+#![allow(dead_code, unused_imports)]
+use jose::KeyAlg;
 trait Local {
     const ALG: jose::JweAlg;
 }

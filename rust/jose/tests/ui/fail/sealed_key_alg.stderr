@@ -1,13 +1,13 @@
 error[E0277]: the trait bound `Mine: jose::jwe::envelope::sealed::KeyAlg` is not satisfied
- --> tests/ui/fail/sealed_key_alg.rs:6:23
+ --> tests/ui/fail/sealed_key_alg.rs:7:17
   |
-6 | impl jose::KeyAlg for Mine {
-  |                       ^^^^ unsatisfied trait bound
+7 | impl KeyAlg for Mine {
+  |                 ^^^^ unsatisfied trait bound
   |
 help: the trait `jose::jwe::envelope::sealed::KeyAlg` is not implemented for `Mine`
- --> tests/ui/fail/sealed_key_alg.rs:5:1
+ --> tests/ui/fail/sealed_key_alg.rs:6:1
   |
-5 | struct Mine;
+6 | struct Mine;
   | ^^^^^^^^^^^
   = note: `Mine` implements similarly named trait `KeyAlg`, but not `jose::jwe::envelope::sealed::KeyAlg`
 note: required by a bound in `KeyAlg`

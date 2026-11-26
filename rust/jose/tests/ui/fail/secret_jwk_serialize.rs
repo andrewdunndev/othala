@@ -1,5 +1,6 @@
-#![allow(dead_code)]
-fn needs<T: serde::Serialize>() {}
+#![allow(dead_code, unused_imports)]
+use serde::Serialize;
+fn needs<T: Serialize>() {}
 fn f() {
     needs::<jose::SecretJwk>();
 }

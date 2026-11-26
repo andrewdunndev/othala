@@ -1,7 +1,7 @@
 error[E0277]: the trait bound `Plaintext: serde::Serialize` is not satisfied
- --> tests/ui/fail/plaintext_serialize.rs:4:13
+ --> tests/ui/fail/plaintext_serialize.rs:5:13
   |
-4 |     needs::<jose::Plaintext>();
+5 |     needs::<jose::Plaintext>();
   |             ^^^^^^^^^^^^^^^ the trait `Serialize` is not implemented for `Plaintext`
   |
   = note: for local types consider adding `#[derive(serde::Serialize)]` to your `Plaintext` type
@@ -17,7 +17,7 @@ error[E0277]: the trait bound `Plaintext: serde::Serialize` is not satisfied
             (T0, T1, T2, T3, T4)
           and $N others
 note: required by a bound in `needs`
- --> tests/ui/fail/plaintext_serialize.rs:2:13
+ --> tests/ui/fail/plaintext_serialize.rs:3:13
   |
-2 | fn needs<T: serde::Serialize>() {}
-  |             ^^^^^^^^^^^^^^^^ required by this bound in `needs`
+3 | fn needs<T: Serialize>() {}
+  |             ^^^^^^^^^ required by this bound in `needs`

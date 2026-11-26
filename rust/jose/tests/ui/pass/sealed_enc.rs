@@ -1,4 +1,5 @@
-#![allow(dead_code)]
+#![allow(dead_code, unused_imports)]
+use jose::Enc;
 trait Local {
     const ENC: jose::JweEnc;
 }
