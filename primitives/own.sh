@@ -19,7 +19,7 @@ else
     # the ownership gate and the queue are the spine's: no other item may rewrite what checks it
     oracle+=(primitives/queue.json 'primitives/*.sh' .gitlab-ci.yml)
 fi
-mapfile -d '' -t paths < <(git diff --name-only --no-renames -z "$base")
+mapfile -d '' -t paths < <(git diff --name-only --no-renames -z "$base" HEAD)
 bad=0
 for p in "${paths[@]}"; do
     case "$p" in rust/Cargo.lock | rust/*/public-api.txt) continue ;; esac
