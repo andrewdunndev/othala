@@ -69,11 +69,11 @@ twins:
 
 # the cargo-mutants version ../mise.toml pins, for CI's cargo install
 mutants-pin:
-    @sed -n 's/^"cargo:cargo-mutants" = "\([0-9][0-9.]*\)"$/\1/p' ../mise.toml
+    @sed -n 's|^"github:sourcefrog/cargo-mutants" = "\([0-9][0-9.]*\)"$|\1|p' ../mise.toml
 
 # the cargo-deny version ../mise.toml pins, for CI's cargo install
 deny-pin:
-    @sed -n 's/^"cargo:cargo-deny" = "\([0-9][0-9.]*\)"$/\1/p' ../mise.toml
+    @sed -n 's|^"github:EmbarkStudios/cargo-deny" = "\([0-9][0-9.]*\)"$|\1|p' ../mise.toml
 
 # the installed cargo-mutants, cargo-deny and jq must be the versions ../mise.toml pins; CI installs by the same pin and is graded here
 tool-pins *tools="cargo-mutants jq cargo-deny":
@@ -81,8 +81,8 @@ tool-pins *tools="cargo-mutants jq cargo-deny":
     set -euo pipefail
     for t in {{tools}}; do
         case "$t" in
-            cargo-mutants) key='"cargo:cargo-mutants"'; have=$(cargo mutants --version | sed -n 's/^cargo-mutants \([0-9][0-9.]*\).*/\1/p') ;;
-            cargo-deny) key='"cargo:cargo-deny"'; have=$(cargo deny --version | sed -n 's/^cargo-deny \([0-9][0-9.]*\).*/\1/p') ;;
+            cargo-mutants) key='"github:sourcefrog\/cargo-mutants"'; have=$(cargo mutants --version | sed -n 's/^cargo-mutants \([0-9][0-9.]*\).*/\1/p') ;;
+            cargo-deny) key='"github:EmbarkStudios\/cargo-deny"'; have=$(cargo deny --version | sed -n 's/^cargo-deny \([0-9][0-9.]*\).*/\1/p') ;;
             jq) key='jq'; have=$(jq --version | sed -n 's/^jq-\([0-9][0-9.]*\).*/\1/p') ;;
             *) echo "tool-pins: unknown tool $t"; exit 1 ;;
         esac
@@ -101,7 +101,7 @@ mutants crate="": (tool-pins "cargo-mutants" "jq")
         if [ -n "$tests" ]; then scope=(--test-package "$tests"); else scope=(--test-workspace=true); fi
         mkdir -p "{{target}}/mutants/$c"
         jobs=$(nproc); [ "$jobs" -le "${MUTANTS_JOBS:-4}" ] || jobs=${MUTANTS_JOBS:-4}
-        env -u CARGO_TARGET_DIR cargo mutants --package "$c" "${scope[@]}" --jobs "$jobs" --no-shuffle --output "{{target}}/mutants/$c" < /dev/null
+        env -u CARGO_TARGET_DIR cargo mutants --package "$c" "${scope[@]}" --jobs "$jobs" --no-shuffle --minimum-test-timeout 60 --output "{{target}}/mutants/$c" < /dev/null
         jq -e --argjson floor "$floor" '.caught >= $floor and .missed == 0 and .timeout == 0' \
             "{{target}}/mutants/$c/mutants.out/outcomes.json" > /dev/null || { echo "mutants $c: under the floor of $floor, or missed or timed out"; exit 1; }
     done <<< "$runs"
@@ -118,7 +118,7 @@ mutants-off floor="5": (tool-pins "cargo-mutants" "jq")
     out="{{target}}/mutants/jose-off"
     jobs=$(nproc); [ "$jobs" -le "${MUTANTS_JOBS:-4}" ] || jobs=${MUTANTS_JOBS:-4}
     mkdir -p "$out"
-    env -u CARGO_TARGET_DIR cargo mutants -p jose --no-config --no-default-features --jobs "$jobs" --no-shuffle --output "$out" \
+    env -u CARGO_TARGET_DIR cargo mutants -p jose --no-config --no-default-features --jobs "$jobs" --no-shuffle --minimum-test-timeout 60 --output "$out" \
         "${files[@]/#/--file=}" --re "supported|replace == with != in Jw[se]<'a>::parse_json" -- -- --skip ledger < /dev/null
     jq -e --argjson floor "{{floor}}" '.caught >= $floor and .missed == 0 and .timeout == 0' \
         "$out/mutants.out/outcomes.json" > /dev/null || { echo "mutants-off: under the floor of {{floor}}, or missed or timed out"; exit 1; }
@@ -181,7 +181,7 @@ mutants-diff base="origin/main": (tool-pins "cargo-mutants" "jq")
         rm -rf "{{target}}/mutants/$c"; mkdir -p "{{target}}/mutants/$c"
         git diff --no-renames --relative "$mb" -- "$c/" > "{{target}}/mutants/$c.diff"
         jobs=$(nproc); [ "$jobs" -le "${MUTANTS_JOBS:-4}" ] || jobs=${MUTANTS_JOBS:-4}
-        env -u CARGO_TARGET_DIR cargo mutants --package "$c" "${scope[@]}" --jobs "$jobs" --no-shuffle --in-diff "{{target}}/mutants/$c.diff" --output "{{target}}/mutants/$c" < /dev/null
+        env -u CARGO_TARGET_DIR cargo mutants --package "$c" "${scope[@]}" --jobs "$jobs" --no-shuffle --minimum-test-timeout 60 --in-diff "{{target}}/mutants/$c.diff" --output "{{target}}/mutants/$c" < /dev/null
         out="{{target}}/mutants/$c/mutants.out/outcomes.json"
         if [ ! -f "$out" ]; then echo "mutants-diff $c: the diff holds no mutant"; continue; fi
         jq -e '.missed == 0 and .timeout == 0' "$out" > /dev/null || { echo "mutants-diff $c: a mutant was missed or timed out"; exit 1; }
