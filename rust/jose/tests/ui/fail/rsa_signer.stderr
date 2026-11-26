@@ -1,0 +1,20 @@
+error[E0277]: the trait bound `jose::Rs256: LocalAlg` is not satisfied
+ --> tests/ui/fail/rsa_signer.rs:5:13
+  |
+5 |     needs::<jose::SigningKey<Alg>>();
+  |             ^^^^^^^^^^^^^^^^^^^^^ the trait `LocalAlg` is not implemented for `jose::Rs256`
+  |
+  = help: the following other types implement trait `LocalAlg`:
+            jose::EdDsa
+            jose::Es256
+            jose::Es384
+            jose::Es512
+            jose::Hs256
+            jose::Hs384
+            jose::Hs512
+  = note: required for `SigningKey<jose::Rs256>` to implement `jose::Signer<jose::Rs256>`
+note: required by a bound in `needs`
+ --> tests/ui/fail/rsa_signer.rs:3:13
+  |
+3 | fn needs<T: jose::Signer<Alg>>() {}
+  |             ^^^^^^^^^^^^^^^^^ required by this bound in `needs`

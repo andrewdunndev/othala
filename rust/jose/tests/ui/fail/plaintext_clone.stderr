@@ -1,0 +1,11 @@
+error[E0277]: the trait bound `Plaintext: Clone` is not satisfied
+ --> tests/ui/fail/plaintext_clone.rs:4:13
+  |
+4 |     needs::<jose::Plaintext>();
+  |             ^^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `Plaintext`
+  |
+note: required by a bound in `needs`
+ --> tests/ui/fail/plaintext_clone.rs:2:13
+  |
+2 | fn needs<T: Clone>() {}
+  |             ^^^^^ required by this bound in `needs`

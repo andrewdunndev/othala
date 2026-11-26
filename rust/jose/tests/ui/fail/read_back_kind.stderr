@@ -1,0 +1,17 @@
+error[E0599]: the associated function or constant `read_back` exists for struct `Policy<K>`, but its trait bounds were not satisfied
+ --> tests/ui/fail/read_back_kind.rs:3:32
+  |
+3 |     let _ = jose::Policy::<K>::read_back(issuer, leeway, jose::Expiry::Unchecked);
+  |                                ^^^^^^^^^ associated function or constant cannot be called on `Policy<K>` due to unsatisfied trait bounds
+  |
+note: if you're trying to build a new `Policy<K>`, consider using `Policy::<K>::new` which returns `Result<Policy<_>, jose::Error>`
+ --> src/claims.rs
+  |
+  |     pub fn new(issuer: Issuer, audience: Audience, leeway: Leeway) -> Result<Self, Error> {
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = note: the following trait bounds were not satisfied:
+          `K: ReadBack`
+help: consider restricting the type parameter to satisfy the trait bound
+  |
+2 | fn f<K: jose::TokenKind>(issuer: jose::Issuer, leeway: jose::Leeway) where K: ReadBack {
+  |                                                                      +++++++++++++++++

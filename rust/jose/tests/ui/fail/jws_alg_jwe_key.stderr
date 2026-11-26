@@ -1,0 +1,15 @@
+error[E0277]: the trait bound `A: KeyAlg` is not satisfied
+ --> tests/ui/fail/jws_alg_jwe_key.rs:2:27
+  |
+2 | fn f<A: jose::Alg>(_key: &jose::EncryptKey<A>) {}
+  |                           ^^^^^^^^^^^^^^^^^^^ the trait `KeyAlg` is not implemented for `A`
+  |
+note: required by a bound in `EncryptKey`
+ --> src/jwe/envelope.rs
+  |
+  | pub struct EncryptKey<K: KeyAlg> {
+  |                          ^^^^^^ required by this bound in `EncryptKey`
+help: consider further restricting type parameter `A` with trait `KeyAlg`
+  |
+2 | fn f<A: jose::Alg + jose::KeyAlg>(_key: &jose::EncryptKey<A>) {}
+  |                   ++++++++++++++

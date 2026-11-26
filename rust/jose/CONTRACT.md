@@ -1,0 +1,371 @@
+# jose contract
+
+Every public signature is listed below verbatim, with the item that lands its body in brackets (`[01]` is this item: a type, a trait, a marker or a constant, which need no body). Each claim carries one tag from the claims ledger: *Type* (the program does not compile), *Runtime* (a check returns an error or a value), *Obligation* (the consumer's or host's, which the crate cannot see). Non-goals and non-claims follow; each non-goal names the claim that holds it.
+
+Checks:
+- `ui:x (Ennnn)` is `tests/ui/fail/x.rs` with its committed `.stderr` opening with that rustc code, and its compiling twin `tests/ui/pass/x.rs` one line and one token away (`just twins`). `tests/ledger.rs` fails unless the cases on disk are exactly the names below; `ui:x (Ennnn, jose-NN)` lands with that item, since its case calls a function that item writes. `off_*` cases run with every feature off, the rest with every feature on.
+- `api` is the committed `public-api.txt` (`just api`): an absence (no accessor, no constructor, no impl) is held there.
+- `vec:f#id` is a case of `rust/vectors/f`; `vec:f` is the whole file. A refusal's error kind is compared only where the oracle file names one (`kind named`); elsewhere the check is refusal alone. Rows read files through testkit's typed readers (`testkit::vectors::{wycheproof, sections, figures}`, testkit `b0aba876`), which check each file's SHA-256 and count against `SOURCES.toml`.
+- `row:x` is `tests/row_x.rs`, one file per family (Layout below). `lib:m::x` is a row run as a `--lib` filter over a `#[cfg(test)]` module of `src/m.rs`, where the inputs are raw primitive values no public item takes (ruling R-l). `prop:t` is a fixed-seed proptest in a row file; `unit:m::t` a test in `src/m.rs`.
+- `gate:x` is `just x` with jose's `gates.json`.
+
+## Signatures
+
+Crate root `[01]`:
+```rust
+pub const MAX_COMPACT_LEN: usize = 16_384;
+pub const MAX_JSON_LEN: usize = 65_536;
+pub const MAX_JSON_DEPTH: usize = 32;
+pub const MAX_JWKS_KEYS: usize = 32;
+pub const MAX_ENTRIES: usize = 8;
+pub const MAX_NAME_LEN: usize = 256;
+pub const MAX_LEEWAY: u64 = 300;
+pub const MIN_RSA_BITS: usize = 2048;
+pub const MAX_RSA_BITS: usize = 8192;
+pub const MAX_RSA_EXPONENT: u64 = (1 << 33) - 1;
+```
+
+Errors (`src/error.rs`):
+```rust
+#[non_exhaustive] #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ErrorKind { Malformed, TooLarge, DuplicateMember, UnsupportedAlg, AlgMismatch, KeyAlgMissing, CriticalHeader, WeakKey,
+    KeyUse, BadSignature, Decrypt, Expired, NotYetValid, Issuer, Audience, Type, MissingClaim, ClaimType, Signer }  // [01]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)] pub struct Error;                                                     // [01]
+impl Error { pub const fn kind(&self) -> ErrorKind }                                                               // [07]
+impl From<ErrorKind> for Error                                                                                     // [07]
+impl core::fmt::Display for Error                                                                                  // [07]
+impl core::error::Error for Error                                                                                  // [07]
+```
+
+Algorithms (`src/alg.rs` `[01]`; `sealed::*` are crate-private supertraits):
+```rust
+pub trait Alg: sealed::Alg { const ALG: SigningAlg; type Signature: AsRef<[u8]> + for<'a> TryFrom<&'a [u8]>; }
+pub trait PublicAlg: Alg {}
+pub trait SignAlg: Alg {}
+pub trait LocalAlg: SignAlg + sealed::Local {}
+#[cfg(feature = "rsa-sign")] pub trait BlindedAlg: SignAlg + sealed::Blinded {}
+pub trait KeyAlg: sealed::KeyAlg { const ALG: JweAlg; }
+pub trait PublicKeyAlg: KeyAlg {}
+pub trait LocalKeyAlg: KeyAlg + sealed::Unwrap {}
+#[cfg(feature = "rsa-decrypt")] pub trait BlindedKeyAlg: KeyAlg + sealed::BlindedUnwrap {}
+pub trait Enc: sealed::Enc { const ENC: JweEnc; }
+#[non_exhaustive] #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SigningAlg { Hs256, Hs384, Hs512, Rs256, Rs384, Rs512, Ps256, Ps384, Ps512, Es256, Es384, Es512, EdDsa }
+#[non_exhaustive] #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum JweAlg { A128Kw, A192Kw, A256Kw, A128GcmKw, A192GcmKw, A256GcmKw, Dir, EcdhEs, EcdhEsA128Kw, EcdhEsA192Kw, EcdhEsA256Kw, RsaOaep, RsaOaep256 }
+#[non_exhaustive] #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum JweEnc { A128Gcm, A192Gcm, A256Gcm, A128CbcHs256, A192CbcHs384, A256CbcHs512 }
+impl SigningAlg { pub const fn name(self) -> &'static str }                                         // [07]
+impl SigningAlg { pub fn parse(name: &str) -> Result<Self, Error> }                                  // [09]
+impl serde::Serialize for SigningAlg; impl<'de> serde::Deserialize<'de> for SigningAlg               // [09], the registry name through parse
+impl SigningAlg { pub fn half_hash(self, octets: &[u8]) -> String }                                  // [16]
+impl JweAlg { pub const fn name(self) -> &'static str }                                             // [07]
+impl JweAlg { pub fn parse(name: &str) -> Result<Self, Error> }                                      // [17]
+impl JweEnc { pub fn parse(name: &str) -> Result<Self, Error>; pub const fn name(self) -> &'static str }     // [17]
+```
+
+Markers, each `#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)] pub struct X;` `[01]`; their impls land with their family:
+```rust
+impl Alg for Hs256 { const ALG: SigningAlg = SigningAlg::Hs256; type Signature = [u8; 32]; } impl SignAlg + LocalAlg  // [02]; Hs384 [u8; 48], Hs512 [u8; 64]
+impl Alg for Es256 { type Signature = [u8; 64]; } impl PublicAlg + SignAlg + LocalAlg                                  // [03]; Es384 [u8; 96]
+#[cfg(feature = "es512")] impl Alg for Es512 { type Signature = [u8; 132]; } impl PublicAlg + SignAlg + LocalAlg      // [14]
+impl Alg for EdDsa { type Signature = [u8; 64]; } impl PublicAlg + SignAlg + LocalAlg                                  // [04]
+impl Alg for Rs256 { type Signature = Vec<u8>; } impl PublicAlg                                                        // [05]; Rs384, Rs512
+impl Alg for Ps256 { type Signature = Vec<u8>; } impl PublicAlg                                                        // [06]; Ps384, Ps512
+#[cfg(feature = "rsa-sign")] impl SignAlg + BlindedAlg for Rs256, Rs384, Rs512, Ps256, Ps384, Ps512                   // [15]
+impl KeyAlg + LocalKeyAlg for A128Kw, A192Kw, A256Kw, A128GcmKw, A192GcmKw, A256GcmKw, Dir                             // [17]
+impl Enc for A128Gcm, A192Gcm, A256Gcm, A128CbcHs256, A192CbcHs384, A256CbcHs512                                       // [17]
+impl KeyAlg + PublicKeyAlg + LocalKeyAlg for EcdhEs, EcdhEsA128Kw, EcdhEsA192Kw, EcdhEsA256Kw                          // [18]
+#[cfg(feature = "rsa-decrypt")] impl KeyAlg + PublicKeyAlg + BlindedKeyAlg for RsaOaep, RsaOaep256                    // [19]
+```
+
+Keys (`src/key.rs`, `src/key/any.rs`, `src/sign.rs`):
+```rust
+pub struct VerifyKey<A: Alg>;                                                                          // [01]
+impl<A: Alg> VerifyKey<A> { pub fn verify_signature(&self, signing_input: &[u8], signature: &[u8]) -> Result<(), Error> }  // [02]
+impl<A: Alg> core::fmt::Debug for VerifyKey<A>                                                         // [02]
+pub trait Signer<A: Alg> { fn sign(&self, input: &[u8]) -> Result<A::Signature, Error>; }             // [01]
+pub struct SigningKey<A: SignAlg>;                                                                     // [01]
+impl<A: LocalAlg> Signer<A> for SigningKey<A>; impl<A: SignAlg> core::fmt::Debug for SigningKey<A>     // [13]
+pub struct AnyVerifyKey; pub struct AnySigningKey;                                                     // [01]
+impl AnyVerifyKey { pub fn from_jwk(jwk: &Jwk) -> Result<Self, Error>; pub fn from_jwk_for(jwk: &Jwk, alg: SigningAlg) -> Result<Self, Error>; pub fn alg(&self) -> SigningAlg }  // [10]
+impl AnySigningKey { pub fn from_jwk(jwk: &SecretJwk) -> Result<Self, Error>; pub fn alg(&self) -> SigningAlg }  // [10]
+impl<A: LocalAlg> Signer<A> for AnySigningKey; impl core::fmt::Debug for AnyVerifyKey, AnySigningKey   // [10]
+```
+
+JWK (`src/jwk/{decode,thumbprint,set}.rs`):
+```rust
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)] pub struct Kid;                          // [01]
+impl Kid { pub fn new(text: &str) -> Result<Self, Error>; pub fn as_str(&self) -> &str }              // [07]
+impl serde::Serialize for Kid; impl<'de> serde::Deserialize<'de> for Kid                              // [07], through Kid::new
+impl Kid { pub fn from_thumbprint(thumbprint: &Digest) -> Self }                                      // [08]
+#[non_exhaustive] #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)] pub enum Kty { Ec, Rsa, Okp, Oct }  // [01]
+pub struct Jwk; pub struct SecretJwk;                                                                 // [01]
+impl Jwk { pub fn decode(json: &[u8]) -> Result<Self, Error>; pub fn kid(&self) -> Option<&Kid>; pub fn kty(&self) -> Kty;
+    pub fn sig_alg(&self) -> Option<SigningAlg>; pub fn verify_key<A: PublicAlg>(&self) -> Result<VerifyKey<A>, Error>;
+    pub fn encrypt_key<K: PublicKeyAlg>(&self) -> Result<EncryptKey<K>, Error> }                       // [07]
+impl Clone for Jwk; impl core::fmt::Debug for Jwk                                                      // [07]
+impl SecretJwk { pub fn decode(json: &[u8]) -> Result<Self, Error>; pub fn from_oct(key: SecretBytes) -> Self;
+    pub fn kid(&self) -> Option<&Kid>; pub fn kty(&self) -> Kty; pub fn public(&self) -> Option<Jwk>;
+    pub fn verify_key<A: Alg>(&self) -> Result<VerifyKey<A>, Error>; pub fn signing_key<A: SignAlg>(&self) -> Result<SigningKey<A>, Error>;
+    pub fn encrypt_key<K: KeyAlg>(&self) -> Result<EncryptKey<K>, Error>; pub fn decrypt_key<K: KeyAlg>(&self) -> Result<DecryptKey<K>, Error> }  // [07]
+impl core::fmt::Debug for SecretJwk                                                                    // [07]
+impl Jwk { pub fn thumbprint(&self) -> Digest }; impl SecretJwk { pub fn thumbprint(&self) -> Digest }  // [08]
+pub struct JwkSet; #[non_exhaustive] #[derive(Clone, Copy)] pub enum JwkEntry<'a> { Public(&'a Jwk), Secret(&'a SecretJwk) }  // [01]
+impl JwkSet { pub fn decode(json: &[u8]) -> Result<Self, Error>; pub fn decode_public(json: &[u8]) -> Result<Self, Error>; pub fn new(keys: Vec<Jwk>) -> Result<Self, Error>;
+    pub fn find(&self, kid: &Kid) -> Result<JwkEntry<'_>, Error>; pub fn entries(&self) -> impl ExactSizeIterator<Item = JwkEntry<'_>> }  // [10]
+impl serde::Serialize for Jwk; impl serde::Serialize for JwkSet                                        // [10]
+```
+
+JWS (`src/jws/{header,compact,json}.rs`, `src/sign.rs`, `src/sig/rsa_sign.rs`):
+```rust
+pub struct Jws<'a>; pub struct Payload;                                                                // [01]
+impl<'a> Jws<'a> { pub fn parse(compact: &'a str) -> Result<Self, Error>; pub fn kids(&self) -> &[Kid];
+    pub fn verify<A: Alg>(self, key: &VerifyKey<A>) -> Result<Payload, Error> }                        // [09]
+impl Payload { pub fn bytes(&self) -> &[u8] }; impl core::fmt::Debug for Jws<'_>, Payload              // [09]
+impl<'a> Jws<'a> { pub fn verify_any(self, key: &AnyVerifyKey) -> Result<Payload, Error> }            // [10]
+impl<'a> Jws<'a> { pub fn parse_json(json: &'a [u8]) -> Result<Self, Error> }                         // [11]
+#[derive(Clone, Debug, PartialEq, Eq)] pub struct Header<A: Alg>; #[must_use] pub struct Unsigned<A: Alg>; #[derive(Clone)] pub struct Compact;  // [01]
+impl<A: Alg> Header<A> { pub const fn new() -> Self; pub fn with_kid(self, kid: Kid) -> Self; pub fn kid(&self) -> Option<&Kid>; pub const fn alg(&self) -> SigningAlg }  // [13]
+impl<A: Alg> Unsigned<A> { pub fn jws(header: Header<A>, payload: &[u8]) -> Result<Self, Error>;
+    pub fn jwt<K: TokenKind>(header: Header<A>, claims: &K::Claims) -> Result<Self, Error> where K::Claims: serde::Serialize;
+    pub fn header(&self) -> &Header<A>; pub fn signing_input(&self) -> &[u8];
+    pub fn finish(self, signature: A::Signature) -> Result<Compact, Error>; pub fn sign(self, signer: &impl Signer<A>) -> Result<Compact, Error> }  // [13]
+impl<A: Alg> core::fmt::Debug for Unsigned<A>; impl Compact { pub fn as_str(&self) -> &str }; impl core::fmt::Debug for Compact  // [13]
+#[cfg(feature = "rsa-sign")] impl<A: BlindedAlg> Unsigned<A> { pub fn sign_blinded(self, key: &SigningKey<A>, e: &mut impl Entropy) -> Result<Compact, Error> }  // [15]
+impl Compact { pub fn flattened(&self) -> String; pub fn general(tokens: &[Compact]) -> Result<String, Error> }  // [11]
+```
+
+JWT (`src/claims.rs`, `src/jwt.rs`):
+```rust
+pub trait TokenKind { const TYP: Typ; type Claims: serde::de::DeserializeOwned; }                     // [01]
+pub trait ReadBack: TokenKind {}                                                                       // [01]
+#[non_exhaustive] #[derive(Clone, Copy, Debug, PartialEq, Eq)] pub enum Typ { Explicit(&'static str), Generic }  // [01]
+#[non_exhaustive] #[derive(Clone, Copy, Debug, PartialEq, Eq)] pub enum Expiry { Required, Unchecked }  // [01]
+pub struct Policy<K: TokenKind>;                                                                       // [01]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)] pub struct Issuer; pub struct Audience; // [01]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)] pub struct Leeway;                                  // [01]
+impl<K: TokenKind> Policy<K> { pub fn new(issuer: Issuer, audience: Audience, leeway: Leeway) -> Result<Self, Error> }  // [16]
+impl<K: ReadBack> Policy<K> { pub fn read_back(issuer: Issuer, leeway: Leeway, expiry: Expiry) -> Result<Self, Error> }  // [16]
+impl<K: TokenKind> Clone for Policy<K>; impl<K: TokenKind> core::fmt::Debug for Policy<K>; impl<K: TokenKind> PartialEq for Policy<K>; impl<K: TokenKind> Eq for Policy<K>  // [16]
+impl Issuer { pub fn new(text: &str) -> Result<Self, Error>; pub fn as_str(&self) -> &str }           // [16]
+impl Audience { pub fn new(text: &str) -> Result<Self, Error>; pub fn as_str(&self) -> &str }         // [16]
+impl serde::Serialize for Issuer, Audience; impl<'de> serde::Deserialize<'de> for Issuer, Audience    // [16], through new
+impl Leeway { pub const fn new(seconds: u64) -> Result<Self, Error>; pub const fn seconds(self) -> u64 }  // [16]
+pub struct Jwt<'a>; pub struct VerifiedJwt;                                                            // [01]
+impl<'a> Jwt<'a> { pub fn parse(compact: &'a str) -> Result<Self, Error>; pub fn kid(&self) -> Option<&Kid>;
+    pub fn verify<A: Alg>(self, key: &VerifyKey<A>) -> Result<VerifiedJwt, Error>; pub fn verify_any(self, key: &AnyVerifyKey) -> Result<VerifiedJwt, Error> }  // [16]
+impl VerifiedJwt { pub fn claims<K: TokenKind>(self, policy: &Policy<K>, now: UnixTime) -> Result<K::Claims, Error> }  // [16]
+impl core::fmt::Debug for Jwt<'_>, VerifiedJwt                                                         // [16]
+```
+
+JWE (`src/jwe/{envelope,kw,content,ecdh,oaep}.rs`):
+```rust
+pub struct Jwe<'a>; pub struct Plaintext; pub struct EncryptKey<K: KeyAlg>; pub struct DecryptKey<K: KeyAlg>;  // [01]
+impl<'a> Jwe<'a> { pub fn parse(compact: &'a str) -> Result<Self, Error>; pub fn parse_json(json: &'a [u8]) -> Result<Self, Error>;
+    pub fn kids(&self) -> &[Kid]; pub fn decrypt<K: LocalKeyAlg, E: Enc>(self, key: &DecryptKey<K>) -> Result<Plaintext, Error> }  // [17]
+impl Plaintext { pub fn bytes(&self) -> &[u8]; pub fn aad(&self) -> Option<&[u8]> }                    // [17]
+impl<K: KeyAlg> EncryptKey<K> { pub fn encrypt<E: Enc>(&self, plaintext: &[u8], e: &mut impl Entropy) -> Result<Compact, Error>;
+    pub fn encrypt_jwt<E: Enc>(&self, jwt: &Compact, e: &mut impl Entropy) -> Result<Compact, Error> }  // [17]
+impl core::fmt::Debug for Jwe<'_>, Plaintext, EncryptKey<K>, DecryptKey<K>                              // [17]
+#[cfg(feature = "rsa-decrypt")] impl<'a> Jwe<'a> { pub fn decrypt_blinded<K: BlindedKeyAlg, E: Enc>(self, key: &DecryptKey<K>, e: &mut impl Entropy) -> Result<Plaintext, Error> }  // [19]
+```
+
+## Bounds (rule 5.7)
+Each bound is a named `pub const` at the crate root; each is checked before anything is allocated, and exceeding it is `TooLarge` (`WeakKey` below `MIN_RSA_BITS`), never a panic.
+- `MAX_COMPACT_LEN`: compact token bytes, read and written: vec:jose-derived/limits.json#compact-bytes (kind named).
+- `MAX_JSON_DEPTH`: header and claims JSON depth, and JWK depth: vec:jose-derived/limits.json#header-depth, #claims-depth (kind named).
+- `MAX_JWKS_KEYS`: keys a set keeps: vec:jose-derived/limits.json#jwks-key-count (kind named).
+- `MIN_RSA_BITS`: vec:jose-derived/keys.json#rs256-2047, #rs256-1024 (kind named).
+- `MAX_JSON_LEN`, `MAX_ENTRIES`, `MAX_NAME_LEN`, `MAX_LEEWAY`, `MAX_RSA_BITS`, `MAX_RSA_EXPONENT`: oracle gap, no oversize case yet in jose-derived/limits.json; requested of the oracle lane.
+
+## Type
+- T1 A parsed `Jws` has no payload accessor; the payload exists only as the `Payload` that a verify returns: api.
+- T2 A parsed `Jwt` has no claims or payload accessor, and a `VerifiedJwt` none either, so `claims` with a `Policy` is the only way out (RFC 8725 3.8, 3.9, 3.11): api.
+- T3 `Payload`, `VerifiedJwt` and `Plaintext` have no public constructor or field: api.
+- T4 `Policy` has no `Default`: ui:policy_default (E0277).
+- T5 Issuer and audience are distinct types, so they cannot be swapped into a policy (8725 3.8, 3.9): ui:policy_swap (E0308).
+- T6 A policy is typed by its kind, so an ID-token policy is not an access-token policy (8725 3.11, 3.12): ui:kind_policy (E0308).
+- T7 Only a `ReadBack` kind has `Policy::read_back`, the one policy that skips the audience and the one that takes `Expiry::Unchecked`; every `Policy::new` requires `exp`: ui:read_back_kind (E0599).
+- T8 A verify key verifies only its own algorithm, and `Jws::verify::<A>` takes only a `VerifyKey<A>` (8725 3.1): ui:alg_bound (E0308).
+- T9 Issuing is typed like verifying: `Header<A>` and `Unsigned<A>` carry the algorithm in the type, so a header cannot name one algorithm while another signs: ui:unsigned_alg_bound (E0308).
+- T10 A `Signer<A>` returns `A::Signature`: a fixed-size array for HS, ES and EdDSA, so `finish` and `sign` cannot receive a signature of the wrong length for those: api.
+- T11 An HMAC key cannot come from a public JWK: `Jwk::verify_key` takes only `PublicAlg`, which no HS marker implements, closing the RS-to-HS swap on the static path (8725 3.1): ui:hmac_public_jwk (E0277).
+- T12 `none` is not a `SigningAlg`, so no header the crate issues carries it (8725 3.2, RFC 7518 3.6): ui:no_none_alg (E0599).
+- T13 A decrypt key decrypts only under its own key-management algorithm: ui:decrypt_key_bound (E0308).
+- T14 `EncryptKey` and `DecryptKey` take only a key-management algorithm, so no JWS algorithm (EdDSA among them) is a JWE key's: ui:jws_alg_jwe_key (E0277).
+- T15 This crate's own RSA private key never signs through `Signer`, which takes no entropy: `SigningKey<Rs*>` and `SigningKey<Ps*>` are not `Signer`s and sign only through `sign_blinded`; with `rsa-sign` off no RS or PS `SigningKey` exists and `BlindedAlg` does not exist. A host's own `Signer<Rs256>` (WebCrypto, a KMS) is allowed: ui:rsa_signer (E0277), ui:off_rsa_sign (E0405).
+- T16 `SecretJwk`, `SigningKey`, `DecryptKey` and `Plaintext` are not `Serialize`, so private key material and plaintext cannot become a store record or a log field: ui:secret_jwk_serialize (E0277), ui:signing_key_serialize (E0277), ui:decrypt_key_serialize (E0277), ui:plaintext_serialize (E0277).
+- T17 `SecretJwk`, `Plaintext` and `VerifyKey` are not `Clone`: ui:secret_jwk_clone (E0277), ui:plaintext_clone (E0277), ui:verify_key_clone (E0277); nor are `SigningKey`, `AnyVerifyKey`, `AnySigningKey`, `EncryptKey` and `DecryptKey`: api.
+- T18 `Compact` is a bearer value with no equality and no `Display`: ui:compact_eq (E0277), api.
+- T19 `Alg`, `KeyAlg` and `Enc` are sealed, and through them every marker trait, so a consumer cannot add an algorithm the contract did not review: ui:sealed_alg (E0277), ui:sealed_key_alg (E0277), ui:sealed_enc (E0277). `Signer`, `TokenKind` and `ReadBack` are open on purpose (an HSM, a token kind).
+- T20 Every public enum is `#[non_exhaustive]`: ui:error_kind_exhaustive (E0004), api.
+- T21 No function fetches: nothing takes a URL, a socket or a file, and `jku`, `x5u`, `x5c` and header `jwk` have no accessor (8725 3.10): api, gate:lint (sockets and files are `disallowed_methods`).
+- T22 With `es512` off `Es512` does not exist, and with `rsa-decrypt` off neither do `RsaOaep` and `RsaOaep256`: ui:off_es512 (E0425), ui:off_rsa_decrypt (E0425).
+- T23 jose is stateless: no signature names `Effect`, `Pending`, `Store`, `Row` or `Receipt`, so it adds no transaction domain: api.
+- T24 Time enters only as a `UnixTime` argument and randomness only as `&mut impl Entropy`; no verify and no `decrypt` takes entropy: api, gate:lint (clock and OS randomness are `disallowed_methods`).
+- T25 `no_std` plus `alloc` for wasm32-unknown-unknown and thumbv7em-none-eabi, with no features and with every feature: gate:wasm, gate:thumb.
+- T26 MSRV 1.89 against the committed lock: gate:msrv.
+- T27 The direct runtime dependencies are `deps.txt`'s (base, serde, serde_json without `arbitrary_precision` or `preserve_order`, sha2, hmac, p256, p384, ecdsa, ed25519-dalek, rsa, aes, aes-gcm, cbc, aes-kw, one-step-kdf; `es512` adds p521, `rsa-decrypt` sha1 and rand_core, `rsa-sign` rand_core); curve crates without `std`; the `Entropy`-to-`rand_core` adapter rsa needs is private to jose: gate:deps, gate:deny.
+- T28 Three features, all off by default: `es512`, `rsa-decrypt`, `rsa-sign`; every other algorithm is always built: `Cargo.toml`, gate:test with every feature and with none (R-i).
+
+## Runtime: JWS
+- R1 RFC 7515 A.1 (HS256), A.2 (RS256) and A.3 (ES256) verify under their keys, and each tampered, truncated or signature-less case is refused: vec:rfc7515/jws.json, row:rfc7515.
+- R2 RFC 7515 A.4 (ES512, `es512`), A.6 (general) and A.7 (flattened) verify; A.5 (unsecured) is refused under every key: vec:rfc7515/appendix-a4-a7.json, row:rfc7515_json (A.4 in row:es512).
+- R3 RFC 7520 4.1 (RS256), 4.2 (PS384), 4.3 (ES512, `es512`), 4.4 (HS256), 4.6, 4.7 and 4.8 verify in each serialization given; 4.5 (detached) is refused: vec:rfc7520/jws.json, row:rfc7520_jws (4.3 in row:es512).
+- R4 The header `alg` is compared with the key's, byte for byte, and never selects code: any other value is `AlgMismatch`, `none`, a case variant and an HS value over a public key included (8725 3.1): vec:jose-derived/header.json#alg-none-with-mac, #alg-case-differs (kind named), vec:rfc8725-derived/jws-alg.json, vec:rfc7515/jws.json#alg-none-unsigned, #alg-confusion-rs256-as-hs256, row:rfc8725.
+- R5 A missing or non-string `alg` is refused (`Malformed`): vec:jose-derived/header.json#alg-missing, #alg-not-string.
+- R6 Wycheproof signatures through `VerifyKey::verify_signature`: every `valid` case verifies and every `invalid` case is refused; `acceptable` cases and HMAC keys shorter than the hash (R13) are not applicable by name: vec:wycheproof/hmac_sha{256,384,512}_test.json (row:wycheproof_hmac), ecdsa_secp{256r1_sha256,384r1_sha384}_p1363_test.json (row:wycheproof_ecdsa) and, under `es512`, ecdsa_secp521r1_sha512_p1363_test.json (row:es512), ed25519_test.json (row:wycheproof_eddsa), the nine `rsa_signature_*` files (row:wycheproof_rsa), the six `rsa_pss_*` files (row:wycheproof_pss).
+- R7 ECDSA signatures are only the RFC 7518 3.4 `R || S` form: every case of the ASN.1 DER files is refused, valid ones included: vec:wycheproof/ecdsa_secp256r1_sha256_test.json, ecdsa_secp384r1_sha384_test.json, ecdsa_secp521r1_sha512_test.json (`es512`, row:es512), row:wycheproof_ecdsa.
+- R8 EdDSA verifies with ed25519-dalek's `verify_strict`: a small-order key or a non-canonical `R` or `S` is refused: vec:wycheproof/ed25519_test.json, row:wycheproof_eddsa.
+- R9 A member named twice in a header, at any depth and through any escape (`alg`), or in more than one of a token's headers, is `DuplicateMember` (RFC 7515 4, 5.2); the crate's own pre-scan finds it, since serde's struct reading sees only known members: vec:jose-derived/header.json#dup-alg-different, #dup-alg-same, #dup-typ, #dup-escaped-name (kind named).
+- R10 A `crit` header member is `CriticalHeader` when it names an extension (none is understood), and is refused when empty, not an array, naming a registered header or naming an absent one (RFC 7515 4.1.11): vec:jose-derived/header.json#crit-unknown (kind named), #crit-empty, #crit-not-array, #crit-registered-name, #crit-name-absent.
+- R11 RFC 7797 is not implemented: a `b64` header member is refused, with or without `crit`: vec:jose-derived/header.json#b64-false-crit, #b64-false-no-crit.
+- R12 A header that is not a UTF-8 JSON object, a segment that is not canonical unpadded base64url (base's codec), whitespace, or other than three segments is `Malformed`; an unknown member is ignored: vec:jose-derived/header.json#header-array, #header-not-json, #segment-padded, #whitespace-inside, #two-segments, #four-segments, #unknown-member-ignored, #control-valid.
+- R13 An HMAC key shorter than its hash output is `WeakKey` (RFC 7518 3.2, 8725 3.5): vec:jose-derived/keys.json#hs256-32-bytes, #hs256-31-bytes, #hs384-47-bytes, #hs512-63-bytes (kind named), row:keys.
+- R14 A string `kid` never chooses or refuses: a valid signature verifies under its key whatever `kid` says, and a header `jwk`, `jku`, `x5u` or `x5c` never changes an outcome (8725 3.10): `Jws::kids` lists them as hints only: prop:kid_never_selects in row:rfc8725.
+- R15 A general JWS verifies when a signature whose `alg` is the key's verifies; when such signatures exist and none verifies it is `BadSignature`, when none names the key's `alg` it is `AlgMismatch`; more than `MAX_ENTRIES` signatures is `TooLarge`; a signature whose `alg` needs an off feature is skipped as not the key's `alg` among several, and is `UnsupportedAlg` in a compact or single-signature token: vec:rfc7520/jws.json (4.8), vec:rfc7515/appendix-a4-a7.json (A.6), row:rfc7520_jws; oracle gap: no vector carries the skip among several, requested of the oracle lane.
+
+## Runtime: keys, JWK and JWK Set
+- R16 Key type and curve bind the algorithm, and this is the whole table: EC P-256 takes only ES256 and ECDH-ES*, P-384 only ES384 and ECDH-ES*, P-521 only ES512 and ECDH-ES* (`es512`), RSA only RS*, PS* and RSA-OAEP* (`rsa-decrypt`), OKP Ed25519 only EdDSA, `oct` only HS*, A*KW, A*GCMKW and `dir`. Any other pairing is refused: vec:jose-derived/keys.json#es256-p256, #es256-p384-key, #es256-p521-key, #es384-p256-key, #es256-rsa-key, #es256-okp-key, #rs256-ec-key, #hs256-rsa-key, #eddsa-ed25519, row:keys.
+- R17 X25519, X448 and Ed448 keys are `UnsupportedAlg` (R-e), as a JWK, as an `epk` and inside a set (skipped there): vec:jose-derived/keys.json#eddsa-x25519-key, vec:jose-derived/jwe-header.json#x25519-ecdh-es-a128kw (kind named), vec:rfc8037/appendix-a.json (A.6, A.7), row:rfc8037.
+- R18 An EC point off its curve, the identity, a coordinate shorter than the curve's full length or a missing member is `Malformed` at decode, for keys and a JWE `epk` alike (8725 3.4; RFC 7518 6.2.1.2, 6.2.1.3): vec:jose-derived/keys.json#es256-off-curve, #es256-point-zero, #es256-x-short, #es256-crv-missing, #es256-y-missing.
+- R19 An RSA modulus below `MIN_RSA_BITS` is `WeakKey` and above `MAX_RSA_BITS` `TooLarge`; `e` above `MAX_RSA_EXPONENT` is `TooLarge`, and `n` and `e` must be minimal Base64urlUInt (RFC 7518 2): vec:jose-derived/keys.json#rs256-2048, #rs256-2047, #rs256-1024 (kind named).
+- R20 A JWK's `alg`, when present, must equal the requested algorithm (`AlgMismatch`); `use` and a non-empty `key_ops` must permit the operation, else `KeyUse` (RFC 7517 4.2, 4.3); a `use` that disagrees with `key_ops` is refused: vec:jose-derived/keys.json#hs256-use-enc, #hs256-key-ops-encrypt (kind named), #hs256-use-key-ops-disagree.
+- R21 `AnyVerifyKey::from_jwk` refuses a JWK without `alg` (`KeyAlgMissing`), an `alg` its key type cannot take (R16), and an `enc`-only key (`KeyUse`); a `Jwk` is never `oct`, so the `oct` cases of keys.json (#any-alg-bound, #any-alg-missing, #any-enc-key) run through `AnySigningKey::from_jwk` on a `SecretJwk`, which binds the same way; `from_jwk_for` binds the algorithm the host expects and refuses a JWK `alg` that differs (`AlgMismatch`); `verify_any` compares the header `alg` with the key's and never selects by it: vec:jose-derived/keys.json#any-alg-bound, #any-alg-missing, #any-enc-key (kind named), #any-alg-kty-mismatch, row:keys.
+- R22 `AnySigningKey::from_jwk` binds the JWK's `alg` (`KeyAlgMissing` without one) and refuses an RS or PS key (`UnsupportedAlg`; it signs through `sign_blinded`); as a `Signer<A>` it is `AlgMismatch` unless `A` is its algorithm: unit:key::any::sign_binds.
+- R23 RFC 7520 section 3 keys decode: 3.1 as `Jwk` and 3.2 as `SecretJwk` (both P-521, so under `es512`; `UnsupportedAlg` with it off, R50), 3.3 as `Jwk`, 3.4 as `SecretJwk`, 3.5 and 3.6 as `oct` `SecretJwk`; a private member or `kty: oct` given to `Jwk::decode` is `Malformed`: vec:rfc7520/jwk.json, row:rfc7520_jwk (3.1 and 3.2 in row:es512).
+- R24 RFC 8037 A.1 and A.2 keys decode, A.3's thumbprint matches, A.4's JWS is reproduced byte for byte by `Unsigned::<EdDsa>::jws(Header::new(), ..).sign(..)`, and A.5 verifies: vec:rfc8037/appendix-a.json, row:rfc8037.
+- R25 Thumbprints (RFC 7638 3) cover the required members only, for public, private and `oct` keys alike, so member order, whitespace, private and optional members never change one; a JWK missing a required member or of an unknown `kty` has none (`Malformed`, `UnsupportedAlg`): vec:rfc7638/thumbprint.json, vec:jose-derived/thumbprint.json, row:rfc7638.
+- R26 `JwkSet::decode` skips, and does not count, a member that is not a supported key (an unknown `kty`, X25519, a `WeakKey` modulus; RFC 7517 5); it refuses a document without a `keys` array, a member named twice at any depth (`DuplicateMember`), and more than `MAX_JWKS_KEYS` kept keys: vec:jose-derived/jwks.json#two-keys, #unknown-kty-skipped, #keys-missing, #keys-not-array, #dup-keys-member (kind named), row:keys.
+- R26b `JwkSet::decode_public` is `decode` for a document fetched from a remote `jwks_uri`: a key carrying any private parameter (`d`, `p`, `q`, `dp`, `dq`, `qi`), and any `oct` key, is dropped whole and not counted (before it is parsed, so even a malformed one), so only asymmetric public keys can come out of it; a document the host trusts (its own) goes through `decode`: unit:jwk::set::remote_sets_keep_asymmetric_public_keys_only; oracle gap: no vector family carries a mixed remote set, requested of the oracle lane.
+- R27 `JwkSet::find` matches `kid` byte for byte; a `kid` no key has is refused (`BadSignature`: no key can verify), and a `kid` two keys share is refused (`DuplicateMember`), never a pick (RFC 7517 4.5); `JwkSet::new` refuses a repeated `kid` the same way: vec:jose-derived/jwks.json#find-by-kid, #find-absent-kid, #find-duplicate-kid, row:keys.
+- R28 A member named twice anywhere in a JWK, a JWK Set or a JWE `epk` is `DuplicateMember`, found by the crate's pre-scan: vec:jose-derived/jwks.json#dup-keys-member.
+- R29 `Kid`, `Issuer` and `Audience` refuse empty text (`Malformed`) and more than `MAX_NAME_LEN` bytes (`TooLarge`); their `Deserialize` goes through the same constructor, so a stored record cannot hold one the constructor refuses; `Kid::from_thumbprint` is the thumbprint's 43-character base64url text: unit:jwk::decode::kid_bounds, unit:claims::name_bounds.
+- R30 `Serialize` on `Jwk` writes `kty`, `crv` and the public members, then `kid`, `alg`, `use` and `key_ops` when present, and nothing else; `JwkSet` writes `{"keys": [...]}` of its public keys only, in order; decoding what either writes gives the same keys; `SecretJwk::public` keeps `kid`, `alg` and `use`: prop:jwk_round_trip in row:keys.
+
+## Runtime: JWT claims
+- R31 `iss` must equal the policy's issuer (`Issuer`) and be present (`MissingClaim`) (8725 3.8): vec:jose-derived/claims.json#iss-wrong, #iss-missing (kind named), row:claims.
+- R32 `aud`, a string or an array of strings, must contain the policy's audience (`Audience`) and be present (`MissingClaim`) (8725 3.9); under `Policy::read_back` it must be present and well typed and is not compared: vec:jose-derived/claims.json#aud-wrong, #aud-array-without, #aud-missing (kind named), #aud-array-contains, row:claims.
+- R33 `typ` is read from the protected header and compared case-insensitively with an `application/` prefix removed; `Typ::Explicit` requires it equal (`Type`, absent included); `Typ::Generic` accepts it absent or equal to `JWT` and refuses any other (8725 3.11, 3.12): vec:jose-derived/claims.json#typ-wrong, #typ-missing (kind named), #typ-application-prefix, row:claims.
+- R34 Under `Expiry::Required` `exp` absent is `MissingClaim` and `exp` at or before `now - leeway` is `Expired`; under `Expiry::Unchecked` (read-back only, T7) a past `exp` passes: vec:jose-derived/claims.json#exp-missing, #exp-past, #exp-at-leeway-edge (kind named), #exp-inside-leeway, #exp-fractional, row:claims.
+- R35 `nbf` or `iat` after `now + leeway` is `NotYetValid`; at the edge it passes: vec:jose-derived/claims.json#nbf-past-leeway (kind named), #nbf-at-leeway-edge, #iat-future-past-leeway, row:claims.
+- R36 A registered time claim that is not a number is `ClaimType`, never "absent" (GHSA-h395-gr6q-cpjc); a fractional `exp` rounds down and a fractional `nbf` or `iat` up, so rounding never widens the window: vec:jose-derived/claims.json#exp-string, #nbf-string, #iat-string (kind named), #exp-fractional, row:claims.
+- R37 Claims that are not a JSON object are refused, a member named twice at any depth is `DuplicateMember`, and a `K::Claims` the payload does not deserialize into is `ClaimType`: vec:jose-derived/claims.json#dup-claim (kind named), #claims-array, row:claims.
+- R38 A JWS whose protected `cty` is `JWT` yields no claims (`Malformed`): the inner token is parsed and verified on its own (8725 3.3): unit:jwt::nested.
+- R39 `claims` checks in one order and names the first failure: shape, `typ`, `cty`, `iss`, `aud`, `exp`, `nbf`, `iat`, each claim's presence and type before its value, then `K::Claims`: unit:claims::order.
+- R40 `Leeway::new` above `MAX_LEEWAY` is `TooLarge`: unit:claims::leeway_bound.
+- R41 `SigningAlg::half_hash` is the left half of the `alg`'s hash, base64url (OpenID Connect Core 3.1.3.6 `at_hash`, 3.3.2.11 `c_hash`): SHA-256 for *256, SHA-384 for *384, SHA-512 for *512 and for EdDSA over Ed25519: unit:claims::half_hash (OpenID Connect Core A.3 and A.4 example values); oracle gap: no vector family carries these values, requested of the oracle lane.
+
+## Runtime: issuing
+- R42 `Unsigned` serializes the protected header as `alg`, then `kid`, then `typ`, without whitespace, `kid` JSON-escaped: unit:sign::header_bytes, prop:sign_round_trip in row:sign.
+- R43 `Unsigned::jwt::<K>` sets `typ` from `K::TYP` (`JWT` for `Typ::Generic`; 8725 3.11 on issue) and refuses claims that do not serialize to a JSON object (`Malformed`) and an `Explicit` value that is empty, uppercase, `application/`-prefixed or `jwt` (`Type`); a token past `MAX_COMPACT_LEN` is `TooLarge`: unit:sign::typ_from_kind.
+- R44 `finish` refuses an RS or PS signature whose length is not the modulus length of 2048 to 8192 bits (`Malformed`); `sign` returns the signer's `Error` unchanged (a device failure is `Signer`): unit:sign::finish_lengths.
+- R45 For HS, ES and EdDSA, `finish(signer.sign(signing_input))` equals `sign(signer)`; RS and PS under `rsa-sign` sign only through `sign_blinded` (T15), so they have no `Signer` path to compare and `finish` is not claimed for them. For every algorithm `verify(sign(x))` returns `x` and any one-byte change to the token fails: prop:sign_round_trip in row:sign (HS, ES, EdDSA), prop:every_rs_and_ps_round_trips in row:rsa_sign (RS and PS).
+- R46 Under `rsa-sign`, `sign_blinded` signs RS (PKCS #1 v1.5) and PS (salt the hash length, from `e`) through rsa's blinded private-key path with the caller's entropy, never the unblinded one: a recording `Entropy` sees draws for each, and RFC 7520 4.1 is reproduced byte for byte (RFC 7515 A.2's key is public in the oracle, so A.2 only verifies; PS is salted, so 4.2 only verifies): vec:rfc7515/jws.json#a2-rs256-valid, vec:rfc7520/jws.json (4.1), row:rsa_sign.
+- R47 `Compact::flattened` parses back with `Jws::parse_json` (or `Jwe::parse_json`) and verifies (decrypts) as the compact form does; `Compact::general` over different payloads or a JWE is `Malformed`, over more than `MAX_ENTRIES` `TooLarge`: prop:serializations_agree in row:sign, prop:jwe_serializations_agree in row:rfc7516.
+
+## Runtime: JWE
+- R48 RFC 7516 A.3 (A128KW, A128CBC-HS256) decrypts to the RFC plaintext, A.1 (RSA-OAEP, A256GCM) under `rsa-decrypt`; A.2 (RSA1_5) is refused: vec:rfc7516/jwe.json, row:rfc7516 (A.1 in row:oaep).
+- R49 RFC 7520 section 5: 5.4 to 5.8 and 5.10 to 5.13 decrypt to the RFC plaintext, 5.2 under `rsa-decrypt`; 5.1 (RSA1_5), 5.3 (PBES2) and 5.9 (`zip`) are refused: vec:rfc7520/jwe.json, vec:rfc7520/jwe-cases.json, row:rfc7520_jwe (5.4, 5.5 and 5.13's ECDH recipient in row:rfc7520_jwe_ecdh, 5.2 in row:oaep).
+- R50 With every feature off, an ES512 token or key (RFC 7515 A.4, RFC 7520 3.1, 3.2, 4.3) and an RSA-OAEP token (RFC 7516 A.1, RFC 7520 5.2) are refused as `UnsupportedAlg` when parsed, and `SigningAlg::parse("ES512")` and `JweAlg::parse("RSA-OAEP")` still succeed: vec:rfc7515/appendix-a4-a7.json, vec:rfc7520/jwk.json, vec:rfc7520/jws.json, vec:rfc7516/jwe.json, vec:rfc7520/jwe.json, row:features_off (`cargo test -p jose --no-default-features --test row_features_off`).
+- R51 `zip` in any header is refused before any key is used, and no content is ever compressed (8725 3.6); `crit` is `CriticalHeader`; a header name shared between protected, shared unprotected and per-recipient headers is `DuplicateMember`; `enc` must be in one of the headers (RFC 7520 5.12 carries it unprotected); RSA1_5, PBES2 and `none` are refused: vec:jose-derived/jwe-header.json#zip-def, #zip-unknown, #crit-unknown, #dup-enc (kind named), #enc-missing, #alg-none, #alg-mismatch, #rsa1_5, #pbes2, #control-a128kw-a128gcm, row:rfc7516.
+- R52 A JWE `alg` is compared with `K` and an `enc` with `E`, never selecting code (`AlgMismatch`); a general JWE decrypts through the first recipient whose `alg` is `K` and whose key decrypts, more than `MAX_ENTRIES` recipients is `TooLarge`, recipients that disagree on `enc` are `Malformed`, and a recipient whose `alg` needs an off feature is skipped among several and `UnsupportedAlg` when alone: vec:rfc7520/jwe-cases.json (5.13), vec:jose-derived/jwe-header.json#alg-mismatch; oracle gap: no vector carries the skip among several or the `enc` disagreement, requested of the oracle lane.
+- R53 Every failure after the header (wrong key, a changed encrypted key, IV, ciphertext, tag or AAD, a CEK of the wrong length) is the one kind `Decrypt` (RFC 7516 11.4): prop:jwe_tamper_is_decrypt in row:rfc7516.
+- R54 RSA-OAEP decryption takes one path (RFC 7516 11.5): an OAEP failure substitutes a random CEK of the right length drawn from `e`, so the content step fails as `Decrypt` and no step is skipped; the blinded private-key path with the caller's entropy is the only one used: vec:wycheproof/rsa_oaep_2048_sha1_mgf1sha1_test.json, rsa_oaep_2048_sha256_mgf1sha256_test.json, rsa_oaep_3072_sha256_mgf1sha256_test.json, rsa_oaep_4096_sha256_mgf1sha256_test.json, lib:jwe::oaep::wycheproof_oaep, unit:jwe::oaep::one_path; Known deviation of the `rsa` dependency, see NC2: the Wycheproof `First byte is 1` case (invalid in the vector) opens, and lib:jwe::oaep::wycheproof_oaep asserts that it does, so a change in `rsa` shows.
+- R55 AES-GCM, AES key wrap and AES-CBC-HMAC agree with Wycheproof: vec:wycheproof/aes_gcm_test.json, a128cbc_hs256_test.json, a192cbc_hs384_test.json, a256cbc_hs512_test.json, aes_cbc_pkcs5_test.json (lib:jwe::content::wycheproof_aead), aes_wrap_test.json (lib:jwe::kw::wycheproof_kw).
+- R56 A*CBC-HS* decrypts only after the truncated HMAC tag verifies, and compares it with the hmac crate's constant-time `verify_truncated_left`: held by review of `src/jwe/content.rs` `open` (the doc comment at line 143, the verify at line 159, the CBC decryption at line 164), not by a test, since every failure is the one `Decrypt` and the order is not observable. Tested: every bad tag and every body that does not decrypt is refused as `Decrypt` (unit:jwe::content::tag_first), and RFC 7518 B.1 to B.3 encrypt and decrypt byte for byte: vec:rfc7518/appendix-b.json, lib:jwe::content::rfc7518_b.
+- R57 ECDH-ES derives with the RFC 7518 4.6.2 Concat KDF (AlgorithmID `enc` for direct agreement, `alg` with key wrap; `apu`, `apv` included) and reproduces RFC 7518 C; the agreement matches Wycheproof's, and an `epk` on another curve or off its curve is refused before any agreement (8725 3.4): vec:rfc7518/appendix-c.json (row:rfc7518_c), vec:wycheproof/ecdh_secp256r1_webcrypto_test.json, ecdh_secp384r1_webcrypto_test.json, ecdh_secp521r1_webcrypto_test.json (`es512`) (lib:jwe::ecdh::wycheproof_ecdh).
+- R58 A KW, GCMKW or `dir` key whose length is not its algorithm's is `WeakKey`; a GCMKW `iv` that is not 96 bits or `tag` not 128 bits is `Malformed`: unit:jwe::kw::lengths.
+- R59 `encrypt` draws the CEK, IV and any ephemeral key only from `e`, so one seed gives one token, and `decrypt(encrypt(x)) = x` for every implemented (`K`, `E`): prop:jwe_round_trip in row:rfc7516, and for ECDH-ES and RSA-OAEP in row:rfc7520_jwe_ecdh and row:oaep.
+- R60 `encrypt_jwt` sets `cty: JWT` (RFC 7519 5.2), and the receiver verifies the inner token on its own (R38): unit:jwe::envelope::issued_headers, unit:jwt::nested.
+
+## Runtime: errors, names, limits
+- R61 Each bound in Bounds holds with `TooLarge` before parsing, for input that is also malformed: vec:jose-derived/limits.json, row:limits.
+- R62 No parser, decoder, verifier or decrypter panics on any input: the fuzz targets `jws_parse`, `jwt_claims`, `jwe_parse` and `jwk_decode` with committed corpora replayed in a row file.
+- R63 `Error` displays its kind only, never input, key or claim bytes: unit:error::display_names_kind_only.
+- R64 `Debug` of every key type, `SecretJwk`, `Plaintext`, `Payload`, `Compact` and `Unsigned` prints no key, plaintext, payload or token byte (`alg`, `kid` and lengths only), and of `Jws`, `Jwt`, `Jwe` and `VerifiedJwt` only their `kid`s: unit:<module>::debug_redacted in each type's own module, the hex, base64url and decimal of the secret absent.
+- R65 `SigningAlg`, `JweAlg` and `JweEnc` parse exactly their registry names, case-sensitively, and `name` round-trips through `Serialize` and `Deserialize`; `none`, `RSA1_5`, `PBES2-HS256+A128KW`, `ES256K`, `Ed25519` and `DEF` are `UnsupportedAlg`: unit:jws::header::names, unit:jwe::envelope::names.
+
+## Obligation
+- O1 The `Entropy` given to `encrypt`, `decrypt_blinded` and `sign_blinded` never repeats a draw, since a repeated GCM IV under one key loses confidentiality and integrity: the host's.
+- O2 The key a consumer verifies with belongs to the issuer its `Policy` names (8725 3.8): the consumer's; `oidc-provider` states it for client assertions and `id_token_hint`.
+- O3 Kinds under `Typ::Generic` stay apart by issuer, audience and required claims (8725 3.12): each kind's author.
+- O4 A token's single use (`jti` of a client assertion, a logout token) is the consumer's: it guards a `Digest` of the `jti` in its own `base::Effect`; jose holds no rows (T23).
+- O5 Private key JWK text lives in host secrets, never in a store row; keys are generated outside the crate (N12) and enter only as JWK text or raw `oct` bytes: the host's; T16 makes a store record of one a compile error.
+- O6 A `dir` or A*GCMKW key used with random 96-bit IVs is limited to 2^32 messages (NIST SP 800-38D 8.3), and rotating it is the host's.
+- O7 One key, one purpose: a host that must keep signing and key agreement apart on one EC key, or HMAC and key wrap on one `oct` key, publishes `use` or `key_ops` (R20).
+- O8 An HMAC or `oct` key carries the entropy its length implies: the host's, since R13 checks only the length.
+- O9 A `ReadBack` kind is implemented only for tokens the verifier itself issued, and read back only under its own key (O2): the kind's author.
+- O10 `rsa-sign` and `rsa-decrypt` are enabled only where an RSA private key is required, accepting the Marvin residual risk (NC2): the host's.
+- O11 HS keys, `oct` JWK material and content-encryption keys are `base::SecretBytes`, never jose-owned buffers, and are read (`expose`) only in `src/sig/hmac.rs`, `src/jwk/decode.rs` (decoding into the curve and rsa types), `src/jwk/thumbprint.rs` (an `oct` key's `k`), `src/jwe/envelope.rs` (a `Plaintext`'s bytes), `src/jwe/kw.rs`, `src/jwe/content.rs`, `src/jwe/ecdh.rs` and `src/jwe/oaep.rs`; private EC, Ed25519 and RSA keys live in their crates' own types, so `src/sig/{ecdsa,ecdsa_p521,eddsa,rsa_sign}.rs` read none. Held by gate:lint, gate:canary and gate:own under ruling R-j once base-expose lands: jose then enables `base/expose` and declares these modules as `expose` in `gates.json` (a dependency of the first item that calls `expose`, jose-07).
+- O12 A key set fetched from a remote `jwks_uri` is decoded with `JwkSet::decode_public`, never `decode` (R26b): the host's, and every consumer's, `oidc-provider` among them.
+
+## Consumption (oidc-provider)
+These are the types `oidc-provider` takes from jose rather than defining its own (rule 5.5): `Issuer` (its URL rule is oidc-provider's checked constructor over `Issuer::new`), `Audience`, `Kid`, `SigningAlg` (discovery's `*_signing_alg_values_supported` and a client's `id_token_signed_response_alg`), `Jwk` and `JwkSet` (`jwks_uri`, through `Serialize`), `Header<A>`, `Unsigned<A>`, `Compact` and `Signer<A>` (`Step::Sign` carries `Unsigned::header()` and `signing_input()` out and takes the signature back through `finish`), `AnyVerifyKey` and `Policy::read_back` (`id_token_hint`), and `SigningAlg::half_hash` (`at_hash`, `c_hash`). Serde: `SigningAlg`, `Kid`, `Issuer` and `Audience` are `Serialize` and `Deserialize`, deserializing through their checked constructors; `Jwk` and `JwkSet` are `Serialize` only; nothing else is either.
+
+## Non-goal
+- N1 Unsecured JWS (`alg: none`): T12, R2, R4.
+- N2 RSA1_5 key encryption (RFC 7516 11.4, 11.5 downgrade and timing oracle): no `JweAlg` variant, R48, R49, R51.
+- N3 PBES2 (attacker-chosen `p2c`): no variant, R49, R51.
+- N4 JWE compression (`zip`, 8725 3.6): R49, R51.
+- N5 X25519 and X448 (ECDH-ES over OKP) and Ed448 (R-e): R17.
+- N6 RFC 7797 unencoded payload: R11.
+- N7 Detached content (RFC 7515 F): R3.
+- N8 Key fetching (`jku`, `x5u`, JWKS refresh) and header-embedded keys (`jwk`, `x5c`): T21, R14.
+- N9 X.509 in a JWK (`x5c`, `x5t`, `x5t#S256`, `x5u`): ignored at decode and never written: R30.
+- N10 Producing a multi-recipient JWE, and a JWE key chosen at runtime by the JWK's `alg`: api; parsing and decrypting a general JWE is R52.
+- N11 Claims from an encrypted-only JWT: `Plaintext` has no claims path (T3); a nested JWT is verified as a `Jwt` (R38, R60).
+- N12 Key generation: api.
+- N13 RFC 9278 thumbprint URIs, RFC 9864 fully-specified algorithm names and ML-DSA: additive later; `Ed25519` is `UnsupportedAlg` today (R65).
+
+## Non-claim
+- NC1 Zeroize of key material is best effort, through `base::SecretBytes` and the RustCrypto types' own `Drop`.
+- NC2 Constant time is the RustCrypto crates' claim (hmac tag checks, aes-gcm, rsa, the curves), not measured here; a wasm engine's JIT sits outside every such claim. `rsa-decrypt` and `rsa-sign` carry the Marvin residual risk: rsa 0.10 is unaudited and its constant time rests on crypto-bigint (RUSTSEC-2023-0071); blinding uses the caller's entropy. Both are off by default for that reason, as the crate docs and `Cargo.toml` say.
+- NC3 p256, p384, p521, ecdsa and rsa 0.10 have no independent audit; aes-gcm and aes have the 2020 NCC review.
+- NC4 `finish` checks only the signature's length: a signature by the wrong key yields a token that fails verification downstream.
+- NC5 A JWS `Payload` is authenticated bytes, not validated content.
+- NC6 The timing of RFC 7516 11.4 is not measured (NC2); AES key-wrap failures return `Decrypt` without a substituted CEK, since a symmetric unwrap is no padding oracle.
+
+## RFC 8725 section 3
+- P3.1 Algorithm verification, the key's type picking the algorithm and the header only compared: T8, T9, T11, R4, R16, R21, R52.
+- P3.2 Appropriate algorithms, no `none`, RSA1_5 or PBES2, RSA at least 2048 bits: T12, N2, N3, R19.
+- P3.3 Validate all cryptographic operations, nested tokens verified separately: T1, T2, R38, N11.
+- P3.4 Validate cryptographic inputs, points on curve, `epk`: R6, R18, R57.
+- P3.5 Sufficient key entropy: R13, R58, O1, O8.
+- P3.6 No compression before encryption: R51, N4.
+- P3.7 UTF-8 only: R12, R37.
+- P3.8 Validate issuer and subject: T5, R31, O2.
+- P3.9 Use and validate audience: T5, R32.
+- P3.10 Do not trust received claims, `kid` a hint only, no fetch: T21, R14, R27.
+- P3.11 Explicit typing: T6, R33, R43.
+- P3.12 Mutually exclusive validation rules: T6, O3.
+
+## Layout
+One private module per item, so a later item touches only its own modules and row files. jose-01 (this item) lands every type, trait, marker and constant above. `#![expect(dead_code)]` in `lib.rs` covers the private representations until their bodies read them; the last item to land removes it, as the unfulfilled expectation then requires.
+
+| Item | Modules | Row files |
+|---|---|---|
+| jose-07 jwk decode | `src/jwk/decode.rs`, `src/error.rs` bodies, `SigningAlg::name` and `JweAlg::name` in `src/alg.rs` | `row_rfc7520_jwk` |
+| jose-02 hmac | `src/sig/hmac.rs`, `src/key.rs` bodies (`verify_signature`, `Debug`) | `row_wycheproof_hmac` |
+| jose-03 ecdsa | `src/sig/ecdsa.rs` | `row_wycheproof_ecdsa` |
+| jose-04 eddsa | `src/sig/eddsa.rs` | `row_wycheproof_eddsa` |
+| jose-05 rsa | `src/sig/rsa.rs` | `row_wycheproof_rsa` |
+| jose-06 pss | `src/sig/pss.rs` | `row_wycheproof_pss` |
+| jose-08 thumbprint | `src/jwk/thumbprint.rs` | `row_rfc7638` |
+| jose-09 compact jws | `src/jws/header.rs`, `src/jws/compact.rs` | `row_rfc7515`, `row_rfc8725` |
+| jose-10 any key | `src/key/any.rs`, `src/jwk/set.rs` | `row_keys` |
+| jose-11 json jws | `src/jws/json.rs` | `row_rfc7515_json` |
+| jose-12 7520 jws | none | `row_rfc7520_jws` |
+| jose-13 sign | `src/sign.rs` | `row_rfc8037`, `row_sign` |
+| jose-14 es512 | `src/sig/ecdsa_p521.rs` | `row_es512` |
+| jose-15 rsa-sign | `src/sig/rsa_sign.rs` | `row_rsa_sign` |
+| jose-16 claims | `src/claims.rs`, `src/jwt.rs` | `row_claims`, `row_limits` |
+| jose-17 jwe envelope, kw, content | `src/jwe/envelope.rs`, `src/jwe/kw.rs`, `src/jwe/content.rs` | `row_rfc7516`, `row_rfc7520_jwe`; `--lib` rows `jwe::content::{rfc7518_b, wycheproof_aead}`, `jwe::kw::wycheproof_kw` |
+| jose-18 ecdh | `src/jwe/ecdh.rs` | `row_rfc7518_c`, `row_rfc7520_jwe_ecdh`; `--lib` row `jwe::ecdh::wycheproof_ecdh` |
+| jose-19 oaep | `src/jwe/oaep.rs` | `row_oaep`, `row_features_off`; `--lib` row `jwe::oaep::wycheproof_oaep` |
+
+The Wycheproof AEAD, key-wrap, ECDH and OAEP files and RFC 7518 B give raw primitive inputs (an arbitrary IV, AAD or shared secret) that no JWE can carry, so those rows are `--lib` filters inside their module (R-l), and the JWE public surface stays the token API. The JWS Wycheproof rows are row files, through `VerifyKey::verify_signature`. `row_features_off` gathers the refusals of all three features and lands last, with jose-19.
+- A row file holds only the cases its own item turns green. A case that needs a later item's code (ES512, RS and PS signing, ECDH-ES, RSA-OAEP) is counted not applicable by name in the earlier file, under the total assertion, and checked in the later item's own file (`row_es512`, `row_rsa_sign`, `row_rfc7520_jwe_ecdh`, `row_oaep`).
+- Seams: every private representation a later module builds or reads is a `pub(crate)` field or a `pub(crate)` enum (`key::Public`, `key::Private`, `jwe::envelope::Params`, `jws::header::Parsed`, `jwk::decode::Meta`), so no item needs a constructor or accessor from another item's module, and none is a function body before its row.
+- Exceptions to "an item touches only its own modules and row files": the last item to land deletes `lib.rs`'s `#![expect(dead_code)]` (the compiler requires it once nothing is dead); items that add mutants raise `gates.json`'s floor; jose-07 enables `base/expose` and declares `expose` in `gates.json` once base-expose lands (O11).

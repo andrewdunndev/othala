@@ -1,0 +1,12 @@
+error[E0277]: can't compare `Compact` with `Compact`
+ --> tests/ui/fail/compact_eq.rs:4:13
+  |
+4 |     needs::<jose::Compact>();
+  |             ^^^^^^^^^^^^^ no implementation for `Compact == Compact`
+  |
+  = help: the trait `PartialEq` is not implemented for `Compact`
+note: required by a bound in `needs`
+ --> tests/ui/fail/compact_eq.rs:2:13
+  |
+2 | fn needs<T: PartialEq>() {}
+  |             ^^^^^^^^^ required by this bound in `needs`
