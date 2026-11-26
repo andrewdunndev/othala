@@ -109,7 +109,7 @@ impl Provider { metadata() -> Metadata; jwks() -> JwkSet;  // both derive from t
   handle(&self, req: &HttpRequest, browser: Option<&Browser>, now, e) -> Step;
   resume(&self, ticket: Ticket, binding: &BrowserBinding, decision: Decision, now, e) -> Step;
   end_session(&self, sid: &SessionId, now) -> Step; }
-pub struct Browser;  // BrowserBinding plus Option<AuthnClaim>; BrowserBinding::from(&Secret<32>) is the digest of a host cookie secret
+pub struct Browser;  // BrowserBinding plus Option<AuthnClaim>; BrowserBinding::from(&Secret<32>) is a labelled digest of a secret the host must derive from its cookie secret
 pub enum Step { Load(Query, AwaitRows), Sign(SignRequest, AwaitSignature), Commit(Effect<Key,Record>, AwaitCommit), Done(Outcome) }  // each wait state accepts exactly one reply type; SignRequest names a kid from SigningKeys
 AwaitRows::resume(rows) -> Step; AwaitSignature::resume(Vec<u8>) -> Step; AwaitCommit::resume(Result<Receipt, Conflict<Key>>) -> Step  // on Conflict: load again, or apply the reuse rule
 pub enum Outcome { Respond(HttpResponse), NeedLogin { ticket, reauth: Reauth::{Required,NotRequired}, min_acr, login_hint }, NeedConsent { ticket, client, scopes, audience }, Logout { response, backchannel: Vec<LogoutDelivery> } }  // backchannel: signed logout_tokens for the shell to POST
