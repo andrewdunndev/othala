@@ -3,7 +3,12 @@
 # each of canary/levels.rs and canary/lints.rs to each crate's src/lib.rs and require each `want:` line's error; copy canary/paths.rs into its tests/
 # and require the set of paths clippy names to be the set clippy.toml lists.
 set -euo pipefail
-[ $# -gt 0 ] || set -- $(./crates.sh | jq -r 'select(.published) | .name')
+crates=$(./crates.sh)
+if [ $# -eq 0 ]; then
+    published=$(jq -r 'select(.published) | .name' <<< "$crates")
+    # shellcheck disable=SC2086 # one crate name per line
+    set -- $published
+fi
 [ $# -gt 0 ] || { echo "canary: no published crate"; exit 1; }
 here=$(pwd -P)
 mkdir -p "$here/target"
@@ -29,13 +34,13 @@ exposers() { # tree: one package name per line
             or any(.features[][]; . as $v | any($deps[]; (.rename // .name) as $k | $v | test("^" + $k + "\\??/(" + ($F | join("|")) + ")$"))))
         | .name' | sort -u
 }
-declared=$(./crates.sh | jq -r 'select(.expose) | .name' | sort -u)
+declared=$(jq -r 'select(.expose) | .name' <<< "$crates" | sort -u)
 [ "$(exposers "$here")" = "$declared" ] || { echo "canary: base/expose is enabled by [$(exposers "$here" | xargs)] but declared by [$(echo $declared)]"; exit 1; }
 for c in $declared; do
     for m in $(jq -r '.expose[]' "$c/gates.json"); do [ -f "$c/src/$m.rs" ] || [ -f "$c/src/$m/mod.rs" ] || { echo "canary $c: expose module $m has no source"; exit 1; }; done
 done
 # the checks must catch an undeclared use: each plant in a scratch copy of a probe member is the only difference they may report
-probe=$(./crates.sh | jq -r 'select((.expose | not) and .name != "base") | .name' | head -n 1)
+probe=$(jq -r 'select((.expose | not) and .name != "base") | .name' <<< "$crates" | head -n 1)
 planted() { # a manifest plant, then the exposers it adds
     cp "$probe/Cargo.toml" "$tmp/$probe/Cargo.toml"
     printf '%s\n' "$1" >> "$tmp/$probe/Cargo.toml"
@@ -51,7 +56,7 @@ leak = ["b/expose"]'; do
     [ "$caught" = "$probe" ] || { echo "canary: an undeclared base/expose ($(echo "${form%%:*}")) in $probe went unreported (got [$caught])"; exit 1; }
 done
 # a feature-unified check (--all-features) lets any member borrow a declaring one's feature, so each undeclared member is checked on its own; a member that depends on a declaring crate gets expose transitively and is covered by the grep alone
-undeclared=$(./crates.sh | jq -r 'select((.expose | not) and .name != "base") | .name')
+undeclared=$(jq -r 'select((.expose | not) and .name != "base") | .name' <<< "$crates")
 call() { grep -rnE '\bexpose[[:space:]]*\(' --include='*.rs' "$@" 2> /dev/null || true; }
 for c in $undeclared; do
     [ -z "$(call "$c")" ] || { echo "canary $c: expose() is called but gates.json declares no expose module:"; call "$c"; exit 1; }

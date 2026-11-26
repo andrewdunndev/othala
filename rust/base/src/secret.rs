@@ -20,7 +20,7 @@ pub struct SecretBytes(Vec<u8>);
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Digest([u8; 32]);
 
-/// Ties a ceremony to the browser holding its cookie secret: safe to store, compared in constant time.
+/// Ties a ceremony to a browser through the secret it is built from: safe to store, compared in constant time.
 #[derive(Clone, Copy, Debug)]
 pub struct BrowserBinding(Digest);
 
@@ -314,6 +314,14 @@ mod tests {
         );
         assert_ne!(BrowserBinding::from(&a).0, a.digest());
         assert_ne!(BrowserBinding::from(&a), BrowserBinding::from(&b));
+    }
+
+    #[test]
+    fn browser_binding_eq_sees_the_last_byte() {
+        let mut bytes = [7u8; 32];
+        let a = BrowserBinding(Digest::from_bytes(bytes));
+        bytes[31] ^= 1;
+        assert_ne!(a, BrowserBinding(Digest::from_bytes(bytes)));
     }
 
     #[cfg(feature = "serde")]
