@@ -26,6 +26,8 @@ field Record::TotpStep::0: crate::TotpStep
 field Rehash::Needed::0: Phc
 function password_hash fn(password: &NewPassword, cost: Cost, e: &mut impl Entropy) -> Result<Phc, crate::Error>
 function password_verify fn(permit: crate::Permit, password: &Password, stored: &Phc, cost: Cost, e: &mut impl Entropy) -> Result<crate::Pending<Result<PasswordMatch, crate::Rejected>>, crate::Error>
+function recovery_generate fn(count: RecoveryCount, e: &mut impl Entropy) -> Result<crate::Pending<alloc::vec::Vec<RecoveryCode>>, crate::Error>
+function recovery_verify fn(permit: crate::Permit, code: &RecoveryCode, stored: Option<base::Row<&RecoveryHash>>, e: &mut impl Entropy) -> Result<crate::Pending<Result<RecoveryMatch, crate::Rejected>>, crate::Error>
 impl Clone for Attempts
 impl Clone for Backoff
 impl Clone for Cap
@@ -99,6 +101,7 @@ impl Debug for Period
 impl Debug for Permit
 impl Debug for Phc
 impl Debug for Record
+impl Debug for RecoveryCode
 impl Debug for RecoveryCount
 impl Debug for RecoveryHash
 impl Debug for RecoveryMatch
@@ -218,6 +221,10 @@ method Phc::as_str fn(self: &Self) -> &str
 method Phc::parse fn(text: &str) -> Result<Self, Error>
 method Record::decode fn(bytes: &[u8]) -> Result<Self, Error>
 method Record::encode fn(self: &Self) -> Vec<u8>
+method RecoveryCode::display fn(self: &Self) -> impl fmt::Display + '_
+method RecoveryCode::key fn(self: &Self) -> Key
+method RecoveryCode::parse fn(text: &str) -> Result<Self, Error>
+method RecoveryCount::new const fn(codes: u8) -> Result<Self, Error>
 method Throttle::check fn(self: &Self, attempts: Option<Row<&Attempts>>, now: UnixTime) -> Result<Permit, Closed>
 method Throttle::new const fn(policy: Backoff) -> Self
 method Throttle::reset fn(attempts: Row<&Attempts>, e: &mut impl Entropy) -> Effect

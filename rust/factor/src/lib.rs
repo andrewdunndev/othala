@@ -20,7 +20,9 @@ pub use password::{
     Cost, Lanes, Memory, Minimum, NewPassword, Passes, Password, PasswordMatch, Phc, Rehash,
     password_hash, password_verify,
 };
-pub use recovery::{RecoveryCode, RecoveryCount, RecoveryHash, RecoveryMatch};
+pub use recovery::{
+    RecoveryCode, RecoveryCount, RecoveryHash, RecoveryMatch, recovery_generate, recovery_verify,
+};
 pub use store::{Effect, Key, Pending, Record, Rejected};
 pub use throttle::{Attempts, Backoff, Cap, Closed, FreeAttempts, Permit, Throttle, Wait};
 

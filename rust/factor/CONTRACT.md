@@ -175,7 +175,7 @@ Recovery codes (NIST SP 800-63B-4 3.1.2)
 - B2 MSRV 1.89 against the committed lock: `just msrv`, `just lock`.
 - B3 The runtime dependencies are exactly argon2 (`alloc`, `password-hash`, `zeroize`; no `getrandom`, no `std`), base (with `expose`), hmac, sha1, sha2 and subtle (D6): `just deps` over `deps.txt`, `just deny` over `gates.json` `allow`.
 - B4 The public API is the committed snapshot: `just api` over `public-api.txt`.
-- B5 The ledger runs every case on disk and pins 31 cases and 31 twins, so a glob that matched nothing cannot pass: `just ledger` (`CASES` in `tests/ledger.rs`), `just twins`.
+- B5 The ledger runs every case on disk and pins 32 cases and 32 twins, so a glob that matched nothing cannot pass: `just ledger` (`CASES` in `tests/ledger.rs`), `just twins`.
 - B6 Every workspace deny-list lint is `forbid` here, so no module calls base's `host_applied` or allows a lint: `just canary`, `just lint`. The crate keeps no secret buffer of its own: `OtpKey`, `OtpCode`, `Password` and `RecoveryCode` wrap base `SecretBytes`, which base wipes (base R32) (R-j): api, review.
 - B7 `src/` is mutated with a factor floor and `missed == 0`: `gates.json` `mutants`, landing with its floor [factor-10].
 - B8 The fuzz targets `record_decode`, `otp_code_parse`, `phc_parse` and `recovery_code_parse` live in `factor/fuzz` with their corpora replayed [factor-04, factor-10].
@@ -203,6 +203,6 @@ Recovery codes (NIST SP 800-63B-4 3.1.2)
 | factor-05 | `src/password.rs` | `argon2id`, costs, `NewPassword`, `password_hash` | m3.rfc9106.argon2id (R22 to R25) |
 | factor-06 | `src/otp.rs`, `src/throttle.rs` (permit time), `tests/row_rfc6238.rs`, `tests/row_rfc6238_window.rs`, `tests/common/` | TOTP and its last step | m3-factor-rfc6238, m3-factor-rfc6238-window (R15 to R21) |
 | factor-07 | `src/password.rs`, `tests/row_password.rs` (shared with factor-05) | `Password`, `Phc::parse`, verify and rehash | m3-factor-password (R23 to R28) |
-| factor-08 | `src/recovery.rs`, `tests/row_recovery.rs` | recovery codes | R30 to R33 |
+| factor-08 | `src/recovery.rs`, `tests/row_recovery.rs` | recovery codes | m3-factor-recovery (R30 to R33) |
 | factor-09 | `src/store.rs`, `tests/props.rs`, `tests/race.rs` | invariants | R3, R4, R6, R12, R17, R29, R33, O2, O3 |
 | factor-10 | `fuzz/`, `gates.json` `mutants` | fuzz and the mutants floor | B7, B8 |
