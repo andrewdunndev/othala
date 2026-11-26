@@ -56,6 +56,6 @@
         | select(.is_synthetic | not) | select(.blanket_impl == null)
         | if .trait == null
           then (.items[] | $ix[(.|tostring)] | select(.visibility == "public") | "method \($item.name)::\(.name) \(sig)")
-          else "impl \({resolved_path: .trait} | ty) for \(.for | ty)"
+          else "impl \(.trait.path) for \($item.name)"
           end )
   ] | unique | .[]
