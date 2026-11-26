@@ -91,11 +91,79 @@ impl fmt::Debug for VerifiedJwt {
 mod tests {
     use alloc::borrow::ToOwned as _;
     use alloc::format;
+    use alloc::string::String;
 
-    use base::SecretBytes;
+    use base::{SecretBytes, UnixTime, b64url_encode};
+    use hmac::{Hmac, KeyInit as _, Mac as _};
+    use serde::Deserialize;
+    use sha2::Sha256;
 
     use super::Jwt;
-    use crate::{Header, Hs256, Kid, SecretJwk, Unsigned};
+    use crate::{
+        Audience, ErrorKind, Header, Hs256, Issuer, Kid, Leeway, Policy, SecretJwk, TokenKind, Typ,
+        Unsigned,
+    };
+
+    #[derive(Deserialize)]
+    struct Anything {}
+
+    struct Generic;
+
+    impl TokenKind for Generic {
+        const TYP: Typ = Typ::Generic;
+        type Claims = Anything;
+    }
+
+    const KEY: [u8; 32] = [9; 32];
+
+    fn signed(header: &str, payload: &str) -> String {
+        let input = alloc::format!(
+            "{}.{}",
+            b64url_encode(header.as_bytes()),
+            b64url_encode(payload.as_bytes())
+        );
+        let mut mac = Hmac::<Sha256>::new_from_slice(&KEY).ok();
+        let tag = mac.as_mut().map(|mac| {
+            mac.update(input.as_bytes());
+            mac.clone().finalize().into_bytes()
+        });
+        alloc::format!(
+            "{input}.{}",
+            b64url_encode(tag.as_deref().unwrap_or_default())
+        )
+    }
+
+    fn claims_kind(header: &str) -> Option<ErrorKind> {
+        let jwk = SecretJwk::from_oct(SecretBytes::new(alloc::vec![9; 32]));
+        let policy = Policy::<Generic>::new(
+            Issuer::new("i").ok()?,
+            Audience::new("a").ok()?,
+            Leeway::new(0).ok()?,
+        )
+        .ok()?;
+        let token = signed(header, r#"{"iss":"i","aud":"a","exp":2000}"#);
+        let verified = Jwt::parse(&token)
+            .and_then(|j| j.verify(&jwk.verify_key::<Hs256>()?))
+            .ok()?;
+        verified
+            .claims(&policy, UnixTime::new(1000))
+            .err()
+            .map(|e| e.kind())
+    }
+
+    #[test]
+    fn nested() {
+        assert_eq!(
+            claims_kind(r#"{"alg":"HS256","cty":"JWT"}"#),
+            Some(ErrorKind::Malformed)
+        );
+        assert_eq!(
+            claims_kind(r#"{"alg":"HS256","cty":"application/jwt"}"#),
+            Some(ErrorKind::Malformed)
+        );
+        assert_eq!(claims_kind(r#"{"alg":"HS256","cty":"other"}"#), None);
+        assert_eq!(claims_kind(r#"{"alg":"HS256"}"#), None);
+    }
 
     #[test]
     fn kid_and_debug() {

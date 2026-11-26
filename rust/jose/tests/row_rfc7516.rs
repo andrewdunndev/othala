@@ -4,7 +4,7 @@ mod common_jwe;
 use base::{Entropy, SecretBytes, b64url_decode, b64url_encode};
 use jose::{
     A128CbcHs256, A128Gcm, A128GcmKw, A128Kw, A192CbcHs384, A192Gcm, A192GcmKw, A192Kw,
-    A256CbcHs512, A256Gcm, A256GcmKw, A256Kw, Dir, Enc, ErrorKind, Jwe, JweAlg, KeyAlg,
+    A256CbcHs512, A256Gcm, A256GcmKw, A256Kw, Compact, Dir, Enc, ErrorKind, Jwe, JweAlg, KeyAlg,
     LocalKeyAlg, SecretJwk,
 };
 use proptest::prelude::*;
@@ -207,4 +207,140 @@ fn jwe_round_trip() {
     });
     assert!(outcome.is_ok(), "{outcome:?}");
     assert_eq!(cek_len("A128GCM"), 16);
+}
+
+/// Every failure after the header is `Decrypt`: a wrong key, a changed key, IV, ciphertext, tag or AAD, a CEK of the wrong length.
+fn tamper<K: LocalKeyAlg, E: Enc>(
+    len: usize,
+    plaintext: &[u8],
+    seed: u8,
+) -> Result<(), TestCaseError> {
+    let (encrypt, secret) = key::<K>(len).ok_or_else(|| TestCaseError::fail("key"))?;
+    let decrypt = secret
+        .decrypt_key::<K>()
+        .map_err(|_| TestCaseError::fail("decrypt key"))?;
+    let token = encrypt
+        .encrypt::<E>(plaintext, &mut Counter(seed))
+        .map_err(|_| TestCaseError::fail("encrypt"))?;
+    let kind = |text: &str, key: &jose::DecryptKey<K>| {
+        Jwe::parse(text)
+            .and_then(|jwe| jwe.decrypt::<K, E>(key))
+            .err()
+            .map(|e| e.kind())
+    };
+    prop_assert_eq!(kind(token.as_str(), &decrypt), None);
+    // a wrong key of the same length
+    let other: Vec<u8> = (0..len)
+        .map(|i| u8::try_from(i % 241).unwrap_or(0) ^ 0x5a)
+        .collect();
+    let wrong = SecretJwk::from_oct(SecretBytes::new(other))
+        .decrypt_key::<K>()
+        .map_err(|_| TestCaseError::fail("wrong key"))?;
+    prop_assert_eq!(kind(token.as_str(), &wrong), Some(ErrorKind::Decrypt));
+    // a changed encrypted key, IV, ciphertext and tag
+    let parts: Vec<String> = token.as_str().split('.').map(str::to_owned).collect();
+    for index in 1..5 {
+        let mut segment = parts
+            .get(index)
+            .and_then(|p| b64url_decode(p).ok())
+            .unwrap_or_default();
+        if let Some(byte) = segment.first_mut() {
+            *byte ^= 0x80;
+            let mut changed = parts.clone();
+            if let Some(part) = changed.get_mut(index) {
+                *part = b64url_encode(&segment);
+            }
+            prop_assert_eq!(
+                kind(&changed.join("."), &decrypt),
+                Some(ErrorKind::Decrypt),
+                "segment {}",
+                index
+            );
+        }
+    }
+    // a changed AAD: the protected header gains a member and keeps its meaning
+    let header = parts
+        .first()
+        .and_then(|p| b64url_decode(p).ok())
+        .and_then(|h| String::from_utf8(h).ok())
+        .unwrap_or_default();
+    let widened = header.strip_suffix('}').map(|h| format!(r#"{h},"zz":1}}"#));
+    let mut changed = parts.clone();
+    if let (Some(first), Some(widened)) = (changed.first_mut(), widened) {
+        *first = b64url_encode(widened.as_bytes());
+    }
+    prop_assert_eq!(kind(&changed.join("."), &decrypt), Some(ErrorKind::Decrypt));
+    Ok(())
+}
+
+#[test]
+fn jwe_tamper_is_decrypt() {
+    let config = ProptestConfig {
+        cases: 24,
+        rng_seed: RngSeed::Fixed(0x5eed_0008),
+        failure_persistence: None,
+        ..ProptestConfig::default()
+    };
+    let strategy = (proptest::collection::vec(any::<u8>(), 1..80), any::<u8>());
+    let outcome = TestRunner::new(config).run(&strategy, |(payload, seed)| {
+        tamper::<A128Kw, A128Gcm>(16, &payload, seed)?;
+        tamper::<A256Kw, A128CbcHs256>(32, &payload, seed)?;
+        tamper::<A128GcmKw, A256Gcm>(16, &payload, seed)?;
+        tamper::<Dir, A128Gcm>(16, &payload, seed)?;
+        tamper::<Dir, A256CbcHs512>(64, &payload, seed)?;
+        Ok(())
+    });
+    assert!(outcome.is_ok(), "{outcome:?}");
+    // a CEK of the wrong length: a direct key that is not the encryption's
+    let token = key::<Dir>(16).and_then(|(k, _)| k.encrypt::<A128Gcm>(b"x", &mut Counter(1)).ok());
+    let short = key::<Dir>(24).and_then(|(_, s)| s.decrypt_key::<Dir>().ok());
+    let kind = token.zip(short).map(|(t, k)| {
+        Jwe::parse(t.as_str())
+            .and_then(|jwe| jwe.decrypt::<Dir, A128Gcm>(&k))
+            .err()
+            .map(|e| e.kind())
+    });
+    assert_eq!(kind, Some(Some(ErrorKind::Decrypt)));
+}
+
+#[test]
+fn jwe_serializations_agree() {
+    let config = ProptestConfig {
+        cases: 24,
+        rng_seed: RngSeed::Fixed(0x5eed_0009),
+        failure_persistence: None,
+        ..ProptestConfig::default()
+    };
+    let strategy = (proptest::collection::vec(any::<u8>(), 0..80), any::<u8>());
+    let outcome = TestRunner::new(config).run(&strategy, |(payload, seed)| {
+        let (encrypt, secret) = key::<A128Kw>(16).ok_or_else(|| TestCaseError::fail("key"))?;
+        let decrypt = secret
+            .decrypt_key::<A128Kw>()
+            .map_err(|_| TestCaseError::fail("decrypt key"))?;
+        let token = encrypt
+            .encrypt::<A128Gcm>(&payload, &mut Counter(seed))
+            .map_err(|_| TestCaseError::fail("encrypt"))?;
+        let compact = Jwe::parse(token.as_str())
+            .and_then(|jwe| jwe.decrypt::<A128Kw, A128Gcm>(&decrypt))
+            .map(|p| p.bytes().to_vec());
+        let flattened = Jwe::parse_json(token.flattened().as_bytes())
+            .and_then(|jwe| jwe.decrypt::<A128Kw, A128Gcm>(&decrypt))
+            .map(|p| p.bytes().to_vec());
+        prop_assert_eq!(compact.ok(), Some(payload));
+        prop_assert_eq!(flattened.ok(), compact_again(&token, &decrypt));
+        // a JWE is not a general JWS
+        prop_assert_eq!(
+            Compact::general(&[token]).err().map(|e| e.kind()),
+            Some(ErrorKind::Malformed)
+        );
+        Ok(())
+    });
+    assert!(outcome.is_ok(), "{outcome:?}");
+}
+
+fn compact_again(token: &Compact, key: &jose::DecryptKey<A128Kw>) -> Option<Vec<u8>> {
+    Jwe::parse(token.as_str())
+        .and_then(|jwe| jwe.decrypt::<A128Kw, A128Gcm>(key))
+        .map(|p| p.bytes().to_vec())
+        .ok()
 }

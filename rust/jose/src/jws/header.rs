@@ -95,3 +95,51 @@ impl Parsed {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use alloc::format;
+
+    use crate::{ErrorKind, SigningAlg};
+
+    #[test]
+    fn names() {
+        let registry = [
+            "HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "PS256", "PS384", "PS512",
+            "ES256", "ES384", "ES512", "EdDSA",
+        ];
+        for name in registry {
+            let alg = SigningAlg::parse(name).ok();
+            assert_eq!(alg.map(SigningAlg::name), Some(name));
+            let json = alg.and_then(|alg| serde_json::to_string(&alg).ok());
+            assert_eq!(json, Some(format!("\"{name}\"")));
+            let back = json.and_then(|json| serde_json::from_str::<SigningAlg>(&json).ok());
+            assert_eq!(back, alg);
+            for changed in [name.to_ascii_lowercase(), name.to_ascii_uppercase()] {
+                if changed != name {
+                    assert_eq!(
+                        SigningAlg::parse(&changed).err().map(|e| e.kind()),
+                        Some(ErrorKind::UnsupportedAlg),
+                        "{changed}"
+                    );
+                }
+            }
+        }
+        for name in [
+            "none",
+            "RSA1_5",
+            "PBES2-HS256+A128KW",
+            "ES256K",
+            "Ed25519",
+            "DEF",
+            "",
+        ] {
+            assert_eq!(
+                SigningAlg::parse(name).err().map(|e| e.kind()),
+                Some(ErrorKind::UnsupportedAlg),
+                "{name}"
+            );
+            assert!(serde_json::from_str::<SigningAlg>(&format!("\"{name}\"")).is_err());
+        }
+    }
+}

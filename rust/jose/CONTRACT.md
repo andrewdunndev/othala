@@ -258,12 +258,12 @@ Each bound is a named `pub const` at the crate root; each is checked before anyt
 - R41 `SigningAlg::half_hash` is the left half of the `alg`'s hash, base64url (OpenID Connect Core 3.1.3.6 `at_hash`, 3.3.2.11 `c_hash`): SHA-256 for *256, SHA-384 for *384, SHA-512 for *512 and for EdDSA over Ed25519: unit:claims::half_hash (OpenID Connect Core A.3 and A.4 example values); oracle gap: no vector family carries these values, requested of the oracle lane.
 
 ## Runtime: issuing
-- R42 `Unsigned` serializes the protected header as `alg`, then `kid`, then `typ`, without whitespace, `kid` JSON-escaped: unit:sign::header_bytes, prop:header_round_trip in row:sign.
+- R42 `Unsigned` serializes the protected header as `alg`, then `kid`, then `typ`, without whitespace, `kid` JSON-escaped: unit:sign::header_bytes, prop:sign_round_trip in row:sign.
 - R43 `Unsigned::jwt::<K>` sets `typ` from `K::TYP` (`JWT` for `Typ::Generic`; 8725 3.11 on issue) and refuses claims that do not serialize to a JSON object (`Malformed`) and an `Explicit` value that is empty, uppercase, `application/`-prefixed or `jwt` (`Type`); a token past `MAX_COMPACT_LEN` is `TooLarge`: unit:sign::typ_from_kind.
 - R44 `finish` refuses an RS or PS signature whose length is not the modulus length of 2048 to 8192 bits (`Malformed`); `sign` returns the signer's `Error` unchanged (a device failure is `Signer`): unit:sign::finish_lengths.
-- R45 For HS, ES and EdDSA, and RS and PS under `rsa-sign`, `verify(sign(x))` returns `x`, `finish(signer.sign(signing_input))` equals `sign(signer)`, and any one-byte change to the token fails: prop:sign_round_trip, prop:finish_equals_sign in row:sign (RS and PS in row:rsa_sign).
+- R45 For HS, ES and EdDSA, and RS and PS under `rsa-sign`, `verify(sign(x))` returns `x`, `finish(signer.sign(signing_input))` equals `sign(signer)`, and any one-byte change to the token fails: prop:sign_round_trip in row:sign (RS and PS in row:rsa_sign).
 - R46 Under `rsa-sign`, `sign_blinded` signs RS (PKCS #1 v1.5) and PS (salt the hash length, from `e`) through rsa's blinded private-key path with the caller's entropy, never the unblinded one: a recording `Entropy` sees draws for each, and RFC 7520 4.1 is reproduced byte for byte (RFC 7515 A.2's key is public in the oracle, so A.2 only verifies; PS is salted, so 4.2 only verifies): vec:rfc7515/jws.json#a2-rs256-valid, vec:rfc7520/jws.json (4.1), row:rsa_sign.
-- R47 `Compact::flattened` parses back with `Jws::parse_json` (or `Jwe::parse_json`) and verifies (decrypts) as the compact form does; `Compact::general` over different payloads or a JWE is `Malformed`, over more than `MAX_ENTRIES` `TooLarge`: prop:serializations_agree in row:sign.
+- R47 `Compact::flattened` parses back with `Jws::parse_json` (or `Jwe::parse_json`) and verifies (decrypts) as the compact form does; `Compact::general` over different payloads or a JWE is `Malformed`, over more than `MAX_ENTRIES` `TooLarge`: prop:serializations_agree in row:sign, prop:jwe_serializations_agree in row:rfc7516.
 
 ## Runtime: JWE
 - R48 RFC 7516 A.3 (A128KW, A128CBC-HS256) decrypts to the RFC plaintext, A.1 (RSA-OAEP, A256GCM) under `rsa-decrypt`; A.2 (RSA1_5) is refused: vec:rfc7516/jwe.json, row:rfc7516 (A.1 in row:oaep).
@@ -278,7 +278,7 @@ Each bound is a named `pub const` at the crate root; each is checked before anyt
 - R57 ECDH-ES derives with the RFC 7518 4.6.2 Concat KDF (AlgorithmID `enc` for direct agreement, `alg` with key wrap; `apu`, `apv` included) and reproduces RFC 7518 C; the agreement matches Wycheproof's, and an `epk` on another curve or off its curve is refused before any agreement (8725 3.4): vec:rfc7518/appendix-c.json (row:rfc7518_c), vec:wycheproof/ecdh_secp256r1_webcrypto_test.json, ecdh_secp384r1_webcrypto_test.json, ecdh_secp521r1_webcrypto_test.json (`es512`) (lib:jwe::ecdh::wycheproof_ecdh).
 - R58 A KW, GCMKW or `dir` key whose length is not its algorithm's is `WeakKey`; a GCMKW `iv` that is not 96 bits or `tag` not 128 bits is `Malformed`: unit:jwe::kw::lengths.
 - R59 `encrypt` draws the CEK, IV and any ephemeral key only from `e`, so one seed gives one token, and `decrypt(encrypt(x)) = x` for every implemented (`K`, `E`): prop:jwe_round_trip in row:rfc7516, and for ECDH-ES and RSA-OAEP in row:rfc7520_jwe_ecdh and row:oaep.
-- R60 `encrypt_jwt` sets `cty: JWT` (RFC 7519 5.2), and the receiver verifies the inner token on its own (R38): unit:jwe::envelope::encrypt_jwt_cty.
+- R60 `encrypt_jwt` sets `cty: JWT` (RFC 7519 5.2), and the receiver verifies the inner token on its own (R38): unit:jwe::envelope::issued_headers, unit:jwt::nested.
 
 ## Runtime: errors, names, limits
 - R61 Each bound in Bounds holds with `TooLarge` before parsing, for input that is also malformed: vec:jose-derived/limits.json, row:limits.

@@ -44,15 +44,31 @@ fn figure(file: &testkit::vectors::Figures, example: &str, number: u32) -> Strin
         .unwrap_or_default()
 }
 
+/// `figure`, counted: a figure the file lacks is empty text, which a refusal would accept.
+fn visit(
+    file: &testkit::vectors::Figures,
+    example: &str,
+    number: u32,
+    visited: &std::cell::Cell<usize>,
+) -> String {
+    let text = figure(file, example, number);
+    assert!(!text.is_empty(), "figure {number} is not in the file");
+    visited.set(visited.get() + 1);
+    text
+}
+
 #[test]
 fn es512_is_refused() {
+    let visited = std::cell::Cell::new(0);
     let keys = common_figures::all(vector!("rfc7520/jwk.json"));
     assert_eq!(
-        kind(Jwk::decode(figure(&keys, "3.1", 1).as_bytes())),
+        kind(Jwk::decode(visit(&keys, "3.1", 1, &visited).as_bytes())),
         Some(ErrorKind::UnsupportedAlg)
     );
     assert_eq!(
-        kind(SecretJwk::decode(figure(&keys, "3.2", 2).as_bytes())),
+        kind(SecretJwk::decode(
+            visit(&keys, "3.2", 2, &visited).as_bytes()
+        )),
         Some(ErrorKind::UnsupportedAlg)
     );
     let appendix = common_sections::all(vector!("rfc7515/appendix-a4-a7.json"));
@@ -65,18 +81,24 @@ fn es512_is_refused() {
     assert_eq!(kind(Jws::parse(&token)), Some(ErrorKind::UnsupportedAlg));
     let signed = common_figures::all(vector!("rfc7520/jws.json"));
     assert_eq!(
-        kind(Jws::parse(&figure(&signed, "4.3", 27))),
+        kind(Jws::parse(&visit(&signed, "4.3", 27, &visited))),
         Some(ErrorKind::UnsupportedAlg)
     );
     assert_eq!(
-        kind(Jws::parse_json(figure(&signed, "4.3", 28).as_bytes())),
+        kind(Jws::parse_json(
+            visit(&signed, "4.3", 28, &visited).as_bytes()
+        )),
         Some(ErrorKind::UnsupportedAlg)
     );
     assert_eq!(
-        kind(Jws::parse_json(figure(&signed, "4.3", 29).as_bytes())),
+        kind(Jws::parse_json(
+            visit(&signed, "4.3", 29, &visited).as_bytes()
+        )),
         Some(ErrorKind::UnsupportedAlg)
     );
     assert_eq!(SigningAlg::parse("ES512").ok(), Some(SigningAlg::Es512));
+    // two keys and three 4.3 tokens
+    assert_eq!(visited.get(), 5);
 }
 
 #[test]

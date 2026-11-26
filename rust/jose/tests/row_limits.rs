@@ -76,13 +76,14 @@ fn nested(depth: usize) -> String {
     format!("{}{}", "[".repeat(depth), "]".repeat(depth))
 }
 
-/// The inputs of a case whose row carries none (an older file): the one-past-the-bound recipe by id.
+/// The inputs of a case whose row carries none (the file before the oracle gave them): main's four ids only.
 fn rebuilt(case: &Case, jwk: &str, k: &[u8]) -> (Option<String>, Option<String>) {
     match case.id.as_str() {
         "compact-bytes" => {
             let longer = (12_000..)
                 .map(|n| token(k, r#"{"alg":"HS256"}"#, &"a".repeat(n)))
                 .find(|t| t.len() > MAX_COMPACT_LEN);
+            assert_eq!(longer.as_ref().map(String::len), Some(MAX_COMPACT_LEN + 1));
             (longer, None)
         }
         "header-depth" => {
@@ -134,7 +135,10 @@ fn bounds() {
                 (Some(jwt), None)
             }
             (None, Some(input)) => (None, Some(input.clone())),
-            _ => rebuilt(case, jwk, &k),
+            (None, None) if case.payload_json.is_none() && case.payload_repeat.is_none() => {
+                rebuilt(case, jwk, &k)
+            }
+            _ => (None, None),
         };
         assert!(jwt.is_some() != set.is_some(), "{}: no inputs", case.id);
         let outcome = match (&jwt, &set) {

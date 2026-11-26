@@ -670,9 +670,84 @@ mod tests {
 
     use super::{DecryptKey, EncryptKey, Jwe, sealed};
     use crate::{
-        A128Gcm, A128GcmKw, A128Kw, Dir, ErrorKind, Hs256, Kid, MAX_COMPACT_LEN, MAX_ENTRIES,
-        MAX_JSON_LEN, SecretJwk,
+        A128Gcm, A128GcmKw, A128Kw, Dir, ErrorKind, Hs256, JweAlg, JweEnc, Kid, MAX_COMPACT_LEN,
+        MAX_ENTRIES, MAX_JSON_LEN, SecretJwk,
     };
+
+    #[test]
+    fn names() {
+        let algs = [
+            "A128KW",
+            "A192KW",
+            "A256KW",
+            "A128GCMKW",
+            "A192GCMKW",
+            "A256GCMKW",
+            "dir",
+            "ECDH-ES",
+            "ECDH-ES+A128KW",
+            "ECDH-ES+A192KW",
+            "ECDH-ES+A256KW",
+            "RSA-OAEP",
+            "RSA-OAEP-256",
+        ];
+        let encs = [
+            "A128GCM",
+            "A192GCM",
+            "A256GCM",
+            "A128CBC-HS256",
+            "A192CBC-HS384",
+            "A256CBC-HS512",
+        ];
+        for name in algs {
+            let alg = JweAlg::parse(name).ok();
+            assert_eq!(alg.map(JweAlg::name), Some(name));
+            let json = alg.and_then(|alg| serde_json::to_string(&alg).ok());
+            assert_eq!(json, Some(format!("\"{name}\"")));
+            let back = json.and_then(|json| serde_json::from_str::<JweAlg>(&json).ok());
+            assert_eq!(back, alg);
+        }
+        for name in encs {
+            let enc = JweEnc::parse(name).ok();
+            assert_eq!(enc.map(JweEnc::name), Some(name));
+            let json = enc.and_then(|enc| serde_json::to_string(&enc).ok());
+            assert_eq!(json, Some(format!("\"{name}\"")));
+            let back = json.and_then(|json| serde_json::from_str::<JweEnc>(&json).ok());
+            assert_eq!(back, enc);
+        }
+        for name in algs.into_iter().chain(encs) {
+            for changed in [name.to_ascii_lowercase(), name.to_ascii_uppercase()] {
+                if changed != name {
+                    for kind in [
+                        JweAlg::parse(&changed).err().map(|e| e.kind()),
+                        JweEnc::parse(&changed).err().map(|e| e.kind()),
+                    ] {
+                        assert_eq!(kind, Some(ErrorKind::UnsupportedAlg), "{changed}");
+                    }
+                }
+            }
+        }
+        for name in [
+            "none",
+            "RSA1_5",
+            "PBES2-HS256+A128KW",
+            "ES256K",
+            "Ed25519",
+            "DEF",
+            "",
+        ] {
+            for kind in [
+                JweAlg::parse(name).err().map(|e| e.kind()),
+                JweEnc::parse(name).err().map(|e| e.kind()),
+            ] {
+                assert_eq!(kind, Some(ErrorKind::UnsupportedAlg), "{name}");
+            }
+            assert!(serde_json::from_str::<JweAlg>(&format!("\"{name}\"")).is_err());
+            assert!(serde_json::from_str::<JweEnc>(&format!("\"{name}\"")).is_err());
+        }
+        // a name of the other registry is not a name of this one
+        assert!(JweAlg::parse("A128GCM").is_err() && JweEnc::parse("A128KW").is_err());
+    }
 
     struct Zeros;
 

@@ -4,8 +4,8 @@ mod common_figures;
 mod common_sections;
 
 use jose::{
-    Alg, EdDsa, Es256, Es384, Header, Hs256, Jws, Kid, LocalAlg, SecretJwk, Signer, SigningKey,
-    Unsigned, VerifyKey,
+    Alg, Compact, EdDsa, ErrorKind, Es256, Es384, Header, Hs256, Jws, Kid, LocalAlg, SecretJwk,
+    Signer, SigningKey, Unsigned, VerifyKey,
 };
 use proptest::prelude::*;
 use proptest::test_runner::{RngSeed, TestRunner};
@@ -184,4 +184,63 @@ fn alg_is_the_markers() {
         (Header::<Es256>::new().alg(), Header::<Hs256>::new().alg()),
         (Es256::ALG, Hs256::ALG)
     );
+}
+
+#[test]
+fn serializations_agree() {
+    let hs = pair::<Hs256>(&case_key(
+        vector!("rfc7515/jws.json"),
+        Some("a1-hs256-valid"),
+        false,
+    ));
+    assert!(hs.is_some());
+    let strategy = (
+        proptest::collection::vec(any::<u8>(), 0..120),
+        proptest::collection::vec(any::<u8>(), 0..120),
+    );
+    let outcome = TestRunner::new(config(0x5eed_0007)).run(&strategy, |(payload, other)| {
+        let Some(p) = &hs else {
+            return Err(TestCaseError::fail("pair"));
+        };
+        let sign = |payload: &[u8]| {
+            Unsigned::<Hs256>::jws(Header::new(), payload)
+                .and_then(|u| u.sign(&p.signer))
+                .map_err(|_| TestCaseError::fail("sign"))
+        };
+        let token = sign(&payload)?;
+        let read = |json: &str| {
+            Jws::parse_json(json.as_bytes())
+                .and_then(|j| j.verify(&p.verifier))
+                .map(|v| v.bytes().to_vec())
+        };
+        // the flattened and the general form verify to what the compact form does
+        prop_assert_eq!(read(&token.flattened()).ok(), Some(payload.clone()));
+        let general = Compact::general(&[sign(&payload)?, sign(&payload)?]);
+        prop_assert_eq!(
+            general.ok().and_then(|json| read(&json).ok()),
+            Some(payload.clone())
+        );
+        // different payloads are not one general JWS
+        let mixed = Compact::general(&[sign(&payload)?, sign(&other)?]);
+        if payload == other {
+            prop_assert!(mixed.is_ok());
+        } else {
+            prop_assert_eq!(mixed.err().map(|e| e.kind()), Some(ErrorKind::Malformed));
+        }
+        // more than MAX_ENTRIES tokens
+        let many: Vec<Compact> = (0..=jose::MAX_ENTRIES)
+            .map(|_| sign(&payload))
+            .collect::<Result<_, _>>()?;
+        prop_assert_eq!(
+            Compact::general(&many).err().map(|e| e.kind()),
+            Some(ErrorKind::TooLarge)
+        );
+        prop_assert!(Compact::general(many.get(..jose::MAX_ENTRIES).unwrap_or_default()).is_ok());
+        prop_assert_eq!(
+            Compact::general(&[]).err().map(|e| e.kind()),
+            Some(ErrorKind::Malformed)
+        );
+        Ok(())
+    });
+    assert!(outcome.is_ok(), "{outcome:?}");
 }

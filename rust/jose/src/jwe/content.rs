@@ -189,6 +189,7 @@ impl JweEnc {
 #[cfg(test)]
 mod tests {
     use alloc::string::String;
+    use alloc::vec;
     use alloc::vec::Vec;
     use expose::Expose as _;
 
@@ -197,7 +198,11 @@ mod tests {
     use testkit::vector;
     use testkit::vectors::{Json, Outcome, Vector, run, wycheproof};
 
-    use super::{A128CbcHs256, A128Gcm, A192CbcHs384, A192Gcm, A256CbcHs512, A256Gcm};
+    use hmac::Mac as _;
+    use hmac::digest::block_api::EagerHash;
+    use sha2::{Sha256, Sha384, Sha512};
+
+    use super::{A128CbcHs256, A128Gcm, A192CbcHs384, A192Gcm, A256CbcHs512, A256Gcm, mac};
     use crate::jwe::envelope::sealed::Enc as Sealed;
     use crate::testing::hex;
     use crate::{ErrorKind, JweEnc};
@@ -387,5 +392,51 @@ mod tests {
         ];
         assert_eq!(cbc, [(94, 0); 3]);
         let _ = (Json::text, JweEnc::A128Gcm);
+    }
+
+    /// Bad tag, bad padding and both at once are the one `Decrypt`: the padding is never reached on a bad tag.
+    fn tag_first_for<E: Sealed, D: EagerHash>() {
+        let cek = SecretBytes::new(
+            (0..E::CEK_LEN)
+                .map(|i| u8::try_from(i).unwrap_or(0))
+                .collect(),
+        );
+        let (iv, aad) = ([7u8; 16], b"header".to_vec());
+        let sealed = E::seal(&cek, &iv, &aad, b"attack at dawn").ok();
+        let (ciphertext, tag) = sealed.unwrap_or_default();
+        assert!(!tag.is_empty());
+        let open =
+            |ct: &[u8], tag: &[u8]| E::open(&cek, &iv, &aad, ct, tag).err().map(|e| e.kind());
+        assert_eq!(open(&ciphertext, &tag), None);
+        let mut bad_tag = tag.clone();
+        if let Some(byte) = bad_tag.last_mut() {
+            *byte ^= 1;
+        }
+        // not a block multiple, then a block of bytes that is not padded text
+        let ragged = [ciphertext.clone(), vec![1]].concat();
+        let unpadded = vec![0u8; 16];
+        let (mac_key, _) = cek.expose().split_at(E::CEK_LEN / 2);
+        let valid_tag = |ct: &[u8]| {
+            let full = mac::<D>(mac_key, &aad, &iv, ct).map(|m| m.finalize().into_bytes());
+            full.map(|t| t.get(..E::CEK_LEN / 2).unwrap_or_default().to_vec())
+                .unwrap_or_default()
+        };
+        for bad_body in [&ragged, &unpadded] {
+            // a tag that verifies over a body that does not decrypt, and a tag that does not verify
+            assert_eq!(
+                open(bad_body, &valid_tag(bad_body)),
+                Some(ErrorKind::Decrypt)
+            );
+            assert_eq!(open(bad_body, &bad_tag), Some(ErrorKind::Decrypt));
+        }
+        assert_eq!(open(&ciphertext, &bad_tag), Some(ErrorKind::Decrypt));
+        assert_eq!(open(&ciphertext, &tag[1..]), Some(ErrorKind::Decrypt));
+    }
+
+    #[test]
+    fn tag_first() {
+        tag_first_for::<A128CbcHs256, Sha256>();
+        tag_first_for::<A192CbcHs384, Sha384>();
+        tag_first_for::<A256CbcHs512, Sha512>();
     }
 }

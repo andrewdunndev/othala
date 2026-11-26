@@ -16,6 +16,14 @@ fn figure(file: &Figures, number: u32) -> String {
         .unwrap_or_default()
 }
 
+/// `figure`, counted: a figure the file lacks is empty text, which a refusal would accept.
+fn visit(file: &Figures, number: u32, visited: &std::cell::Cell<usize>) -> String {
+    let text = figure(file, number);
+    assert!(!text.is_empty(), "figure {number} is not in the file");
+    visited.set(visited.get() + 1);
+    text
+}
+
 /// The payload when `text` verifies under `key`, as a compact JWS (`json` false) or as JSON.
 fn payload<A: Alg>(key: &Option<VerifyKey<A>>, text: &str, json: bool) -> Option<Vec<u8>> {
     let jws = if json {
@@ -42,13 +50,14 @@ fn section_4() {
     let ps = rsa.as_ref().and_then(|k| k.verify_key::<Ps384>().ok());
     let hs = hmac.as_ref().and_then(|k| k.verify_key::<Hs256>().ok());
     assert!(rs.is_some() && ps.is_some() && hs.is_some());
-    let want = base::b64url_decode(&figure(&signed, 8)).ok();
+    let visited = std::cell::Cell::new(0);
+    let want = base::b64url_decode(&visit(&signed, 8, &visited)).ok();
     assert!(want.as_ref().is_some_and(|w| !w.is_empty()));
 
     // 4.1 RS256, 4.2 PS384 and 4.4 HS256: compact, general and flattened
     for (figures, form) in [([13, 14, 15], 0), ([20, 21, 22], 1), ([34, 35, 36], 2)] {
         for (number, json) in figures.into_iter().zip([false, true, true]) {
-            let text = figure(&signed, number);
+            let text = visit(&signed, number, &visited);
             let got = match form {
                 0 => payload(&rs, &text, json),
                 1 => payload(&ps, &text, json),
@@ -61,14 +70,14 @@ fn section_4() {
     // 4.6 and 4.7: unprotected and protected-free headers, general and flattened
     for number in [49, 50, 54, 55] {
         assert_eq!(
-            payload(&hs, &figure(&signed, number), true),
+            payload(&hs, &visit(&signed, number, &visited), true),
             want,
             "figure {number}"
         );
     }
 
     // 4.8: three signatures; the RS256 and HS256 ones verify under their keys, the ES512 one is not this key's
-    let general = figure(&signed, 71);
+    let general = visit(&signed, 71, &visited);
     assert_eq!(payload(&rs, &general, true), want);
     assert_eq!(payload(&hs, &general, true), want);
     assert_eq!(payload(&ps, &general, true), None);
@@ -78,9 +87,11 @@ fn section_4() {
     // 4.5, detached content: refused in the compact and both JSON forms
     for (number, json) in [(41, false), (42, true), (43, true)] {
         assert_eq!(
-            payload(&hs, &figure(&signed, number), json),
+            payload(&hs, &visit(&signed, number, &visited), json),
             None,
             "figure {number}"
         );
     }
+    // 1 payload, 9 in 4.1 4.2 4.4, 4 in 4.6 and 4.7, 1 in 4.8, 3 detached
+    assert_eq!(visited.get(), 18);
 }
