@@ -219,6 +219,19 @@ impl<A: SignAlg> fmt::Debug for SigningKey<A> {
     }
 }
 
+#[cfg(feature = "rsa-sign")]
+impl<A: crate::BlindedAlg> Unsigned<A> {
+    /// Signs with `key` through the blinded private-key operation, the blinding and any salt drawn from `e`.
+    pub fn sign_blinded(
+        self,
+        key: &SigningKey<A>,
+        e: &mut impl base::Entropy,
+    ) -> Result<Compact, Error> {
+        let signature = <A as sealed::Blinded>::sign(&key.material, &self.input, e)?;
+        self.finish(signature)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::format;

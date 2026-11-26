@@ -41,6 +41,12 @@ impl Alg for Ps512
 impl Alg for Rs256
 impl Alg for Rs384
 impl Alg for Rs512
+impl BlindedAlg for Ps256
+impl BlindedAlg for Ps384
+impl BlindedAlg for Ps512
+impl BlindedAlg for Rs256
+impl BlindedAlg for Rs384
+impl BlindedAlg for Rs512
 impl BlindedKeyAlg for RsaOaep
 impl BlindedKeyAlg for RsaOaep256
 impl Clone for A128CbcHs256
@@ -420,6 +426,12 @@ impl SignAlg for Es512
 impl SignAlg for Hs256
 impl SignAlg for Hs384
 impl SignAlg for Hs512
+impl SignAlg for Ps256
+impl SignAlg for Ps384
+impl SignAlg for Ps512
+impl SignAlg for Rs256
+impl SignAlg for Rs384
+impl SignAlg for Rs512
 impl Signer for AnySigningKey
 impl Signer for SigningKey
 impl StructuralPartialEq for A128CbcHs256
@@ -543,6 +555,7 @@ method Unsigned::header const fn(self: &Self) -> &Header<A>
 method Unsigned::jws fn(header: Header<A>, payload: &[u8]) -> Result<Self, Error>
 method Unsigned::jwt fn<K: TokenKind>(header: Header<A>, claims: &K::Claims) -> Result<Self, Error>
 method Unsigned::sign fn(self: Self, signer: &impl Signer<A>) -> Result<Compact, Error>
+method Unsigned::sign_blinded fn(self: Self, key: &SigningKey<A>, e: &mut impl base::Entropy) -> Result<Compact, Error>
 method Unsigned::signing_input fn(self: &Self) -> &[u8]
 method VerifiedJwt::claims fn<K: TokenKind>(self: Self, policy: &Policy<K>, now: UnixTime) -> Result<K::Claims, Error>
 method VerifyKey::verify_signature fn(self: &Self, signing_input: &[u8], signature: &[u8]) -> Result<(), Error>
