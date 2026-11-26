@@ -352,7 +352,7 @@ cases = 109
 files = [
   { path = "jose-derived/claims.json", sha256 = "708fe7fcd78b3463fae0ebe1ac7cb33823a518b6743bb76ca611798eda7f7696", cases = 23 },
   { path = "jose-derived/header.json", sha256 = "25d515ff305dabcb4c672b4ad0116cc2f2071f36e471f90511e35c0d68612b24", cases = 23 },
-  { path = "jose-derived/jwe-header.json", sha256 = "fb9f27408aebdc7c2c5b269fd0d9f05cde050cd4cd313c1f9739054974222098", cases = 11 },
+  { path = "jose-derived/jwe-header.json", sha256 = "2fa4106e5a755ccf2c5bd403d7feb49dbdb47d681268ab2134955cf37c645457", cases = 11 },
   { path = "jose-derived/jwks.json", sha256 = "2e9135581fcda0c0bd8128ed3cc966d8c2a1bf574f3fd83ea248d82c40a1048c", cases = 8 },
   { path = "jose-derived/keys.json", sha256 = "59ecabe434bd617484e98d6f299ac726f30b13624208a18559b0262f6da3ab3d", cases = 29 },
   { path = "jose-derived/limits.json", sha256 = "68f727a22c03c2db3384e02f878b99855ef58180f74132897dfb43540e8e2748", cases = 8 },

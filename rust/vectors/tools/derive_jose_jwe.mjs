@@ -5,10 +5,11 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { createCipheriv, createHash, diffieHellman, createPrivateKey, createPublicKey } from "node:crypto";
-import { deflateRawSync } from "node:zlib";
 
 const [V, OUT] = process.argv.slice(2);
 const load = (p) => JSON.parse(readFileSync(join(V, p), "utf8"));
+// a single stored DEFLATE block (RFC 1951 3.2.4): zlib builds emit different bytes for the same input, so no zlib call
+const stored = (b) => Buffer.concat([Buffer.from([1, b.length & 255, b.length >> 8, ~b.length & 255, (~b.length >> 8) & 255]), b]);
 const b64 = (b) => Buffer.from(b).toString("base64url");
 const ub = (s) => Buffer.from(s, "base64url");
 const fig = Object.fromEntries(load("rfc7520/jwe.json").figures.map((f) => [f.figure, f]));
@@ -54,7 +55,7 @@ const c = (id, spec, expect, f) => ({ id, op: "jwe_decrypt", serialization: "com
 const kwk = (hdr, pt = PT) => compact(hdr, kw(ub(KEY.k), CEK), pt);
 const cases = [
   c("control-a128kw-a128gcm", "RFC 7516 5.2 (the generator's own positive control)", OK, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM"}') }),
-  c("zip-def", "RFC 7516 4.1.3 (zip DEF; a non-goal, must-refuse)", NO, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM","zip":"DEF"}', deflateRawSync(PT, { level: 9 })), note: "must-refuse: JWE zip is a non-goal" }),
+  c("zip-def", "RFC 7516 4.1.3 (zip DEF; a non-goal, must-refuse)", NO, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM","zip":"DEF"}', stored(PT)), note: "must-refuse: JWE zip is a non-goal" }),
   c("zip-unknown", "RFC 7516 4.1.3", NO, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM","zip":"XYZ"}') }),
   c("crit-unknown", "RFC 7516 4.1.13 with RFC 7515 4.1.11", { ok: false, kind: "CriticalHeader" }, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM","crit":["exp-x"],"exp-x":1}') }),
   c("dup-enc", "RFC 7516 4 (names MUST be unique; this oracle rejects)", { ok: false, kind: "DuplicateMember" }, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM","enc":"A256GCM"}') }),
