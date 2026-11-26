@@ -17,6 +17,8 @@ webauthn-ext:
 webauthn-ext-verify:
     #!/usr/bin/env bash
     set -euo pipefail
+    # a system OpenSSL under a crypto policy refuses SHA-1 signatures, which the chains and the TPM RS1 case carry on purpose; the plant below proves a bad one still fails
+    export OPENSSL_ENABLE_SHA1_SIGNATURES=1
     cd "{{ justfile_directory() }}"
     t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
     node tools/check_webauthn_ext.mjs .
@@ -24,7 +26,11 @@ webauthn-ext-verify:
     python3 -I tools/plant_webauthn_ext.py "$t" > /dev/null
     if out=$(node tools/check_webauthn_ext.mjs "$t"); then echo "plant not caught"; exit 1; fi
     [ "$(grep -c '^FAIL' <<< "$out")" = 1 ] && grep -q 'tpm-plant-es256-p384-aik: fault tpm-alg-key-mismatch' <<< "$out" || { echo "plant caught by the wrong fault: $out"; exit 1; }
-    echo "webauthn-ext: ok (plant fails as tpm-alg-key-mismatch)"
+    rm -rf "$t/webauthn-rp-derived"; cp -r webauthn-rp-derived "$t"
+    python3 -I tools/plant_sha1_chain.py "$t" > /dev/null
+    if out=$(node tools/check_webauthn_ext.mjs "$t"); then echo "sha1 plant not caught"; exit 1; fi
+    [ "$(grep -c '^FAIL' <<< "$out")" = 1 ] && grep -q '^FAIL chains#ecdsa-sha1-leaf: expected Unanchored, found link 0 signature fails' <<< "$out" || { echo "sha1 plant caught wrongly: $out"; exit 1; }
+    echo "webauthn-ext: ok (plants fail as tpm-alg-key-mismatch and a bad SHA-1 link)"
 
 # run as `just --justfile rust/vectors/justfile check`, offline; the vector gate: every derive script reproduces its committed files, SOURCES.toml's hashes and counts match the files, every WebAuthn step or section cited exists and each quoted passage is in its step (tools/check_vectors.py), then webauthn-ext-verify
 check:
