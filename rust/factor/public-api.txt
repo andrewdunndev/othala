@@ -25,6 +25,7 @@ field Record::Recovery::0: crate::RecoveryHash
 field Record::TotpStep::0: crate::TotpStep
 field Rehash::Needed::0: Phc
 function password_hash fn(password: &NewPassword, cost: Cost, e: &mut impl Entropy) -> Result<Phc, crate::Error>
+function password_verify fn(permit: crate::Permit, password: &Password, stored: &Phc, cost: Cost, e: &mut impl Entropy) -> Result<crate::Pending<Result<PasswordMatch, crate::Rejected>>, crate::Error>
 impl Clone for Attempts
 impl Clone for Backoff
 impl Clone for Cap
@@ -210,8 +211,11 @@ method OtpKey::generate fn(alg: OtpAlg, e: &mut impl Entropy) -> Self
 method OtpKey::import fn(key: Vec<u8>) -> Result<Self, Error>
 method OtpMatch::step const fn(self: &Self) -> u64
 method Passes::new const fn(passes: u32) -> Self
+method Password::presented fn(text: &str) -> Result<Self, Error>
+method PasswordMatch::rehash const fn(self: &Self) -> &Rehash
 method Period::new const fn(secs: u32) -> Result<Self, Error>
 method Phc::as_str fn(self: &Self) -> &str
+method Phc::parse fn(text: &str) -> Result<Self, Error>
 method Record::decode fn(bytes: &[u8]) -> Result<Self, Error>
 method Record::encode fn(self: &Self) -> Vec<u8>
 method Throttle::check fn(self: &Self, attempts: Option<Row<&Attempts>>, now: UnixTime) -> Result<Permit, Closed>

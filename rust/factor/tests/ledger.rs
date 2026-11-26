@@ -2,7 +2,7 @@
 use std::path::{Path, PathBuf};
 
 // the ui cases and twins on disk; a glob that matched nothing would pass while measuring nothing
-const CASES: usize = 30;
+const CASES: usize = 31;
 
 #[test]
 fn ledger() {

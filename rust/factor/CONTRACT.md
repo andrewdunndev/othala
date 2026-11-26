@@ -141,7 +141,7 @@ Passwords (RFC 9106, NIST SP 800-63B-4 3.1.1.2, OWASP Password Storage)
 - R24 `NewPassword::new` is `TooLarge` over 4,096 bytes, then `PasswordLength` under 15 Unicode scalar values for `Minimum::SingleFactor` or 8 for `Minimum::MultiFactor`; no composition rule, and every length from the minimum to 64 is accepted: row:password [factor-05].
 - R25 `password_hash` is Argon2id v19 at the given cost with a 16-byte salt from `Entropy` and a 32-byte tag, as canonical PHC text; `Phc::parse(p.as_str())` reads back the same text: row:password, oracle: factor-derived/phc.json [factor-05, parse factor-07].
 - R26 `Password::presented` is `TooLarge` over 4,096 bytes and `PasswordLength` when empty, and keeps every other text byte for byte; the whole password is hashed, so two that differ only in their 4,096th byte verify apart: row:password [factor-07].
-- R27 `Phc::parse` is `TooLarge` over 256 bytes; `Malformed` unless PHC syntax that `argon2`'s `PasswordHash` writes back to the same text; `Unsupported` for another algorithm, a version other than 19, or a `keyid` or `data` parameter; `Malformed` unless salt 8 to 64 bytes, tag 16 to 64 bytes, memory 8 x lanes to R23's ceiling, passes and lanes 1 to 64; a cost below the floor parses, so older hashes verify and rehash: row:password, oracle: factor-derived/phc.json, fuzz:phc_parse [factor-07, fuzz factor-10].
+- R27 `Phc::parse` is `TooLarge` over 256 bytes; `Malformed` unless PHC syntax that `argon2`'s `PasswordHash` writes back to the same text; `Unsupported` for another algorithm, a version other than 19, or a `keyid` or `data` parameter; `Malformed` unless salt 8 to 48 bytes (`phc`'s own bound), tag 16 to 64 bytes, memory 8 x lanes to R23's ceiling, passes and lanes 1 to 64; a cost below the floor parses, so older hashes verify and rehash: row:password, oracle: factor-derived/phc.json, fuzz:phc_parse [factor-07, fuzz factor-10].
 - R28 `password_verify` matches iff Argon2id over the presented password with the stored parameters and salt yields the stored tag, compared by `argon2`'s `verify_password`, never by `==`; on a match `rehash` is `Rehash::Needed` with the password hashed at the `Cost` given iff the stored memory, passes or lanes is below it or the salt or tag is shorter than R25's, and `Rehash::Current` otherwise, so a stronger hash is never downgraded: row:password, oracle: factor-derived/phc.json, mutants:password [factor-07].
 - R29 A verifier's `Err` does not depend on whether the presented secret matched: `password_verify`'s is `OutOfMemory`, decided by the stored cost before any tag is compared; the OTP and recovery verifiers return `Err` for no accepted input: prop:err_independent_of_secret [factor-09].
 
@@ -175,7 +175,7 @@ Recovery codes (NIST SP 800-63B-4 3.1.2)
 - B2 MSRV 1.89 against the committed lock: `just msrv`, `just lock`.
 - B3 The runtime dependencies are exactly argon2 (`alloc`, `password-hash`, `zeroize`; no `getrandom`, no `std`), base (with `expose`), hmac, sha1, sha2 and subtle (D6): `just deps` over `deps.txt`, `just deny` over `gates.json` `allow`.
 - B4 The public API is the committed snapshot: `just api` over `public-api.txt`.
-- B5 The ledger runs every case on disk and pins 30 cases and 30 twins, so a glob that matched nothing cannot pass: `just ledger` (`CASES` in `tests/ledger.rs`), `just twins`.
+- B5 The ledger runs every case on disk and pins 31 cases and 31 twins, so a glob that matched nothing cannot pass: `just ledger` (`CASES` in `tests/ledger.rs`), `just twins`.
 - B6 Every workspace deny-list lint is `forbid` here, so no module calls base's `host_applied` or allows a lint: `just canary`, `just lint`. The crate keeps no secret buffer of its own: `OtpKey`, `OtpCode`, `Password` and `RecoveryCode` wrap base `SecretBytes`, which base wipes (base R32) (R-j): api, review.
 - B7 `src/` is mutated with a factor floor and `missed == 0`: `gates.json` `mutants`, landing with its floor [factor-10].
 - B8 The fuzz targets `record_decode`, `otp_code_parse`, `phc_parse` and `recovery_code_parse` live in `factor/fuzz` with their corpora replayed [factor-04, factor-10].
@@ -202,7 +202,7 @@ Recovery codes (NIST SP 800-63B-4 3.1.2)
 | factor-04 | `src/store.rs`, `tests/row_record.rs`, `tests/golden/`, `fuzz/` | the record codec | m3-factor-record (R5, B8) |
 | factor-05 | `src/password.rs` | `argon2id`, costs, `NewPassword`, `password_hash` | m3.rfc9106.argon2id (R22 to R25) |
 | factor-06 | `src/otp.rs`, `src/throttle.rs` (permit time), `tests/row_rfc6238.rs`, `tests/row_rfc6238_window.rs`, `tests/common/` | TOTP and its last step | m3-factor-rfc6238, m3-factor-rfc6238-window (R15 to R21) |
-| factor-07 | `src/password.rs`, `tests/row_password.rs` | `Password`, `Phc::parse`, verify and rehash | R26 to R28 |
+| factor-07 | `src/password.rs`, `tests/row_password.rs` (shared with factor-05) | `Password`, `Phc::parse`, verify and rehash | m3-factor-password (R23 to R28) |
 | factor-08 | `src/recovery.rs`, `tests/row_recovery.rs` | recovery codes | R30 to R33 |
 | factor-09 | `src/store.rs`, `tests/props.rs`, `tests/race.rs` | invariants | R3, R4, R6, R12, R17, R29, R33, O2, O3 |
 | factor-10 | `fuzz/`, `gates.json` `mutants` | fuzz and the mutants floor | B7, B8 |

@@ -18,7 +18,7 @@ use core::fmt;
 pub use otp::{Digits, OtpAlg, OtpCode, OtpKey, OtpMatch, Period, Skew, Totp, TotpStep};
 pub use password::{
     Cost, Lanes, Memory, Minimum, NewPassword, Passes, Password, PasswordMatch, Phc, Rehash,
-    password_hash,
+    password_hash, password_verify,
 };
 pub use recovery::{RecoveryCode, RecoveryCount, RecoveryHash, RecoveryMatch};
 pub use store::{Effect, Key, Pending, Record, Rejected};
