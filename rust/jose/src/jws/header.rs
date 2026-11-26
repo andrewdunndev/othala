@@ -11,6 +11,7 @@ use crate::jwk::decode::scan;
 use crate::{Error, ErrorKind, Kid};
 
 /// One signature's protected and unprotected headers, merged after the duplicate check.
+#[derive(Clone)]
 pub(crate) struct Parsed {
     pub(crate) alg: Option<String>,
     pub(crate) kid: Option<Kid>,

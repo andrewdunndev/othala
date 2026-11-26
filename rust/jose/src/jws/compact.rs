@@ -70,6 +70,14 @@ impl<'a> Jws<'a> {
     /// The payload, when a signature whose `alg` is `A`'s verifies under `key`: `AlgMismatch` when no signature names
     /// `A`, `BadSignature` when some do and none verifies. The header never selects an algorithm.
     pub fn verify<A: Alg>(self, key: &VerifyKey<A>) -> Result<Payload, Error> {
+        self.verify_parsed(key).map(|(payload, _)| payload)
+    }
+
+    /// As [`Self::verify`], with the header of the signature that verified.
+    pub(crate) fn verify_parsed<A: Alg>(
+        self,
+        key: &VerifyKey<A>,
+    ) -> Result<(Payload, Parsed), Error> {
         let name = A::ALG.name();
         let mut named = false;
         for signature in &self.signatures {
@@ -82,9 +90,10 @@ impl<'a> Jws<'a> {
                 .verify_signature(input.as_bytes(), &signature.bytes)
                 .is_ok()
             {
-                return b64url_decode(self.payload)
+                let payload = b64url_decode(self.payload)
                     .map(Payload)
-                    .map_err(|_| malformed());
+                    .map_err(|_| malformed())?;
+                return Ok((payload, signature.header.clone()));
             }
         }
         Err(if named {
@@ -99,9 +108,14 @@ impl<'a> Jws<'a> {
 impl<'a> Jws<'a> {
     /// Verifies under a key bound at runtime: the header `alg` is compared with the key's and never selects code.
     pub fn verify_any(self, key: &AnyVerifyKey) -> Result<Payload, Error> {
+        self.verify_any_parsed(key).map(|(payload, _)| payload)
+    }
+
+    /// As [`Self::verify_any`], with the header of the signature that verified.
+    pub(crate) fn verify_any_parsed(self, key: &AnyVerifyKey) -> Result<(Payload, Parsed), Error> {
         macro_rules! under {
             ($marker:ty) => {
-                self.verify(&VerifyKey::<$marker> {
+                self.verify_parsed(&VerifyKey::<$marker> {
                     material: dup(&key.material),
                     alg: core::marker::PhantomData,
                 })

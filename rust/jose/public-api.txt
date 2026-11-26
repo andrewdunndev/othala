@@ -79,6 +79,7 @@ impl Clone for JwkEntry
 impl Clone for Kid
 impl Clone for Kty
 impl Clone for Leeway
+impl Clone for Policy
 impl Clone for Ps256
 impl Clone for Ps384
 impl Clone for Ps512
@@ -168,10 +169,12 @@ impl Debug for JweAlg
 impl Debug for JweEnc
 impl Debug for Jwk
 impl Debug for Jws
+impl Debug for Jwt
 impl Debug for Kid
 impl Debug for Kty
 impl Debug for Leeway
 impl Debug for Payload
+impl Debug for Policy
 impl Debug for Ps256
 impl Debug for Ps384
 impl Debug for Ps512
@@ -185,8 +188,11 @@ impl Debug for SigningAlg
 impl Debug for SigningKey
 impl Debug for Typ
 impl Debug for Unsigned
+impl Debug for VerifiedJwt
 impl Debug for VerifyKey
 impl Default for Header
+impl Deserialize for Audience
+impl Deserialize for Issuer
 impl Deserialize for Kid
 impl Display for Error
 impl Eq for A128CbcHs256
@@ -224,6 +230,7 @@ impl Eq for JweEnc
 impl Eq for Kid
 impl Eq for Kty
 impl Eq for Leeway
+impl Eq for Policy
 impl Eq for Ps256
 impl Eq for Ps384
 impl Eq for Ps512
@@ -326,6 +333,7 @@ impl PartialEq for JweEnc
 impl PartialEq for Kid
 impl PartialEq for Kty
 impl PartialEq for Leeway
+impl PartialEq for Policy
 impl PartialEq for Ps256
 impl PartialEq for Ps384
 impl PartialEq for Ps512
@@ -352,6 +360,8 @@ impl PublicAlg for Ps512
 impl PublicAlg for Rs256
 impl PublicAlg for Rs384
 impl PublicAlg for Rs512
+impl Serialize for Audience
+impl Serialize for Issuer
 impl Serialize for Jwk
 impl Serialize for JwkSet
 impl Serialize for Kid
@@ -414,6 +424,8 @@ method AnySigningKey::from_jwk fn(jwk: &SecretJwk) -> Result<Self, Error>
 method AnyVerifyKey::alg const fn(self: &Self) -> SigningAlg
 method AnyVerifyKey::from_jwk fn(jwk: &Jwk) -> Result<Self, Error>
 method AnyVerifyKey::from_jwk_for fn(jwk: &Jwk, alg: SigningAlg) -> Result<Self, Error>
+method Audience::as_str fn(self: &Self) -> &str
+method Audience::new fn(text: &str) -> Result<Self, Error>
 method Compact::as_str fn(self: &Self) -> &str
 method Compact::flattened fn(self: &Self) -> String
 method Compact::general fn(tokens: &[Compact]) -> Result<String, Error>
@@ -422,6 +434,8 @@ method Header::alg const fn(self: &Self) -> SigningAlg
 method Header::kid const fn(self: &Self) -> Option<&Kid>
 method Header::new const fn() -> Self
 method Header::with_kid fn(self: Self, kid: Kid) -> Self
+method Issuer::as_str fn(self: &Self) -> &str
+method Issuer::new fn(text: &str) -> Result<Self, Error>
 method JweAlg::name const fn(self: Self) -> &'static str
 method Jwk::decode fn(json: &[u8]) -> Result<Self, Error>
 method Jwk::encrypt_key fn<K: PublicKeyAlg>(self: &Self) -> Result<EncryptKey<K>, Error>
@@ -439,10 +453,18 @@ method Jws::parse fn(compact: &'a str) -> Result<Self, Error>
 method Jws::parse_json fn(json: &'a [u8]) -> Result<Self, Error>
 method Jws::verify fn<A: Alg>(self: Self, key: &VerifyKey<A>) -> Result<Payload, Error>
 method Jws::verify_any fn(self: Self, key: &AnyVerifyKey) -> Result<Payload, Error>
+method Jwt::kid fn(self: &Self) -> Option<&Kid>
+method Jwt::parse fn(compact: &'a str) -> Result<Self, Error>
+method Jwt::verify fn<A: Alg>(self: Self, key: &VerifyKey<A>) -> Result<VerifiedJwt, Error>
+method Jwt::verify_any fn(self: Self, key: &AnyVerifyKey) -> Result<VerifiedJwt, Error>
 method Kid::as_str fn(self: &Self) -> &str
 method Kid::from_thumbprint fn(thumbprint: &Digest) -> Self
 method Kid::new fn(text: &str) -> Result<Self, Error>
+method Leeway::new const fn(seconds: u64) -> Result<Self, Error>
+method Leeway::seconds const fn(self: Self) -> u64
 method Payload::bytes fn(self: &Self) -> &[u8]
+method Policy::new fn(issuer: Issuer, audience: Audience, leeway: Leeway) -> Result<Self, Error>
+method Policy::read_back fn(issuer: Issuer, leeway: Leeway, expiry: Expiry) -> Result<Self, Error>
 method SecretJwk::decode fn(json: &[u8]) -> Result<Self, Error>
 method SecretJwk::decrypt_key fn<K: KeyAlg>(self: &Self) -> Result<DecryptKey<K>, Error>
 method SecretJwk::encrypt_key fn<K: KeyAlg>(self: &Self) -> Result<EncryptKey<K>, Error>
@@ -453,6 +475,7 @@ method SecretJwk::public fn(self: &Self) -> Option<Jwk>
 method SecretJwk::signing_key fn<A: SignAlg>(self: &Self) -> Result<SigningKey<A>, Error>
 method SecretJwk::thumbprint fn(self: &Self) -> Digest
 method SecretJwk::verify_key fn<A: Alg>(self: &Self) -> Result<VerifyKey<A>, Error>
+method SigningAlg::half_hash fn(self: Self, octets: &[u8]) -> String
 method SigningAlg::name const fn(self: Self) -> &'static str
 method Unsigned::finish fn(self: Self, signature: A::Signature) -> Result<Compact, Error>
 method Unsigned::header const fn(self: &Self) -> &Header<A>
@@ -460,6 +483,7 @@ method Unsigned::jws fn(header: Header<A>, payload: &[u8]) -> Result<Self, Error
 method Unsigned::jwt fn<K: TokenKind>(header: Header<A>, claims: &K::Claims) -> Result<Self, Error>
 method Unsigned::sign fn(self: Self, signer: &impl Signer<A>) -> Result<Compact, Error>
 method Unsigned::signing_input fn(self: &Self) -> &[u8]
+method VerifiedJwt::claims fn<K: TokenKind>(self: Self, policy: &Policy<K>, now: UnixTime) -> Result<K::Claims, Error>
 method VerifyKey::verify_signature fn(self: &Self, signing_input: &[u8], signature: &[u8]) -> Result<(), Error>
 struct A128CbcHs256
 struct A128Gcm
