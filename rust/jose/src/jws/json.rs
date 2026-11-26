@@ -162,6 +162,21 @@ mod tests {
     }
 
     #[test]
+    fn signatures_beside_flattened_members_are_malformed() {
+        let sig = format!(r#"{{"protected":"{H}","signature":"AQ"}}"#);
+        let with = |extra: &str| format!(r#"{{"payload":"AA",{extra},"signatures":[{sig}]}}"#);
+        assert_eq!(
+            kind(&with(&format!(r#""protected":"{H}""#))),
+            Some(ErrorKind::Malformed)
+        );
+        assert_eq!(
+            kind(&with(r#""header":{"kid":"k"}"#)),
+            Some(ErrorKind::Malformed)
+        );
+        assert_eq!(kind(&with(r#""x":1"#)), None);
+    }
+
+    #[test]
     fn serializations() {
         let one = token(H, "AA", "AQ");
         assert_eq!(
