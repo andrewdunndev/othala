@@ -148,12 +148,14 @@ impl Debug for AnySigningKey
 impl Debug for AnyVerifyKey
 impl Debug for Audience
 impl Debug for Compact
+impl Debug for DecryptKey
 impl Debug for Dir
 impl Debug for EcdhEs
 impl Debug for EcdhEsA128Kw
 impl Debug for EcdhEsA192Kw
 impl Debug for EcdhEsA256Kw
 impl Debug for EdDsa
+impl Debug for EncryptKey
 impl Debug for Error
 impl Debug for ErrorKind
 impl Debug for Es256
@@ -165,6 +167,7 @@ impl Debug for Hs256
 impl Debug for Hs384
 impl Debug for Hs512
 impl Debug for Issuer
+impl Debug for Jwe
 impl Debug for JweAlg
 impl Debug for JweEnc
 impl Debug for Jwk
@@ -174,6 +177,7 @@ impl Debug for Kid
 impl Debug for Kty
 impl Debug for Leeway
 impl Debug for Payload
+impl Debug for Plaintext
 impl Debug for Policy
 impl Debug for Ps256
 impl Debug for Ps384
@@ -193,8 +197,17 @@ impl Debug for VerifyKey
 impl Default for Header
 impl Deserialize for Audience
 impl Deserialize for Issuer
+impl Deserialize for JweAlg
+impl Deserialize for JweEnc
 impl Deserialize for Kid
+impl Deserialize for SigningAlg
 impl Display for Error
+impl Enc for A128CbcHs256
+impl Enc for A128Gcm
+impl Enc for A192CbcHs384
+impl Enc for A192Gcm
+impl Enc for A256CbcHs512
+impl Enc for A256Gcm
 impl Eq for A128CbcHs256
 impl Eq for A128Gcm
 impl Eq for A128GcmKw
@@ -285,6 +298,13 @@ impl Hash for Rs512
 impl Hash for RsaOaep
 impl Hash for RsaOaep256
 impl Hash for SigningAlg
+impl KeyAlg for A128GcmKw
+impl KeyAlg for A128Kw
+impl KeyAlg for A192GcmKw
+impl KeyAlg for A192Kw
+impl KeyAlg for A256GcmKw
+impl KeyAlg for A256Kw
+impl KeyAlg for Dir
 impl LocalAlg for EdDsa
 impl LocalAlg for Es256
 impl LocalAlg for Es384
@@ -292,6 +312,13 @@ impl LocalAlg for Es512
 impl LocalAlg for Hs256
 impl LocalAlg for Hs384
 impl LocalAlg for Hs512
+impl LocalKeyAlg for A128GcmKw
+impl LocalKeyAlg for A128Kw
+impl LocalKeyAlg for A192GcmKw
+impl LocalKeyAlg for A192Kw
+impl LocalKeyAlg for A256GcmKw
+impl LocalKeyAlg for A256Kw
+impl LocalKeyAlg for Dir
 impl Ord for Audience
 impl Ord for Issuer
 impl Ord for JweAlg
@@ -362,9 +389,12 @@ impl PublicAlg for Rs384
 impl PublicAlg for Rs512
 impl Serialize for Audience
 impl Serialize for Issuer
+impl Serialize for JweAlg
+impl Serialize for JweEnc
 impl Serialize for Jwk
 impl Serialize for JwkSet
 impl Serialize for Kid
+impl Serialize for SigningAlg
 impl SignAlg for EdDsa
 impl SignAlg for Es256
 impl SignAlg for Es384
@@ -429,6 +459,8 @@ method Audience::new fn(text: &str) -> Result<Self, Error>
 method Compact::as_str fn(self: &Self) -> &str
 method Compact::flattened fn(self: &Self) -> String
 method Compact::general fn(tokens: &[Compact]) -> Result<String, Error>
+method EncryptKey::encrypt fn<E: Enc>(self: &Self, plaintext: &[u8], e: &mut impl Entropy) -> Result<Compact, Error>
+method EncryptKey::encrypt_jwt fn<E: Enc>(self: &Self, jwt: &Compact, e: &mut impl Entropy) -> Result<Compact, Error>
 method Error::kind const fn(self: &Self) -> ErrorKind
 method Header::alg const fn(self: &Self) -> SigningAlg
 method Header::kid const fn(self: &Self) -> Option<&Kid>
@@ -436,7 +468,14 @@ method Header::new const fn() -> Self
 method Header::with_kid fn(self: Self, kid: Kid) -> Self
 method Issuer::as_str fn(self: &Self) -> &str
 method Issuer::new fn(text: &str) -> Result<Self, Error>
+method Jwe::decrypt fn<K: LocalKeyAlg, E: Enc>(self: Self, key: &DecryptKey<K>) -> Result<Plaintext, Error>
+method Jwe::kids fn(self: &Self) -> &[Kid]
+method Jwe::parse fn(compact: &'a str) -> Result<Self, Error>
+method Jwe::parse_json fn(json: &'a [u8]) -> Result<Self, Error>
 method JweAlg::name const fn(self: Self) -> &'static str
+method JweAlg::parse fn(name: &str) -> Result<Self, Error>
+method JweEnc::name const fn(self: Self) -> &'static str
+method JweEnc::parse fn(name: &str) -> Result<Self, Error>
 method Jwk::decode fn(json: &[u8]) -> Result<Self, Error>
 method Jwk::encrypt_key fn<K: PublicKeyAlg>(self: &Self) -> Result<EncryptKey<K>, Error>
 method Jwk::kid const fn(self: &Self) -> Option<&Kid>
@@ -463,6 +502,8 @@ method Kid::new fn(text: &str) -> Result<Self, Error>
 method Leeway::new const fn(seconds: u64) -> Result<Self, Error>
 method Leeway::seconds const fn(self: Self) -> u64
 method Payload::bytes fn(self: &Self) -> &[u8]
+method Plaintext::aad fn(self: &Self) -> Option<&[u8]>
+method Plaintext::bytes fn(self: &Self) -> &[u8]
 method Policy::new fn(issuer: Issuer, audience: Audience, leeway: Leeway) -> Result<Self, Error>
 method Policy::read_back fn(issuer: Issuer, leeway: Leeway, expiry: Expiry) -> Result<Self, Error>
 method SecretJwk::decode fn(json: &[u8]) -> Result<Self, Error>
@@ -477,6 +518,7 @@ method SecretJwk::thumbprint fn(self: &Self) -> Digest
 method SecretJwk::verify_key fn<A: Alg>(self: &Self) -> Result<VerifyKey<A>, Error>
 method SigningAlg::half_hash fn(self: Self, octets: &[u8]) -> String
 method SigningAlg::name const fn(self: Self) -> &'static str
+method SigningAlg::parse fn(name: &str) -> Result<Self, Error>
 method Unsigned::finish fn(self: Self, signature: A::Signature) -> Result<Compact, Error>
 method Unsigned::header const fn(self: &Self) -> &Header<A>
 method Unsigned::jws fn(header: Header<A>, payload: &[u8]) -> Result<Self, Error>
@@ -565,6 +607,7 @@ trait_item Blinded::sign fn(key: &key::Private, input: &[u8], e: &mut dyn base::
 trait_item BlindedUnwrap::unwrap fn(key: &Private, encrypted_key: &[u8], enc: JweEnc, e: &mut dyn Entropy) -> SecretBytes
 trait_item Enc::CEK_LEN
 trait_item Enc::ENC
+trait_item Enc::IV_LEN
 trait_item Enc::open fn(cek: &SecretBytes, iv: &[u8], aad: &[u8], ciphertext: &[u8], tag: &[u8]) -> Result<SecretBytes, Error>
 trait_item Enc::seal fn(cek: &SecretBytes, iv: &[u8], aad: &[u8], plaintext: &[u8]) -> Result<(Vec<u8>, Vec<u8>), Error>
 trait_item KeyAlg::ALG

@@ -1,4 +1,4 @@
-use crate::{Error, key};
+use crate::{Error, ErrorKind, key};
 
 /// Per-family operations, implemented beside each family's markers; sealing [`Alg`] keeps the set reviewed.
 #[expect(
@@ -202,3 +202,88 @@ impl JweAlg {
         }
     }
 }
+
+impl JweEnc {
+    /// The registry value.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::A128Gcm => "A128GCM",
+            Self::A192Gcm => "A192GCM",
+            Self::A256Gcm => "A256GCM",
+            Self::A128CbcHs256 => "A128CBC-HS256",
+            Self::A192CbcHs384 => "A192CBC-HS384",
+            Self::A256CbcHs512 => "A256CBC-HS512",
+        }
+    }
+}
+
+pub(crate) const SIGNING: [SigningAlg; 13] = [
+    SigningAlg::Hs256,
+    SigningAlg::Hs384,
+    SigningAlg::Hs512,
+    SigningAlg::Rs256,
+    SigningAlg::Rs384,
+    SigningAlg::Rs512,
+    SigningAlg::Ps256,
+    SigningAlg::Ps384,
+    SigningAlg::Ps512,
+    SigningAlg::Es256,
+    SigningAlg::Es384,
+    SigningAlg::Es512,
+    SigningAlg::EdDsa,
+];
+
+const KEY_MANAGEMENT: [JweAlg; 13] = [
+    JweAlg::A128Kw,
+    JweAlg::A192Kw,
+    JweAlg::A256Kw,
+    JweAlg::A128GcmKw,
+    JweAlg::A192GcmKw,
+    JweAlg::A256GcmKw,
+    JweAlg::Dir,
+    JweAlg::EcdhEs,
+    JweAlg::EcdhEsA128Kw,
+    JweAlg::EcdhEsA192Kw,
+    JweAlg::EcdhEsA256Kw,
+    JweAlg::RsaOaep,
+    JweAlg::RsaOaep256,
+];
+
+const CONTENT: [JweEnc; 6] = [
+    JweEnc::A128Gcm,
+    JweEnc::A192Gcm,
+    JweEnc::A256Gcm,
+    JweEnc::A128CbcHs256,
+    JweEnc::A192CbcHs384,
+    JweEnc::A256CbcHs512,
+];
+
+macro_rules! registry {
+    ($type:ident, $all:expr) => {
+        impl $type {
+            /// The value for exactly this registry name, case-sensitively; any other is `UnsupportedAlg`.
+            pub fn parse(name: &str) -> Result<Self, Error> {
+                $all.into_iter()
+                    .find(|alg| alg.name() == name)
+                    .ok_or_else(|| ErrorKind::UnsupportedAlg.into())
+            }
+        }
+
+        impl serde::Serialize for $type {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                serializer.serialize_str(self.name())
+            }
+        }
+
+        impl<'de> serde::Deserialize<'de> for $type {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                let name = <&str>::deserialize(deserializer)?;
+                Self::parse(name).map_err(serde::de::Error::custom)
+            }
+        }
+    };
+}
+
+registry!(SigningAlg, SIGNING);
+registry!(JweAlg, KEY_MANAGEMENT);
+registry!(JweEnc, CONTENT);

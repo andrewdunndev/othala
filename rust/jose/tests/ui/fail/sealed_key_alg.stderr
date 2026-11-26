@@ -10,9 +10,25 @@ help: the trait `jose::jwe::envelope::sealed::KeyAlg` is not implemented for `Mi
 6 | struct Mine;
   | ^^^^^^^^^^^
   = note: `Mine` implements similarly named trait `KeyAlg`, but not `jose::jwe::envelope::sealed::KeyAlg`
+  = help: the following other types implement trait `jose::jwe::envelope::sealed::KeyAlg`:
+            jose::A128GcmKw
+            jose::A128Kw
+            jose::A192GcmKw
+            jose::A192Kw
+            jose::A256GcmKw
+            jose::A256Kw
+            jose::Dir
 note: required by a bound in `KeyAlg`
  --> src/alg.rs
   |
   | pub trait KeyAlg: crate::jwe::envelope::sealed::KeyAlg {
   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `KeyAlg`
   = note: `KeyAlg` is a "sealed trait", because to implement it you also need to implement `jose::jwe::envelope::sealed::KeyAlg`, which is not accessible; this is usually done to force you to use one of the provided types that already implement it
+  = help: the following types implement the trait:
+            jose::A128Kw
+            jose::A192Kw
+            jose::A256Kw
+            jose::A128GcmKw
+            jose::A192GcmKw
+            jose::A256GcmKw
+            jose::Dir

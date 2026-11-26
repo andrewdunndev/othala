@@ -20,7 +20,7 @@ pub(crate) struct Parsed {
 }
 
 /// Every header name a registry defines (RFC 7515 4.1, RFC 7516 4.1, RFC 7518 4, RFC 7797): `crit` may not name one.
-const REGISTERED: [&str; 22] = [
+pub(crate) const REGISTERED: [&str; 22] = [
     "alg", "jku", "jwk", "kid", "x5u", "x5c", "x5t", "x5t#S256", "typ", "cty", "crit", "b64",
     "enc", "zip", "epk", "apu", "apv", "iv", "tag", "p2s", "p2c", "ppt",
 ];

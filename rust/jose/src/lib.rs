@@ -19,6 +19,8 @@ mod error;
 mod jwt;
 mod key;
 mod sign;
+#[cfg(test)]
+mod testing;
 mod jwk {
     pub(crate) mod decode;
     pub(crate) mod set;

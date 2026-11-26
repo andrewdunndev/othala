@@ -12,6 +12,7 @@ use rsa::BoxedUint;
 use serde::de::{DeserializeSeed, IgnoredAny, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::alg::SIGNING;
 use crate::key::{Private, Public};
 use crate::{
     Alg, DecryptKey, EncryptKey, Error, ErrorKind, JweAlg, KeyAlg, MAX_JSON_DEPTH, MAX_JSON_LEN,
@@ -124,22 +125,6 @@ const REGISTRY: [&str; 32] = [
     "A128CBC-HS256",
     "A192CBC-HS384",
     "A256CBC-HS512",
-];
-
-const SIGNING: [SigningAlg; 13] = [
-    SigningAlg::Hs256,
-    SigningAlg::Hs384,
-    SigningAlg::Hs512,
-    SigningAlg::Rs256,
-    SigningAlg::Rs384,
-    SigningAlg::Rs512,
-    SigningAlg::Ps256,
-    SigningAlg::Ps384,
-    SigningAlg::Ps512,
-    SigningAlg::Es256,
-    SigningAlg::Es384,
-    SigningAlg::Es512,
-    SigningAlg::EdDsa,
 ];
 
 fn malformed() -> Error {
@@ -594,8 +579,28 @@ impl Meta {
         Ok(())
     }
 
-    fn check_jwe(&self, (fam, _): (Fam, usize), alg: JweAlg, ops: u8) -> Result<(), Error> {
-        self.check(jwe_takes(alg, fam), alg.name(), ops)
+    /// `alg` is a JWE algorithm of the key's family, `ops` is permitted, and an AES key is as long as its algorithm says.
+    pub(crate) fn check_jwe(
+        &self,
+        (fam, len): (Fam, usize),
+        alg: JweAlg,
+        ops: u8,
+    ) -> Result<(), Error> {
+        // a `dir` key names the content algorithm it serves as its `alg` (RFC 7516 A, RFC 7520 5.6)
+        let enc = self.alg.filter(|a| {
+            alg == JweAlg::Dir && REGISTRY.get(26..).is_some_and(|enc| enc.contains(a))
+        });
+        self.check(jwe_takes(alg, fam), enc.unwrap_or(alg.name()), ops)?;
+        let want = match alg {
+            JweAlg::A128Kw | JweAlg::A128GcmKw => 16,
+            JweAlg::A192Kw | JweAlg::A192GcmKw => 24,
+            JweAlg::A256Kw | JweAlg::A256GcmKw => 32,
+            _ => len,
+        };
+        if len != want {
+            return Err(ErrorKind::WeakKey.into());
+        }
+        Ok(())
     }
 
     pub(crate) fn sig_alg(&self) -> Option<SigningAlg> {
@@ -1191,7 +1196,7 @@ mod tests {
         let kw = info(&oct());
         let kw = kw.as_ref();
         assert_eq!(
-            kw.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::A128Kw, ENCRYPT))),
+            kw.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::Dir, ENCRYPT))),
             None
         );
         assert_eq!(

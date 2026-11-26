@@ -10,9 +10,23 @@ help: the trait `jose::jwe::envelope::sealed::Enc` is not implemented for `Mine`
 6 | struct Mine;
   | ^^^^^^^^^^^
   = note: `Mine` implements similarly named trait `Enc`, but not `jose::jwe::envelope::sealed::Enc`
+  = help: the following other types implement trait `jose::jwe::envelope::sealed::Enc`:
+            jose::A128CbcHs256
+            jose::A128Gcm
+            jose::A192CbcHs384
+            jose::A192Gcm
+            jose::A256CbcHs512
+            jose::A256Gcm
 note: required by a bound in `Enc`
  --> src/alg.rs
   |
   | pub trait Enc: crate::jwe::envelope::sealed::Enc {
   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `Enc`
   = note: `Enc` is a "sealed trait", because to implement it you also need to implement `jose::jwe::envelope::sealed::Enc`, which is not accessible; this is usually done to force you to use one of the provided types that already implement it
+  = help: the following types implement the trait:
+            jose::A128Gcm
+            jose::A192Gcm
+            jose::A256Gcm
+            jose::A128CbcHs256
+            jose::A192CbcHs384
+            jose::A256CbcHs512
