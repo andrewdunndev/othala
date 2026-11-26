@@ -1,0 +1,8 @@
+{
+  "oracle": ["rust/vectors/*", "exam/*", "*/exam/*", "*expected-fail*", "primitives/rows.json"],
+  "items": [
+    {"id": "p0-base", "milestone": "M0", "rows": ["m0-base-unit", "m0-base-vectors", "m0-base-golden", "m0-base-ledger", "m0-base-effect-props", "m0-base-corpus", "m0-base-race", "m0-store-conformance", "m0-store-memstore", "m0-testkit-unit", "m0-wipe-unit"], "globs": ["rust/*", ".gitlab-ci.yml"], "deps": [], "state": "review", "model": "opus", "title": "Land primitives/base on main (MR !433)"},
+    {"id": "p0-spine", "milestone": "M0", "rows": ["m0-twins", "m0-deps"], "globs": ["rust/Cargo.toml", "rust/Cargo.lock", "rust/justfile", "rust/crates.sh", "rust/canary.sh", "rust/canary/*", "rust/clippy.toml", "rust/deny.toml", "rust/*/gates.json", "rust/*/deps.txt", "rust/deps.txt", ".gitlab-ci.yml", "primitives/*"], "deps": ["p0-base"], "state": "review", "model": "opus", "title": "Per-crate gate data, the ownership check, the queue and just score"},
+    {"id": "p0-dispatch", "milestone": "M0", "rows": [], "globs": ["primitives/dispatch*"], "deps": ["p0-spine"], "state": "needs_decision", "model": "opus", "title": "The dispatcher, held at one lane; waits on the operator check-in before any swarm"}
+  ]
+}
