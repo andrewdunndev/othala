@@ -306,6 +306,24 @@ files = [
   { path = "android-key-attestation/status.json", sha256 = "6b204883d3ae63b42605552e20eddb1e1c4178f73b4a4fced40542c0d7c62211", cases = 0 },
 ]
 
+[source."jose-derived"]
+url = "https://www.rfc-editor.org/rfc/rfc7515.txt"
+revision = "RFC 7515, 7516, 7517, 7518, 7519, 7638, 7797, 8037, 8725, 9068 sections named per case; keys from sources rfc7515, rfc7515-a4-a7, rfc7520-jwk, rfc7520-jwe, rfc7520-jwe-cases, rfc8037"
+retrieved = "2026-11-26"
+licence = "MIT OR Apache-2.0 (our own derived data; key values from the RFCs, IETF Trust)"
+feeds = ["jose"]
+notes = "Derived by tools/derive_jose.py and tools/derive_jose_jwe.mjs (deterministic, re-run byte-identical) from the specs and the pinned upstream keys only, never from crate code or drafts (ruling R-b). Each case names its spec section in `spec`. expect.kind is set only where the architecture contract or a ruling names the class (DuplicateMember, CriticalHeader, AlgMismatch, WeakKey, KeyUse, KeyAlgMissing, Issuer, Audience, MissingClaim, Expired, NotYetValid, ClaimType, Type, TooLarge; UnsupportedAlg for X25519 per R-e). Oracle choices beyond a MUST are stated in the case's spec text: duplicate names rejected (not last-wins), RFC 7797 not implemented, a duplicate-kid lookup refused, an iat beyond now plus leeway refused. limits.json is parametric (contract rule 5.7 states no numbers): the crate exposes jose::MAX_COMPACT_LEN, jose::MAX_JSON_DEPTH and jose::MAX_JWKS_KEYS and the row builds bound+1 per recipe. Header MACs, EC/RSA key validity and every JWE (otherwise valid, so the refusal is for the header alone) were cross-checked with Node crypto; the Ed25519 thumbprint equals RFC 8037 A.3."
+cases = 105
+files = [
+  { path = "jose-derived/claims.json", sha256 = "708fe7fcd78b3463fae0ebe1ac7cb33823a518b6743bb76ca611798eda7f7696", cases = 23 },
+  { path = "jose-derived/header.json", sha256 = "25d515ff305dabcb4c672b4ad0116cc2f2071f36e471f90511e35c0d68612b24", cases = 23 },
+  { path = "jose-derived/jwe-header.json", sha256 = "fb9f27408aebdc7c2c5b269fd0d9f05cde050cd4cd313c1f9739054974222098", cases = 11 },
+  { path = "jose-derived/jwks.json", sha256 = "2e9135581fcda0c0bd8128ed3cc966d8c2a1bf574f3fd83ea248d82c40a1048c", cases = 8 },
+  { path = "jose-derived/keys.json", sha256 = "a62fe57d85aa28713dcced1556eaf1eaa241ffb7a5ef4264d8b08d0aa25e050c", cases = 29 },
+  { path = "jose-derived/limits.json", sha256 = "30902a763039ecc4bf6d410af226175f6d11e7630fbf18d10307ddb2b802db2a", cases = 4 },
+  { path = "jose-derived/thumbprint.json", sha256 = "6e0127398009b39c2a124711a5eadbdd189e8c0e7e49aa3934fe82945f6b6209", cases = 7 },
+]
+
 # Real-authenticator corpus. Seeded from the survey failure list (survey-webauthn.md section 4 item 3).
 # Nothing below is committed yet except android-key-attestation above. Candidate sources are named by
 # repository and stated licence only; no candidate has been read or copied.
