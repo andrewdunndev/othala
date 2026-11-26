@@ -305,6 +305,10 @@ impl KeyAlg for A192Kw
 impl KeyAlg for A256GcmKw
 impl KeyAlg for A256Kw
 impl KeyAlg for Dir
+impl KeyAlg for EcdhEs
+impl KeyAlg for EcdhEsA128Kw
+impl KeyAlg for EcdhEsA192Kw
+impl KeyAlg for EcdhEsA256Kw
 impl LocalAlg for EdDsa
 impl LocalAlg for Es256
 impl LocalAlg for Es384
@@ -319,6 +323,10 @@ impl LocalKeyAlg for A192Kw
 impl LocalKeyAlg for A256GcmKw
 impl LocalKeyAlg for A256Kw
 impl LocalKeyAlg for Dir
+impl LocalKeyAlg for EcdhEs
+impl LocalKeyAlg for EcdhEsA128Kw
+impl LocalKeyAlg for EcdhEsA192Kw
+impl LocalKeyAlg for EcdhEsA256Kw
 impl Ord for Audience
 impl Ord for Issuer
 impl Ord for JweAlg
@@ -387,6 +395,10 @@ impl PublicAlg for Ps512
 impl PublicAlg for Rs256
 impl PublicAlg for Rs384
 impl PublicAlg for Rs512
+impl PublicKeyAlg for EcdhEs
+impl PublicKeyAlg for EcdhEsA128Kw
+impl PublicKeyAlg for EcdhEsA192Kw
+impl PublicKeyAlg for EcdhEsA256Kw
 impl Serialize for Audience
 impl Serialize for Issuer
 impl Serialize for JweAlg

@@ -1,8 +1,8 @@
 //! Helpers the JWE row files share: one `jwe_decrypt` case run under the algorithms the vector names.
 use jose::{
     A128CbcHs256, A128Gcm, A128GcmKw, A128Kw, A192CbcHs384, A192Gcm, A192GcmKw, A192Kw,
-    A256CbcHs512, A256Gcm, A256GcmKw, A256Kw, Dir, Enc, Error, ErrorKind, Jwe, LocalKeyAlg,
-    SecretJwk,
+    A256CbcHs512, A256Gcm, A256GcmKw, A256Kw, Dir, EcdhEs, EcdhEsA128Kw, EcdhEsA192Kw,
+    EcdhEsA256Kw, Enc, Error, ErrorKind, Jwe, LocalKeyAlg, SecretJwk,
 };
 
 /// The key-management algorithms that need no randomness to decrypt and are this file's.
@@ -45,6 +45,10 @@ pub(crate) fn decrypt(alg: &str, enc: &str, jwk: &str, jwe: Jwe<'_>) -> Result<V
         "A192GCMKW" => by_enc::<A192GcmKw>(enc, jwk, jwe),
         "A256GCMKW" => by_enc::<A256GcmKw>(enc, jwk, jwe),
         "dir" => by_enc::<Dir>(enc, jwk, jwe),
+        "ECDH-ES" => by_enc::<EcdhEs>(enc, jwk, jwe),
+        "ECDH-ES+A128KW" => by_enc::<EcdhEsA128Kw>(enc, jwk, jwe),
+        "ECDH-ES+A192KW" => by_enc::<EcdhEsA192Kw>(enc, jwk, jwe),
+        "ECDH-ES+A256KW" => by_enc::<EcdhEsA256Kw>(enc, jwk, jwe),
         _ => Err(ErrorKind::UnsupportedAlg.into()),
     }
 }

@@ -14,7 +14,7 @@
     ]
   },
   "mutants": {
-    "floor": 250
+    "floor": 280
   },
   "expose": ["sig/hmac", "jwk/decode", "jwk/thumbprint", "jwe/envelope", "jwe/kw", "jwe/content", "jwe/ecdh", "jwe/oaep"],
   "vectors": [
