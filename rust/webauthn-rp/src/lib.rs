@@ -86,7 +86,7 @@ pub type Effect = base::Effect<Key, Record>;
 /// What a finish returns: the verification result, held until the effect commits; a failure still carries the ceremony row's delete.
 pub type Verdict<T> = Pending<Result<T, Error>>;
 
-/// Longest credential id accepted (L3 7.1 step 25).
+/// Longest credential id accepted (L3 7.1 step 28).
 pub const MAX_CREDENTIAL_ID: usize = 1023;
 
 /// Longest user handle (L3 5.4.3).

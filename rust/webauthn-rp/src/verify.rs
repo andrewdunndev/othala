@@ -647,6 +647,14 @@ mod tests {
         Error::new(ErrorKind::Corrupt)
     }
 
+    // guards and writes of an effect: R141 bounds both by two
+    fn shape(effect: &BaseEffect<Key, Record>) -> (usize, usize) {
+        (
+            effect.guards().count(),
+            effect.puts().count() + effect.deletes().count(),
+        )
+    }
+
     // a valid assertion and the rows it finishes, each part open to a test's change
     struct Fx {
         key: SigningKey,
@@ -671,6 +679,7 @@ mod tests {
         result: Result<Assertion, Error>,
         left: BTreeMap<Key, Record>,
         before: BTreeMap<Key, Record>,
+        shape: (usize, usize),
     }
 
     impl Fx {
@@ -799,6 +808,7 @@ mod tests {
                 UnixTime::new(self.now),
                 &mut testkit::seeded(20),
             );
+            let shape = shape(verdict.effect());
             let receipt = store
                 .apply(verdict.effect(), start)
                 .map_err(bad)?
@@ -807,6 +817,7 @@ mod tests {
                 result: verdict.settle(receipt).map_err(bad)?,
                 left: store.contents(start),
                 before,
+                shape,
             })
         }
 
@@ -1401,6 +1412,7 @@ mod tests {
     struct Registering {
         result: Result<Registered, Error>,
         left: BTreeMap<Key, Record>,
+        shape: (usize, usize),
     }
 
     struct Unknown;
@@ -1496,6 +1508,7 @@ mod tests {
                 UnixTime::new(self.now),
                 &mut testkit::seeded(20),
             );
+            let shape = shape(verdict.effect());
             let receipt = store
                 .apply(verdict.effect(), start)
                 .map_err(bad)?
@@ -1503,6 +1516,7 @@ mod tests {
             Ok(Registering {
                 result: verdict.settle(receipt).map_err(bad)?,
                 left: store.contents(start),
+                shape,
             })
         }
 
@@ -1914,6 +1928,92 @@ mod tests {
                 Some(ErrorKind::TooLarge)
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn every_effect_is_one_transaction_of_at_most_two_guards_and_two_writes() -> Result<(), Error> {
+        let fx = Fx::new()?;
+        let ok = fx.run()?;
+        assert!(ok.result.is_ok());
+        assert_eq!(
+            ok.shape,
+            (2, 2),
+            "assertion: consume the ceremony, update the credential"
+        );
+        let mut late = Fx::new()?;
+        late.now = DEADLINE;
+        let refused = late.run()?;
+        assert!(refused.result.is_err());
+        assert_eq!(
+            refused.shape,
+            (1, 1),
+            "a refusal deletes the ceremony alone"
+        );
+        let reg = Reg::new()?;
+        let ok = reg.run()?;
+        assert!(ok.result.is_ok());
+        assert_eq!(
+            ok.shape,
+            (2, 2),
+            "registration: consume the ceremony, reserve the credential"
+        );
+        let mut wrong = Reg::new()?;
+        wrong.kind = "webauthn.get".into();
+        let refused = wrong.run()?;
+        assert!(refused.result.is_err());
+        assert_eq!(refused.shape, (1, 1));
+        let user = UserHandle::from_stored(USER)?;
+        let (_, start) = fx.rp.start_authentication(
+            Allow::User {
+                user: &user,
+                credentials: &[],
+            },
+            &AuthenticationOptions::new(Requirement::Required, Timeout::from_secs(30)?),
+            &fx.browser,
+            UnixTime::new(NOW),
+            &mut testkit::seeded(5),
+        )?;
+        assert_eq!(shape(&start), (1, 1));
+        let entity = UserEntity::new(user, UserName::parse("ada")?, DisplayName::parse("Ada")?);
+        let (_, start) = reg.rp.start_registration(
+            &entity,
+            &[],
+            &reg.ceremony.options,
+            &reg.browser,
+            UnixTime::new(NOW),
+            &mut testkit::seeded(5),
+        )?;
+        assert_eq!(shape(&start), (1, 1));
+        assert!(
+            start
+                .puts()
+                .map(|(k, ..)| k)
+                .chain(start.deletes())
+                .all(|k| matches!(k, Key::Ceremony(_) | Key::Credential(_)))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn the_ceremony_row_holds_the_challenge_digest_and_never_the_challenge() -> Result<(), Error> {
+        let has = |hay: &[u8], needle: &[u8]| hay.windows(needle.len()).any(|w| w == needle);
+        assert!(has(&[1, 2, 3, 4], &[2, 3]) && !has(&[1, 2, 4], &[2, 3]));
+        let fx = Fx::new()?;
+        let (request, effect) = fx.rp.start_authentication(
+            Allow::Discoverable,
+            &AuthenticationOptions::new(Requirement::Required, Timeout::from_secs(30)?),
+            &fx.browser,
+            UnixTime::new(NOW),
+            &mut testkit::seeded(5),
+        )?;
+        let puts: Vec<_> = effect.puts().collect();
+        let [(_, record, _)] = puts.as_slice() else {
+            return Err(bad(()));
+        };
+        let row = record.encode()?;
+        assert!(has(&row, sha256(&request.challenge).as_bytes()));
+        assert!(!has(&row, &request.challenge));
         Ok(())
     }
 }

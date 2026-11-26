@@ -56,7 +56,15 @@ const FORMATS: [(&str, bool); 1] = [("none", cfg!(feature = "none"))];
 
 /// Verifies `att_stmt` by the procedure of the format named `fmt`, matched byte for byte: an unlisted name is `UnknownFormat`, one whose feature is off `FormatDisabled`.
 pub(crate) fn verify(fmt: &str, statement: &Statement<'_>) -> Result<Verified, Error> {
-    match FORMATS.iter().find(|(name, _)| *name == fmt) {
+    among(&FORMATS, fmt, statement)
+}
+
+fn among(
+    formats: &[(&str, bool)],
+    fmt: &str,
+    statement: &Statement<'_>,
+) -> Result<Verified, Error> {
+    match formats.iter().find(|(name, _)| *name == fmt) {
         None => Err(Error::new(ErrorKind::UnknownFormat)),
         Some((_, false)) => Err(Error::new(ErrorKind::FormatDisabled)),
         Some((_, true)) => match statement.att_stmt {
@@ -73,7 +81,7 @@ pub(crate) fn verify(fmt: &str, statement: &Statement<'_>) -> Result<Verified, E
 mod tests {
     use alloc::vec;
 
-    use super::{Statement, verify};
+    use super::{Statement, among};
     use crate::authdata::AuthData;
     use crate::cbor::Value;
     use crate::error::{Error, ErrorKind};
@@ -81,6 +89,14 @@ mod tests {
     use crate::trust::AttestationType;
 
     fn check(fmt: &str, stmt: &Value<'_>) -> Result<Result<AttestationType, ErrorKind>, Error> {
+        check_in(&[("none", true)], fmt, stmt)
+    }
+
+    fn check_in(
+        formats: &[(&str, bool)],
+        fmt: &str,
+        stmt: &Value<'_>,
+    ) -> Result<Result<AttestationType, ErrorKind>, Error> {
         let (_, cose, _) = key()?;
         let bytes = auth_data(&[0; 32], 0x41, 0, b"c", &cose);
         let parsed = AuthData::parse(&bytes)?;
@@ -90,7 +106,7 @@ mod tests {
             auth_data_bytes: &bytes,
             client_data_hash: [0; 32],
         };
-        Ok(verify(fmt, &statement)
+        Ok(among(formats, fmt, &statement)
             .map(|v| v.kind)
             .map_err(|e| e.kind()))
     }
@@ -114,6 +130,21 @@ mod tests {
                 "{other}"
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn a_format_whose_feature_is_off_is_disabled_not_unknown() -> Result<(), Error> {
+        let empty = Value::Map(vec![]);
+        let formats = [("none", false), ("packed", true)];
+        assert_eq!(
+            check_in(&formats, "none", &empty)?,
+            Err(ErrorKind::FormatDisabled)
+        );
+        assert_eq!(
+            check_in(&formats, "tpm", &empty)?,
+            Err(ErrorKind::UnknownFormat)
+        );
         Ok(())
     }
 }
