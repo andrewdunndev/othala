@@ -18,6 +18,7 @@ queue:
 
 # every CONTRACT.md test ref resolves to a test, row, ui case, vector or fuzz target, each pending ref gives its reason, and a quoted mutants floor is gates.json's; the tool first proves itself on planted defects
 claims:
+    command -v node > /dev/null || { echo 'claims: node is not on PATH; mise.toml pins it, so run under `mise x --`'; exit 1; }
     node canary/claims.mjs --selftest
     node canary/claims.mjs
 
