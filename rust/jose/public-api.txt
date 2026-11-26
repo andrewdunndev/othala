@@ -142,6 +142,8 @@ impl Debug for A256CbcHs512
 impl Debug for A256Gcm
 impl Debug for A256GcmKw
 impl Debug for A256Kw
+impl Debug for AnySigningKey
+impl Debug for AnyVerifyKey
 impl Debug for Audience
 impl Debug for Dir
 impl Debug for EcdhEs
@@ -343,6 +345,8 @@ impl PublicAlg for Ps512
 impl PublicAlg for Rs256
 impl PublicAlg for Rs384
 impl PublicAlg for Rs512
+impl Serialize for Jwk
+impl Serialize for JwkSet
 impl Serialize for Kid
 impl SignAlg for EdDsa
 impl SignAlg for Es256
@@ -350,6 +354,7 @@ impl SignAlg for Es384
 impl SignAlg for Hs256
 impl SignAlg for Hs384
 impl SignAlg for Hs512
+impl Signer for AnySigningKey
 impl StructuralPartialEq for A128CbcHs256
 impl StructuralPartialEq for A128Gcm
 impl StructuralPartialEq for A128GcmKw
@@ -395,6 +400,11 @@ impl StructuralPartialEq for RsaOaep
 impl StructuralPartialEq for RsaOaep256
 impl StructuralPartialEq for SigningAlg
 impl StructuralPartialEq for Typ
+method AnySigningKey::alg const fn(self: &Self) -> SigningAlg
+method AnySigningKey::from_jwk fn(jwk: &SecretJwk) -> Result<Self, Error>
+method AnyVerifyKey::alg const fn(self: &Self) -> SigningAlg
+method AnyVerifyKey::from_jwk fn(jwk: &Jwk) -> Result<Self, Error>
+method AnyVerifyKey::from_jwk_for fn(jwk: &Jwk, alg: SigningAlg) -> Result<Self, Error>
 method Error::kind const fn(self: &Self) -> ErrorKind
 method JweAlg::name const fn(self: Self) -> &'static str
 method Jwk::decode fn(json: &[u8]) -> Result<Self, Error>
@@ -404,9 +414,14 @@ method Jwk::kty fn(self: &Self) -> Kty
 method Jwk::sig_alg fn(self: &Self) -> Option<SigningAlg>
 method Jwk::thumbprint fn(self: &Self) -> Digest
 method Jwk::verify_key fn<A: PublicAlg>(self: &Self) -> Result<VerifyKey<A>, Error>
+method JwkSet::decode fn(json: &[u8]) -> Result<Self, Error>
+method JwkSet::entries fn(self: &Self) -> impl ExactSizeIterator<Item = JwkEntry<'_>>
+method JwkSet::find fn(self: &Self, kid: &Kid) -> Result<JwkEntry<'_>, Error>
+method JwkSet::new fn(keys: Vec<Jwk>) -> Result<Self, Error>
 method Jws::kids fn(self: &Self) -> &[Kid]
 method Jws::parse fn(compact: &'a str) -> Result<Self, Error>
 method Jws::verify fn<A: Alg>(self: Self, key: &VerifyKey<A>) -> Result<Payload, Error>
+method Jws::verify_any fn(self: Self, key: &AnyVerifyKey) -> Result<Payload, Error>
 method Kid::as_str fn(self: &Self) -> &str
 method Kid::from_thumbprint fn(thumbprint: &Digest) -> Self
 method Kid::new fn(text: &str) -> Result<Self, Error>

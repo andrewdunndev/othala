@@ -1,7 +1,13 @@
 //! JWK Set decoding, lookup and publication (RFC 7517 section 5).
 use alloc::vec::Vec;
 
-use crate::{Jwk, SecretJwk};
+use serde::ser::{SerializeMap as _, Serializer};
+use serde::{Deserialize, Serialize};
+use serde_json::value::RawValue;
+
+use crate::jwk::decode::{Key, parse, scan};
+use crate::jwk::thumbprint::members;
+use crate::{Error, ErrorKind, Jwk, Kid, MAX_JWKS_KEYS, SecretJwk};
 
 /// A JWK Set: the public keys, and any private or symmetric ones a decoded document held, in document order.
 /// `Serialize` writes the public keys only.
@@ -23,4 +29,166 @@ pub enum JwkEntry<'a> {
     Public(&'a Jwk),
     /// A private or symmetric key.
     Secret(&'a SecretJwk),
+}
+
+impl Member {
+    fn kid(&self) -> Option<&Kid> {
+        match self {
+            Self::Public(key) => key.kid(),
+            Self::Secret(key) => key.kid(),
+        }
+    }
+
+    const fn entry(&self) -> JwkEntry<'_> {
+        match self {
+            Self::Public(key) => JwkEntry::Public(key),
+            Self::Secret(key) => JwkEntry::Secret(key),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct Document<'a> {
+    #[serde(borrow)]
+    keys: Vec<&'a RawValue>,
+}
+
+impl JwkSet {
+    /// Decodes `{"keys": [...]}`: a member that is not a supported key (an unknown `kty`, X25519, a weak modulus) is
+    /// skipped and not counted; a malformed one, a name used twice or more than `MAX_JWKS_KEYS` kept keys is refused.
+    pub fn decode(json: &[u8]) -> Result<Self, Error> {
+        scan(json)?;
+        let document: Document<'_> =
+            serde_json::from_slice(json).map_err(|_| ErrorKind::Malformed)?;
+        let mut keys = Vec::new();
+        for raw in document.keys {
+            match parse(raw.get().as_bytes()) {
+                Ok((meta, Key::Public(material))) => {
+                    keys.push(Member::Public(Jwk { meta, material }))
+                }
+                Ok((meta, Key::Private(material))) => {
+                    keys.push(Member::Secret(SecretJwk { meta, material }));
+                }
+                Err(error)
+                    if matches!(error.kind(), ErrorKind::UnsupportedAlg | ErrorKind::WeakKey) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        if keys.len() > MAX_JWKS_KEYS {
+            return Err(ErrorKind::TooLarge.into());
+        }
+        Ok(Self { keys })
+    }
+
+    /// A set of public keys; more than `MAX_JWKS_KEYS` is `TooLarge`, a `kid` repeated `DuplicateMember`.
+    pub fn new(keys: Vec<Jwk>) -> Result<Self, Error> {
+        if keys.len() > MAX_JWKS_KEYS {
+            return Err(ErrorKind::TooLarge.into());
+        }
+        let kids: Vec<&Kid> = keys.iter().filter_map(Jwk::kid).collect();
+        if kids
+            .iter()
+            .enumerate()
+            .any(|(i, kid)| kids.iter().skip(i + 1).any(|other| other == kid))
+        {
+            return Err(ErrorKind::DuplicateMember.into());
+        }
+        Ok(Self {
+            keys: keys.into_iter().map(Member::Public).collect(),
+        })
+    }
+
+    /// The one key whose `kid` is `kid`, byte for byte: none is `BadSignature` (no key can verify), two are
+    /// `DuplicateMember`, never a pick.
+    pub fn find(&self, kid: &Kid) -> Result<JwkEntry<'_>, Error> {
+        let mut named = self.keys.iter().filter(|key| key.kid() == Some(kid));
+        match (named.next(), named.next()) {
+            (Some(key), None) => Ok(key.entry()),
+            (Some(_), Some(_)) => Err(ErrorKind::DuplicateMember.into()),
+            (None, _) => Err(ErrorKind::BadSignature.into()),
+        }
+    }
+
+    /// The kept keys in document order.
+    pub fn entries(&self) -> impl ExactSizeIterator<Item = JwkEntry<'_>> {
+        self.keys.iter().map(Member::entry)
+    }
+}
+
+impl Serialize for Jwk {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(None)?;
+        for (name, value) in members(&self.material) {
+            map.serialize_entry(name, &value)?;
+        }
+        if let Some(kid) = &self.meta.kid {
+            map.serialize_entry("kid", kid)?;
+        }
+        if let Some(alg) = self.meta.alg {
+            map.serialize_entry("alg", alg)?;
+        }
+        if let Some(usage) = self.meta.use_name {
+            map.serialize_entry("use", usage)?;
+        }
+        if !self.meta.ops.is_empty() {
+            map.serialize_entry("key_ops", &self.meta.ops)?;
+        }
+        map.end()
+    }
+}
+
+impl Serialize for JwkSet {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(Some(1))?;
+        let public = self.keys.iter().filter_map(|key| match key {
+            Member::Public(key) => Some(key),
+            Member::Secret(_) => None,
+        });
+        map.serialize_entry("keys", &public.collect::<Vec<_>>())?;
+        map.end()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::borrow::ToOwned as _;
+    use alloc::format;
+    use alloc::string::String;
+    use alloc::vec::Vec;
+
+    use super::JwkSet;
+    use crate::{ErrorKind, MAX_JWKS_KEYS};
+
+    const K: &str = "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg";
+
+    fn set(members: &[String]) -> Result<usize, ErrorKind> {
+        let text = format!(r#"{{"keys":[{}]}}"#, members.join(","));
+        JwkSet::decode(text.as_bytes())
+            .map(|s| s.entries().len())
+            .map_err(|e| e.kind())
+    }
+
+    fn oct(i: usize) -> String {
+        format!(r#"{{"kty":"oct","kid":"k{i}","k":"{K}"}}"#)
+    }
+
+    #[test]
+    fn unsupported_members_are_skipped_and_bad_ones_refused() {
+        let weak = r#"{"kty":"RSA","n":"AQAB","e":"AQAB"}"#.to_owned();
+        let unknown = r#"{"kty":"other"}"#.to_owned();
+        let broken = r#"{"kty":"EC","crv":"P-256"}"#.to_owned();
+        assert_eq!(set(&[oct(0), weak, unknown]), Ok(1));
+        assert_eq!(set(&[oct(0), broken]), Err(ErrorKind::Malformed));
+        assert_eq!(set(&[]), Ok(0));
+    }
+
+    #[test]
+    fn key_count_is_bounded() {
+        let keys: Vec<String> = (0..=MAX_JWKS_KEYS).map(oct).collect();
+        assert_eq!(
+            set(keys.get(..MAX_JWKS_KEYS).unwrap_or_default()),
+            Ok(MAX_JWKS_KEYS)
+        );
+        assert_eq!(set(&keys), Err(ErrorKind::TooLarge));
+    }
 }

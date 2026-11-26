@@ -43,14 +43,17 @@ pub(crate) struct Meta {
     pub(crate) kid: Option<Kid>,
     pub(crate) alg: Option<&'static str>,
     pub(crate) usage: Usage,
+    /// `use` and `key_ops` as written, so a JWK serializes the members it was given.
+    pub(crate) use_name: Option<&'static str>,
+    pub(crate) ops: Vec<&'static str>,
 }
 
 /// The operations `use` and `key_ops` permit, one bit each; absent members permit every one the key type allows.
 #[derive(Clone, Copy)]
 pub(crate) struct Usage(pub(crate) u8);
 
-const SIGN: u8 = 1;
-const VERIFY: u8 = 2;
+pub(crate) const SIGN: u8 = 1;
+pub(crate) const VERIFY: u8 = 2;
 const WRAP: u8 = 4;
 const UNWRAP: u8 = 8;
 const DERIVE: u8 = 16;
@@ -78,7 +81,7 @@ pub(crate) enum Key {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Fam {
+pub(crate) enum Fam {
     Oct,
     P256,
     P384,
@@ -374,31 +377,43 @@ fn rsa(r: &Raw<'_>) -> Result<Key, Error> {
         .map_err(|_| malformed())
 }
 
-fn usage(r: &Raw<'_>) -> Result<Usage, Error> {
-    let by_use = match r.usage.as_deref() {
-        None => None,
-        Some("sig") => Some(SIGN + VERIFY),
-        Some("enc") => Some(WRAP + UNWRAP + DERIVE),
+/// The `key_ops` values and the operations each permits.
+const OPS: [(&str, u8); 8] = [
+    ("sign", SIGN),
+    ("verify", VERIFY),
+    ("encrypt", WRAP),
+    ("wrapKey", WRAP),
+    ("decrypt", UNWRAP),
+    ("unwrapKey", UNWRAP),
+    ("deriveKey", DERIVE),
+    ("deriveBits", DERIVE),
+];
+
+fn usage(r: &Raw<'_>) -> Result<(Usage, Option<&'static str>, Vec<&'static str>), Error> {
+    let (use_name, by_use) = match r.usage.as_deref() {
+        None => (None, None),
+        Some("sig") => (Some("sig"), Some(SIGN + VERIFY)),
+        Some("enc") => (Some("enc"), Some(WRAP + UNWRAP + DERIVE)),
         Some(_) => return Err(ErrorKind::KeyUse.into()),
     };
+    let mut names = Vec::new();
     let mut ops = 0;
     for op in r.key_ops.iter().flatten() {
-        ops |= match op.as_str() {
-            "sign" => SIGN,
-            "verify" => VERIFY,
-            "encrypt" | "wrapKey" => WRAP,
-            "decrypt" | "unwrapKey" => UNWRAP,
-            "deriveKey" | "deriveBits" => DERIVE,
-            _ => return Err(ErrorKind::KeyUse.into()),
-        };
+        let (name, bit) = OPS
+            .iter()
+            .find(|(name, _)| *name == op)
+            .ok_or(ErrorKind::KeyUse)?;
+        names.push(*name);
+        ops |= bit;
     }
-    Ok(Usage(match (by_use, ops) {
+    let bits = match (by_use, ops) {
         (None, 0) => u8::MAX,
         (Some(by_use), 0) => by_use,
         (None, ops) => ops,
         (Some(by_use), ops) if ops & !by_use == 0 => ops,
         (Some(_), _) => return Err(ErrorKind::KeyUse.into()),
-    }))
+    };
+    Ok((Usage(bits), use_name, names))
 }
 
 fn meta(r: &Raw<'_>) -> Result<Meta, Error> {
@@ -411,10 +426,13 @@ fn meta(r: &Raw<'_>) -> Result<Meta, Error> {
                 .ok_or(ErrorKind::UnsupportedAlg)?,
         ),
     };
+    let (usage, use_name, ops) = usage(r)?;
     Ok(Meta {
         kid: r.kid.as_deref().map(Kid::new).transpose()?,
         alg: alg.copied(),
-        usage: usage(r)?,
+        usage,
+        use_name,
+        ops,
     })
 }
 
@@ -479,7 +497,7 @@ pub(crate) fn public_of(key: &Private) -> Public {
 }
 
 /// The family of a public key, and its length when symmetric.
-fn public_info(key: &Public) -> (Fam, usize) {
+pub(crate) fn public_info(key: &Public) -> (Fam, usize) {
     match key {
         Public::Oct(k) => (Fam::Oct, k.expose().len()),
         Public::P256(_) => (Fam::P256, 0),
@@ -491,7 +509,7 @@ fn public_info(key: &Public) -> (Fam, usize) {
     }
 }
 
-fn private_info(key: &Private) -> (Fam, usize) {
+pub(crate) fn private_info(key: &Private) -> (Fam, usize) {
     match key {
         Private::Oct(k) => (Fam::Oct, k.expose().len()),
         Private::P256(_) => (Fam::P256, 0),
@@ -557,7 +575,12 @@ impl Meta {
     }
 
     /// `alg` is a JWS algorithm of the key's family, `ops` is permitted, and an HMAC key is as long as its hash.
-    fn check_sig(&self, (fam, len): (Fam, usize), alg: SigningAlg, ops: u8) -> Result<(), Error> {
+    pub(crate) fn check_sig(
+        &self,
+        (fam, len): (Fam, usize),
+        alg: SigningAlg,
+        ops: u8,
+    ) -> Result<(), Error> {
         self.check(fam == sig_fam(alg), alg.name(), ops)?;
         let floor = match alg {
             SigningAlg::Hs256 => 32,
@@ -575,7 +598,7 @@ impl Meta {
         self.check(jwe_takes(alg, fam), alg.name(), ops)
     }
 
-    fn sig_alg(&self) -> Option<SigningAlg> {
+    pub(crate) fn sig_alg(&self) -> Option<SigningAlg> {
         SIGNING.into_iter().find(|alg| Some(alg.name()) == self.alg)
     }
 }
@@ -691,6 +714,8 @@ impl SecretJwk {
                 kid: None,
                 alg: None,
                 usage: Usage(u8::MAX),
+                use_name: None,
+                ops: Vec::new(),
             },
             material: Private::Oct(key),
         }
@@ -708,10 +733,19 @@ impl SecretJwk {
 
     /// The public half, keeping `kid`, `alg` and `use`; none for an `oct` key.
     pub fn public(&self) -> Option<Jwk> {
+        let bits = match self.meta.use_name {
+            Some("sig") => SIGN + VERIFY,
+            Some(_) => WRAP + UNWRAP + DERIVE,
+            None => u8::MAX,
+        };
         match self.material {
             Private::Oct(_) => None,
             _ => Some(Jwk {
-                meta: self.meta.clone(),
+                meta: Meta {
+                    usage: Usage(bits),
+                    ops: Vec::new(),
+                    ..self.meta.clone()
+                },
                 material: public_of(&self.material),
             }),
         }
@@ -990,6 +1024,30 @@ mod tests {
         assert_eq!(secret.as_ref().map(SecretJwk::kty), Some(Kty::Ec));
         assert_eq!(public.as_ref().map(Jwk::kty), Some(Kty::Ec));
         assert!(secret.and_then(|s| s.public()).is_some());
+    }
+
+    #[test]
+    fn the_public_half_keeps_use_and_drops_key_ops() {
+        let public = |key: &Members| {
+            let secret = SecretJwk::decode(text(key).as_bytes()).ok();
+            secret
+                .and_then(|s| s.public())
+                .map(|p| (p.meta.usage.0, p.meta.ops.len(), p.meta.use_name))
+        };
+        let ec = ec_private();
+        assert_eq!(public(&ec), Some((u8::MAX, 0, None)));
+        assert_eq!(
+            public(&with(&ec, "use", "sig")),
+            Some((SIGN + VERIFY, 0, Some("sig")))
+        );
+        assert_eq!(
+            public(&with(&ec, "use", "enc")),
+            Some((WRAP + UNWRAP + DERIVE, 0, Some("enc")))
+        );
+        assert_eq!(
+            public(&with(&ec, "key_ops", "[\"sign\"]")),
+            Some((u8::MAX, 0, None))
+        );
     }
 
     #[test]

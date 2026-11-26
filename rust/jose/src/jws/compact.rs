@@ -5,8 +5,12 @@ use core::fmt;
 
 use base::b64url_decode;
 
+use crate::jwk::decode::dup;
 use crate::jws::header::Parsed;
-use crate::{Alg, Error, ErrorKind, Kid, MAX_COMPACT_LEN, VerifyKey};
+use crate::{
+    Alg, AnyVerifyKey, EdDsa, Error, ErrorKind, Es256, Es384, Kid, MAX_COMPACT_LEN, Ps256, Ps384,
+    Ps512, Rs256, Rs384, Rs512, SigningAlg, VerifyKey,
+};
 
 /// One signature of a JWS: the protected header text as received, the merged header, the signature bytes.
 pub(crate) struct Signature<'a> {
@@ -89,6 +93,32 @@ impl<'a> Jws<'a> {
             ErrorKind::AlgMismatch
         }
         .into())
+    }
+}
+
+impl<'a> Jws<'a> {
+    /// Verifies under a key bound at runtime: the header `alg` is compared with the key's and never selects code.
+    pub fn verify_any(self, key: &AnyVerifyKey) -> Result<Payload, Error> {
+        macro_rules! under {
+            ($marker:ty) => {
+                self.verify(&VerifyKey::<$marker> {
+                    material: dup(&key.material),
+                    alg: core::marker::PhantomData,
+                })
+            };
+        }
+        match key.alg {
+            SigningAlg::Rs256 => under!(Rs256),
+            SigningAlg::Rs384 => under!(Rs384),
+            SigningAlg::Rs512 => under!(Rs512),
+            SigningAlg::Ps256 => under!(Ps256),
+            SigningAlg::Ps384 => under!(Ps384),
+            SigningAlg::Ps512 => under!(Ps512),
+            SigningAlg::Es256 => under!(Es256),
+            SigningAlg::Es384 => under!(Es384),
+            SigningAlg::EdDsa => under!(EdDsa),
+            _ => Err(ErrorKind::UnsupportedAlg.into()),
+        }
     }
 }
 

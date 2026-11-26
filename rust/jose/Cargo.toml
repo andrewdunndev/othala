@@ -19,7 +19,7 @@ rsa-sign = ["dep:rand_core"]
 [dependencies]
 base = { workspace = true, features = ["expose"] }
 serde = { workspace = true, features = ["alloc", "derive"] }
-serde_json = { version = "1.0.154", default-features = false, features = ["alloc"] }
+serde_json = { version = "1.0.154", default-features = false, features = ["alloc", "raw_value"] }
 sha2.workspace = true
 hmac = "0.13"
 p256 = { version = "0.14", default-features = false, features = ["ecdsa", "ecdh"] }
