@@ -28,6 +28,8 @@ enum Typ
 field JwkEntry::Public::0: &'a crate::Jwk
 field JwkEntry::Secret::0: &'a crate::SecretJwk
 field Typ::Explicit::0: &'static str
+impl Alg for Es256
+impl Alg for Es384
 impl Alg for Hs256
 impl Alg for Hs384
 impl Alg for Hs512
@@ -260,6 +262,8 @@ impl Hash for Rs512
 impl Hash for RsaOaep
 impl Hash for RsaOaep256
 impl Hash for SigningAlg
+impl LocalAlg for Es256
+impl LocalAlg for Es384
 impl LocalAlg for Hs256
 impl LocalAlg for Hs384
 impl LocalAlg for Hs512
@@ -320,7 +324,11 @@ impl PartialOrd for JweAlg
 impl PartialOrd for JweEnc
 impl PartialOrd for Kid
 impl PartialOrd for SigningAlg
+impl PublicAlg for Es256
+impl PublicAlg for Es384
 impl Serialize for Kid
+impl SignAlg for Es256
+impl SignAlg for Es384
 impl SignAlg for Hs256
 impl SignAlg for Hs384
 impl SignAlg for Hs512
