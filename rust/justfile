@@ -112,7 +112,7 @@ mutants-changed base="origin/main":
     while read -r c tests; do
         mode=""
         touched "$c" && mode=diff
-        for t in ${tests//,/ }; do touched "$t" && mode=whole; done
+        for t in ${tests//,/ }; do [ "$t" != "$c" ] && touched "$t" && mode=whole; done
         [ "$everything" = 1 ] && mode=whole
         [ -n "$mode" ] && plan="$plan$c $mode"$'\n'
     done <<< "$runs"

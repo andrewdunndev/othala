@@ -225,6 +225,9 @@ check-purity:
     key: rust-$CI_JOB_NAME
     paths:
       - .cargo-home/registry
+      - .cargo-home/bin
+      - .cargo-home/.crates.toml
+      - .cargo-home/.crates2.json
       - rust/target
   before_script:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
@@ -267,7 +270,7 @@ check-ownership:
     - base=$(git merge-base origin/main HEAD)
     - git show "$base:primitives/own.sh" | bash -s -- "${branch#item/}"
 
-# check-rust-mutants: `just mutants-changed`, the floors of each crate the MR changes since its merge base with main; no merge base fails the job.
+# check-rust-mutants: `just mutants-changed`, cargo mutants --in-diff on each crate the MR changes since its merge base with main, none missed or timed out; the floors run on the schedule; no merge base fails the job.
 check-rust-mutants:
   extends: .rust
   timeout: 1h
