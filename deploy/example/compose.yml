@@ -164,7 +164,7 @@ services:
 
   caddy:
     # Needs caddy-ratelimit and a DNS module; any build with both will do.
-    image: registry.gitlab.com/dunn.dev/caddy:v2.11.4-3@sha256:78e84240c3c703bb374aa003424c56143376c621a0b7e17cc6bcf009eec86446
+    image: registry.gitlab.com/dunn.dev/cairn/caddy:v2.11.4-3@sha256:78e84240c3c703bb374aa003424c56143376c621a0b7e17cc6bcf009eec86446
     restart: unless-stopped
     read_only: true
     tmpfs: [/tmp]
