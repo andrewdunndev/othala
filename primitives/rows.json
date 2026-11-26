@@ -37,7 +37,7 @@
   {"id": "m3-factor-rfc6238", "milestone": "M3", "title": "factor: RFC 6238 TOTP SHA-1/256/512", "cmd": "cargo test -p factor --all-features --test row_rfc6238"},
   {"id": "m3-factor-rfc6238-window", "milestone": "M3", "title": "factor: factor-derived TOTP window and last-step replay", "cmd": "cargo test -p factor --all-features --test row_rfc6238_window"},
   {"id": "m3-factor-rfc9106", "milestone": "M3", "title": "factor: RFC 9106 Argon2id through the mapping function", "cmd": "cargo test -p factor --all-features --lib password::rfc9106"},
-  {"id": "m3-factor-throttle", "milestone": "M3", "title": "factor: capped backoff schedule; verdicts only increment; one reset", "cmd": "cargo test -p factor --all-features --test row_throttle"},
+  {"id": "m3-factor-throttle", "milestone": "M3", "title": "factor: capped backoff schedule; verdicts only increment; one reset", "cmd": "cargo test -p factor --all-features --lib throttle:: && cargo test -p factor --all-features --test row_throttle"},
   {"id": "m3-factor-record", "milestone": "M3", "title": "factor: record round trip and golden debug", "cmd": "cargo test -p factor --all-features --test row_record"},
   {"id": "m3-factor-password", "milestone": "M3", "title": "factor: password verify, rehash, counted attempts", "cmd": "cargo test -p factor --all-features --test row_password"},
   {"id": "m3-factor-recovery", "milestone": "M3", "title": "factor: recovery codes consumed once", "cmd": "cargo test -p factor --all-features --test row_recovery"},
