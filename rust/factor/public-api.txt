@@ -193,6 +193,7 @@ method Backoff::new const fn(free: FreeAttempts, first: Wait, cap: Cap) -> Self
 method Cap::new const fn(secs: u64) -> Result<Self, Error>
 method Error::kind const fn(self: &Self) -> ErrorKind
 method FreeAttempts::new const fn(attempts: u32) -> Result<Self, Error>
+method OtpKey::import fn(key: Vec<u8>) -> Result<Self, Error>
 method Throttle::check fn(self: &Self, attempts: Option<Row<&Attempts>>, now: UnixTime) -> Result<Permit, Closed>
 method Throttle::new const fn(policy: Backoff) -> Self
 method Throttle::reset fn(attempts: Row<&Attempts>, e: &mut impl Entropy) -> Effect
