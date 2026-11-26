@@ -7,8 +7,13 @@
 // least one name, signature, CA-rule or validity fault; every attestation.json x5c chain verifies link by link (names too) and to its anchor; statement
 // signatures, TPM extraData and the TPM attested name verify or fail exactly where the case id names that fault, both ways.
 // Licence: MIT OR Apache-2.0.
-import { X509Certificate, createPublicKey, verify, createHash } from "node:crypto";
+import { X509Certificate, createPublicKey, verify, sign, generateKeyPairSync, createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+
+// a system OpenSSL under a crypto policy (Fedora, RHEL) refuses SHA-1 signatures, and okVerify would then read every SHA-1 link as a bad signature
+try { const k = generateKeyPairSync("ec", { namedCurve: "P-256" }); verify("sha1", Buffer.from("x"), k.publicKey, sign("sha1", Buffer.from("x"), k.privateKey)); } catch {
+  console.error("this node's OpenSSL refuses SHA-1 signatures; set OPENSSL_ENABLE_SHA1_SIGNATURES=1"); process.exit(1);
+}
 
 const dir = process.argv[2] + "/webauthn-rp-derived/";
 const load = (f) => JSON.parse(readFileSync(dir + f, "utf8")).cases;
