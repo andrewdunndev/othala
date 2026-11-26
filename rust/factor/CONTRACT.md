@@ -177,7 +177,7 @@ Recovery codes (NIST SP 800-63B-4 3.1.2)
 - B4 The public API is the committed snapshot: `just api` over `public-api.txt`.
 - B5 The ledger runs every case on disk and pins 32 cases and 32 twins, so a glob that matched nothing cannot pass: `just ledger` (`CASES` in `tests/ledger.rs`), `just twins`.
 - B6 Every workspace deny-list lint is `forbid` here, so no module calls base's `host_applied` or allows a lint: `just canary`, `just lint`. The crate keeps no secret buffer of its own: `OtpKey`, `OtpCode`, `Password` and `RecoveryCode` wrap base `SecretBytes`, which base wipes (base R32) (R-j): api, review.
-- B7 `src/` is mutated with a factor floor and `missed == 0`: `gates.json` `mutants`, landing with its floor [factor-10].
+- B7 `src/` is mutated with a factor floor and `missed == 0`: `just mutants factor`, floor in `gates.json` `mutants`.
 - B8 The fuzz targets `record_decode`, `otp_code_parse`, `phc_parse` and `recovery_code_parse` live in `factor/fuzz` with their corpora replayed [factor-04, factor-10].
 
 ## Non-claim

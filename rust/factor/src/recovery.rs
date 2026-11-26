@@ -83,7 +83,7 @@ impl RecoveryCode {
         for b in text.bytes().filter(|b| !matches!(b, b'-' | b' ')) {
             let v = value(b).ok_or(err(ErrorKind::Malformed))?;
             symbols += 1;
-            (acc, bits) = ((acc << 5) | v, bits + 5);
+            (acc, bits) = ((acc << 5) + v, bits + 5);
             if bits >= 8 {
                 bits -= 8;
                 bytes.extend(u8::try_from((acc >> bits) & 0xff));
@@ -118,7 +118,7 @@ impl fmt::Display for Shown<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (mut acc, mut bits, mut shown) = (0u32, 0u32, 0usize);
         for byte in self.0.expose() {
-            (acc, bits) = ((acc << 8) | u32::from(*byte), bits + 8);
+            (acc, bits) = ((acc << 8) + u32::from(*byte), bits + 8);
             while bits >= 5 {
                 bits -= 5;
                 if shown > 0 && shown % GROUP == 0 {

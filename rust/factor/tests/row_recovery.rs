@@ -232,3 +232,12 @@ fn a_row_holding_another_digest_is_not_a_match() -> Result<(), Boxed> {
     assert!(row(&mut store, a).is_some() && row(&mut store, b).is_some());
     Ok(())
 }
+
+#[test]
+fn debug_names_the_type_only() -> Result<(), Boxed> {
+    assert_eq!(
+        format!("{:?}", RecoveryCode::parse(&"1".repeat(24))?),
+        "RecoveryCode { .. }"
+    );
+    Ok(())
+}

@@ -381,3 +381,21 @@ fn rehash_only_when_below_the_cost_given() -> Result<(), Boxed> {
     }
     Ok(())
 }
+
+#[test]
+fn debug_names_the_type_only() -> Result<(), Boxed> {
+    let new = NewPassword::new("a password of length", Minimum::SingleFactor)?;
+    let phc = Phc::parse(&text("m=7168,t=5,p=1", 22, 43))?;
+    assert_eq!(format!("{new:?}"), "NewPassword { .. }");
+    assert_eq!(
+        format!("{:?}", Password::presented("secret")?),
+        "Password { .. }"
+    );
+    assert_eq!(format!("{phc:?}"), "Phc { .. }");
+    // the size bound is on bytes: 256 are read, 257 are too many
+    let at = |n: usize| format!("{}{}", text("m=7168,t=5,p=1", 22, 43), "x".repeat(n));
+    let len = text("m=7168,t=5,p=1", 22, 43).len();
+    assert_eq!(parsed(&at(256 - len)), Some(ErrorKind::Malformed));
+    assert_eq!(parsed(&at(257 - len)), Some(ErrorKind::TooLarge));
+    Ok(())
+}

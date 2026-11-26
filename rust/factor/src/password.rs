@@ -24,6 +24,13 @@ const fn err(kind: ErrorKind) -> Error {
     Error { kind }
 }
 
+fn hashing(e: password_hash::Error) -> Error {
+    match e {
+        password_hash::Error::OutOfMemory => err(ErrorKind::OutOfMemory),
+        _ => err(ErrorKind::Internal),
+    }
+}
+
 /// The one path to `argon2`: version 19, Argon2id, the given tag length, and optional secret and associated data.
 pub(crate) fn argon2id<'k>(
     memory: Memory,
@@ -197,10 +204,7 @@ fn hash(password: &Password, cost: Cost, e: &mut impl Entropy) -> Result<Phc, Er
     let argon = argon2id(cost.memory, cost.passes, cost.lanes, TAG_LEN, &[], &[])?;
     let hash = argon
         .hash_password_with_salt(password.0.expose(), &salt)
-        .map_err(|e| match e {
-            password_hash::Error::OutOfMemory => err(ErrorKind::OutOfMemory),
-            _ => err(ErrorKind::Internal),
-        })?;
+        .map_err(hashing)?;
     Ok(Phc(hash.to_string()))
 }
 
@@ -285,8 +289,7 @@ pub fn password_verify(
     let matched = match argon.verify_password(password.0.expose(), &parsed) {
         Ok(()) => true,
         Err(password_hash::Error::PasswordInvalid) => false,
-        Err(password_hash::Error::OutOfMemory) => return Err(err(ErrorKind::OutOfMemory)),
-        Err(_) => return Err(internal),
+        Err(e) => return Err(hashing(e)),
     };
     let salt = parsed.salt.map_or(0, |s| s.len());
     let below = params.m_cost() < cost.memory.0
@@ -309,6 +312,20 @@ pub fn password_verify(
     };
     let effect = permit.count(e).build().map_err(|_| internal)?;
     Ok(Pending::new(verdict, effect))
+}
+
+#[cfg(test)]
+mod hashing_errors {
+    use argon2::password_hash::Error as Hash;
+
+    use super::hashing;
+    use crate::ErrorKind;
+
+    #[test]
+    fn only_memory_is_named() {
+        assert_eq!(hashing(Hash::OutOfMemory).kind, ErrorKind::OutOfMemory);
+        assert_eq!(hashing(Hash::Crypto).kind, ErrorKind::Internal);
+    }
 }
 
 #[cfg(test)]

@@ -3,7 +3,7 @@ mod common;
 
 use base::{Row, UnixTime};
 use common::{Case, Mem, Outcome, applied, attempts, last, run, step_record, stored, totp};
-use factor::{ErrorKind, Key, OtpCode, Period, Rejected, Throttle};
+use factor::{ErrorKind, Key, OtpCode, OtpKey, Period, Rejected, Throttle};
 use testkit::vectors::{Outcome as Seen, run as run_vector};
 use testkit::{seeded, vector};
 
@@ -150,5 +150,17 @@ fn confirm_records_the_step_and_bars_its_own_code() -> Result<(), Box<dyn std::e
         t.confirm(&code, now, Some(seen), &mut e),
         Err(Rejected::Replayed)
     ));
+    Ok(())
+}
+
+#[test]
+fn debug_names_the_type_only() -> Result<(), Box<dyn std::error::Error>> {
+    let c = sha1_case(8, 1, 59, "94287082");
+    assert_eq!(format!("{:?}", totp(&c).ok_or("totp")?), "Totp { .. }");
+    assert_eq!(format!("{:?}", OtpCode::parse("123456")?), "OtpCode { .. }");
+    assert_eq!(
+        format!("{:?}", OtpKey::import(vec![1; 16])?),
+        "OtpKey { .. }"
+    );
     Ok(())
 }
