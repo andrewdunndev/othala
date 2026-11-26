@@ -63,5 +63,10 @@
   {"id": "m1-jose-ecdh", "milestone": "M1", "title": "jose: Wycheproof ECDH P-256/384/521", "cmd": "cargo test -p jose --all-features --lib jwe::ecdh::"},
   {"id": "m1-jose-oaep", "milestone": "M1", "title": "jose: RSA-OAEP one path (rsa-decrypt)", "cmd": "cargo test -p jose --all-features --test row_oaep"},
   {"id": "m1-jose-oaep-wycheproof", "milestone": "M1", "title": "jose: Wycheproof RSA-OAEP", "cmd": "cargo test -p jose --all-features --lib jwe::oaep::"},
-  {"id": "m1-jose-features-off", "milestone": "M1", "title": "jose: every feature off: the cases that must refuse there", "cmd": "cargo test -p jose --no-default-features --test row_features_off"}
+  {"id": "m1-jose-features-off", "milestone": "M1", "title": "jose: every feature off: the cases that must refuse there", "cmd": "cargo test -p jose --no-default-features --test row_features_off"},
+  {"id": "m2-webauthn-rp-packed-self", "milestone": "M2", "title": "webauthn-rp: packed self attestation", "cmd": "cargo test -p webauthn-rp --all-features --test row_packed_self"},
+  {"id": "m2-webauthn-rp-cose-algs", "milestone": "M2", "title": "webauthn-rp: COSE ES384, RS256 and EdDSA verification", "cmd": "cargo test -p webauthn-rp --all-features --test row_cose_algs"},
+  {"id": "m2-webauthn-rp-extensions", "milestone": "M2", "title": "webauthn-rp: credProps, appid and largeBlob extensions", "cmd": "cargo test -p webauthn-rp --all-features --test row_extensions"},
+  {"id": "m2-webauthn-rp-json-goldens", "milestone": "M2", "title": "webauthn-rp: JSON option shapes against goldens", "cmd": "cargo test -p webauthn-rp --all-features --test row_json_goldens"},
+  {"id": "m0-spine-selftest", "milestone": "M0", "title": "spine: gate self-test plants each bad input and asserts the specific refusal", "cmd": "just gate-selftest"}
 ]
