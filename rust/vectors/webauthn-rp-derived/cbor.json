@@ -1,0 +1,200 @@
+{
+ "source": "strict CBOR decoding (RFC 8949 4.2.1 and CTAP2 canonical form, as WebAuthn L3 6.5.6 requires of authenticators); hex inputs written by hand per the rule named in `spec`",
+ "cases": [
+  {
+   "id": "cose-key-canonical",
+   "op": "cbor_decode",
+   "input": "a501020326200121582060fed4ba255a9d31c961eb74c6356d68c049b8923b61fa6ce669622e60f29fb62258207903fe1008b8bc99a41ae9e95628bc64f2f1b20c2d7e9f5177a3c294d4462299",
+   "spec": "CTAP2 canonical CBOR (WebAuthn L3 6.5.6, CTAP 2.2 8)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "map-keys-unsorted",
+   "op": "cbor_decode",
+   "input": "a503260102200121582060fed4ba255a9d31c961eb74c6356d68c049b8923b61fa6ce669622e60f29fb62258207903fe1008b8bc99a41ae9e95628bc64f2f1b20c2d7e9f5177a3c294d4462299",
+   "spec": "CTAP2 canonical CBOR (keys sorted, shortest first then bytewise)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "map-duplicate-key",
+   "op": "cbor_decode",
+   "input": "a201020102",
+   "spec": "RFC 8949 5.6 (duplicate keys are invalid)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "int-not-shortest",
+   "op": "cbor_decode",
+   "input": "1805",
+   "spec": "RFC 8949 4.2.1 (preferred serialization)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "int-16-for-8",
+   "op": "cbor_decode",
+   "input": "190017",
+   "spec": "RFC 8949 4.2.1",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "neg-int-not-shortest",
+   "op": "cbor_decode",
+   "input": "3806",
+   "spec": "RFC 8949 4.2.1",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "length-not-shortest",
+   "op": "cbor_decode",
+   "input": "7803616263",
+   "spec": "RFC 8949 4.2.1 (lengths in shortest form)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "indefinite-bytes",
+   "op": "cbor_decode",
+   "input": "5f42010243030405ff",
+   "spec": "RFC 8949 4.2.1 (no indefinite length)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "indefinite-array",
+   "op": "cbor_decode",
+   "input": "9f0102ff",
+   "spec": "RFC 8949 4.2.1",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "indefinite-map",
+   "op": "cbor_decode",
+   "input": "bf0102ff",
+   "spec": "RFC 8949 4.2.1",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "break-outside-indefinite",
+   "op": "cbor_decode",
+   "input": "ff",
+   "spec": "RFC 8949 3.2.1 (not well-formed)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "reserved-additional-info",
+   "op": "cbor_decode",
+   "input": "1c",
+   "spec": "RFC 8949 3 (additional information 28-30 is not well-formed)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "simple-two-byte-low",
+   "op": "cbor_decode",
+   "input": "f818",
+   "spec": "RFC 8949 3.3 (simple values below 32 in two bytes are not well-formed)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "text-invalid-utf8",
+   "op": "cbor_decode",
+   "input": "62c328",
+   "spec": "RFC 8949 3.1 major type 3 (valid UTF-8)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "truncated-bytes",
+   "op": "cbor_decode",
+   "input": "44010203",
+   "spec": "RFC 8949 3 (the declared length exceeds the input)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "huge-declared-length",
+   "op": "cbor_decode",
+   "input": "5bffffffffffffffff00",
+   "spec": "contract rule 5.7 (a declared length is checked against the remaining input before allocating)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "trailing-bytes",
+   "op": "cbor_decode",
+   "input": "0100",
+   "spec": "RFC 8949 5.1 with WebAuthn L3 6.5 (one item, nothing after it)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "tag-unexpected",
+   "op": "cbor_decode",
+   "input": "c11a514b67b0",
+   "spec": "CTAP2 canonical CBOR (tags are not used)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "float-key",
+   "op": "cbor_decode",
+   "input": "a1f93c0001",
+   "spec": "CTAP2 canonical CBOR (COSE_Key labels are integers or text)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "depth-bound",
+   "op": "cbor_limit",
+   "bound": "webauthn_rp::MAX_CBOR_DEPTH",
+   "excess": 1,
+   "recipe": "nested one-element arrays 0x81 ... 0x81 0x00 whose depth (the outer array is 1) is the bound plus one",
+   "spec": "contract rule 5.7 (CBOR nesting depth)",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "item-bound",
+   "op": "cbor_limit",
+   "bound": "webauthn_rp::MAX_CBOR_ITEMS",
+   "excess": 1,
+   "recipe": "one definite array of the bound items of 0x00, so the item count with the array itself is the bound plus one",
+   "spec": "contract rule 5.7 (CBOR item count)",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  }
+ ]
+}
