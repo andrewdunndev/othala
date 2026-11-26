@@ -313,6 +313,14 @@ mod tests {
         assert_ne!(BrowserBinding::from(&a), BrowserBinding::from(&b));
     }
 
+    #[test]
+    fn browser_binding_eq_sees_the_last_byte() {
+        let mut bytes = [7u8; 32];
+        let a = BrowserBinding(Digest::from_bytes(bytes));
+        bytes[31] ^= 1;
+        assert_ne!(a, BrowserBinding(Digest::from_bytes(bytes)));
+    }
+
     #[cfg(feature = "serde")]
     #[test]
     fn browser_binding_serde_is_digest_text() {
