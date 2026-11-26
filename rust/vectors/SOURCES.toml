@@ -168,6 +168,18 @@ files = [
   { path = "w3c-webauthn-3/prf.json", sha256 = "07e59c88be25b3bf687b6895c8866628d523599d1c387def97c1599d415e8879", cases = 8 },
 ]
 
+[source."w3c-webauthn-3-steps"]
+url = "https://www.w3.org/TR/webauthn-3/"
+revision = "https://www.w3.org/TR/2026/REC-webauthn-3-20260825/ (spec html sha256 157030c980d44a3ce4b1ec5bcfaa16790c7dfefac20709af6ed2b11c7120970b)"
+retrieved = "2026-11-26"
+licence = "W3C Software and Document License"
+feeds = ["webauthn-rp"]
+notes = "Built by tools/extract_rec_steps.py from the dated HTML above (reproducible byte for byte; the HTML is not committed): the top-level step texts of 7.1 and 7.2 (sub-steps stay inside their step) and the section-number to heading map. tools/check_spec_steps.py checks every step and section cited in the derived vectors and their generators against it, offline, and that each case citing a step quotes a passage of it; `--refresh` refetches the HTML, checks the sha256 above and rewrites the file. 'cases' counts steps (29 in 7.1, 25 in 7.2). Not a test vector: no crate reads it."
+cases = 54
+files = [
+  { path = "w3c/webauthn-3-steps.json", sha256 = "5fdd73cd6a7290eefd999e93203e9910bdb960c1b1febda6a94f74fff252844e", cases = 54 },
+]
+
 [source."webauthn-rp-derived-ext"]
 url = "https://www.w3.org/TR/webauthn-3/"
 revision = "https://www.w3.org/TR/2026/REC-webauthn-3-20260825/ (spec html sha256 157030c980d44a3ce4b1ec5bcfaa16790c7dfefac20709af6ed2b11c7120970b) sections 5.1, 5.1.8-5.1.10, 5.11, 6.1, 7.1, 7.2, 8.2-8.4, 10.1, 13.1; RFC 5280 4.1, 4.2.1; RFC 9052/9053 COSE; RFC 8032; RFC 6979 (deterministic ECDSA); TPM 2.0 Part 2 (TPMT_PUBLIC, TPMS_ATTEST)"
@@ -179,11 +191,11 @@ cases = 527
 files = [
   { path = "webauthn-rp-derived/attestation-object.json", sha256 = "8f6dac5092ede0e6b0c4ea825bded9ebadc48d09639ce1d576841f9acd9d0f73", cases = 22 },
   { path = "webauthn-rp-derived/attestation.json", sha256 = "3af4dadeeb6fa0cb9adb3f5f62de75afde7f1779b638fa4a17cecdc3fed6795e", cases = 78 },
-  { path = "webauthn-rp-derived/authentication.json", sha256 = "d0131de744d8e7b6435298c5c113bc218a58264e648e0b7742113c66dedc2ea2", cases = 16 },
+  { path = "webauthn-rp-derived/authentication.json", sha256 = "2861f030262884a84e958d2641076054a7f8c528bebc18cd4df45f48fe26da62", cases = 16 },
   { path = "webauthn-rp-derived/browser-binding.json", sha256 = "f7e54a79bbafcb6cac07944399707264527e3b730a48a2559d5309bdad734769", cases = 8 },
   { path = "webauthn-rp-derived/chains.json", sha256 = "44c09c2fec2e1c20fbbe66b3261c2485783359b311afe5cb95e64605175204e4", cases = 54 },
   { path = "webauthn-rp-derived/cose.json", sha256 = "35666f7d1e2b4e496c2278e01e2f7a74238c7227be91818fce6cd8654ddd71c1", cases = 50 },
-  { path = "webauthn-rp-derived/extensions.json", sha256 = "f1852da15dadc20e62fef2f038585eaac02591d3ff0b8d92048cb08ec50e5843", cases = 70 },
+  { path = "webauthn-rp-derived/extensions.json", sha256 = "ef070315dac0121fb5626feb11c13f8508238fa5c3cd6cb79306bd46fb1638e9", cases = 70 },
   { path = "webauthn-rp-derived/limits.json", sha256 = "eeceeca0d3d609fd81b1aaafa6e614ba4fa2a890a934d3cdbd0096d7328e2e99", cases = 48 },
   { path = "webauthn-rp-derived/options-json.json", sha256 = "0bfd6ba34a3b78e4e71223bf82dee44c7b4ff13940595e5e172c3de1f54c9d2e", cases = 42 },
   { path = "webauthn-rp-derived/origins.json", sha256 = "4ef298257655d6d5b3b6cf69a5b9323bad2c254bc28f3c2a62f1ac6003c62c89", cases = 90 },
@@ -369,10 +381,10 @@ feeds = ["webauthn-rp"]
 notes = "Derived by tools/derive_webauthn.py (deterministic) from the specs only (ruling R-b). Step numbers are L3 7.1 and 7.2 as numbered in the pinned dated HTML. Assertions (op webauthn_assert, the field names of the exam-spike file plus policy fields) and registrations (op webauthn_register, none attestation) use the RFC 6979 A.2.5 P-256 key with RFC 6979 deterministic signatures; the script checks the key and the A.2.5 sample signature first, and Node crypto verified all 40 assertion signatures, so every refusal is for the rule the case names. cbor.json: hand-written inputs per RFC 8949 and CTAP2 canonical form (op cbor_decode) plus two parametric bounds of contract rule 5.7 (op cbor_limit, webauthn_rp::MAX_CBOR_DEPTH and webauthn_rp::MAX_CBOR_ITEMS, TooLarge). expect.kind only where the contract names the class (CounterRegressed, TooLarge). Oracle choices: cross-origin deny-by-default (contract), a topOrigin without crossOrigin refused, BE change refused (7.2 step 19 applies because Assertion::backup() feeds RP policy)."
 cases = 78
 files = [
-  { path = "webauthn-rp-derived/authenticator-data.json", sha256 = "ab947f3152b3b750bc4735b5ed65acb9ec7900969942d2d7d4e597e4bcbb393d", cases = 20 },
-  { path = "webauthn-rp-derived/cbor.json", sha256 = "d35068e42113595e9158ad9dbd2ea0f5f2d5d5d5d9af7a4383c87cbd057784d0", cases = 21 },
-  { path = "webauthn-rp-derived/client-data.json", sha256 = "8cad78c18e11d9a96adb7a03367d7b11555a7fa7693058568c6477c10bb8e929", cases = 20 },
-  { path = "webauthn-rp-derived/registration.json", sha256 = "0c09657edf08efbc33e775f4cac8f5decfbb375c42f06ca9158e2cd03ab79f45", cases = 17 },
+  { path = "webauthn-rp-derived/authenticator-data.json", sha256 = "2f6f345e4cd84a453e09201f57d70809614bca11863136a4a66bbb2ddc808967", cases = 20 },
+  { path = "webauthn-rp-derived/cbor.json", sha256 = "24133b26fe212ea58eae465a46a991407323e2685221f4ae38bf4f0b5dce138a", cases = 21 },
+  { path = "webauthn-rp-derived/client-data.json", sha256 = "fd4faeca70c8068f663dac47e33f66857fed414818300a04d970864659dbb0d6", cases = 20 },
+  { path = "webauthn-rp-derived/registration.json", sha256 = "085b6e48c7ca8ce6b97a14fce5061a157f6f9dc139eb821d10291145aaf7bb99", cases = 17 },
 ]
 
 # Real-authenticator corpus. Seeded from the survey failure list (survey-webauthn.md section 4 item 3).

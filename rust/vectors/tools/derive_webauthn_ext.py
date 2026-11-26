@@ -255,22 +255,22 @@ def auth_cases():
     allow = lambda *ids: {"allow": {"credentials": [i.hex() for i in ids]}}
     user = lambda ident: {"allow": {"credentials": [], "identified_user": ident.hex()}}
     return [
-        assertion("allow-listed", A + "step 5 (the credential is among allowCredentials)", OK | {"user_verified": True, "counter": 6}, **base, **allow(CRED_ID, OTHER_ID)),
-        assertion("allow-not-listed", A + "step 5 (id not in allowCredentials; contract R64 NotAllowed)", NO, **base, **allow(OTHER_ID)),
-        assertion("allow-list-of-one-other", A + "step 5 (a single listed credential that is not the response's; contract R64)", NO, **dict(base, raw_id=OTHER_ID.hex()), **allow(CRED_ID)),
-        assertion("discoverable-no-list", A + "step 5 (an empty allow list adds no constraint; Allow::Discoverable)", OK | {"user_verified": True, "counter": 6}, **base, allow="discoverable", user_handle=UH.hex()),
-        assertion("stored-credential-other-id", A + "step 6 (the stored credential's id is the response's; contract R65 CredentialMismatch)", NO, **dict(base, stored_credential_id=OTHER_ID.hex()), **allow(CRED_ID)),
-        assertion("user-stored-other", A + "step 6 (the stored credential's user is the identified user; contract R66 UserHandleMismatch)", NO, **dict(base, stored_user_handle=UH2.hex()), **user(UH)),
-        assertion("user-stored-same", A + "step 6 (contract R66)", OK | {"user_verified": True, "counter": 6}, **base, **user(UH)),
-        assertion("user-handle-other", A + "step 6 (a present userHandle equals the identified user; contract R67 UserHandleMismatch)", NO, **base, **user(UH), user_handle=UH2.hex()),
-        assertion("user-handle-same", A + "step 6 (contract R67)", OK | {"user_verified": True, "counter": 6}, **base, **user(UH), user_handle=UH.hex()),
-        assertion("user-handle-absent-ok", A + "step 6 (contract R67: a userHandle may be absent under Allow::User)", OK | {"user_verified": True, "counter": 6}, **base, **user(UH)),
-        assertion("user-handle-empty-reads-absent", "contract R16 (an empty userHandle reads as absent) with " + A + "step 6", OK | {"user_verified": True, "counter": 6}, **base, **user(UH), user_handle=""),
-        assertion("discoverable-handle-missing", A + "step 6 (a discoverable response must carry userHandle; contract R68 UserHandleMismatch)", NO, **base, allow="discoverable"),
+        assertion("allow-listed", A + "step 5 \"verify that credential.id identifies one of the public key credentials listed in pkOptions.allowCredentials\" (the credential is among allowCredentials)", OK | {"user_verified": True, "counter": 6}, **base, **allow(CRED_ID, OTHER_ID)),
+        assertion("allow-not-listed", A + "step 5 \"verify that credential.id identifies one of the public key credentials listed in pkOptions.allowCredentials\" (id not in allowCredentials; contract R64 NotAllowed)", NO, **base, **allow(OTHER_ID)),
+        assertion("allow-list-of-one-other", A + "step 5 \"verify that credential.id identifies one of the public key credentials listed in pkOptions.allowCredentials\" (a single listed credential that is not the response's; contract R64)", NO, **dict(base, raw_id=OTHER_ID.hex()), **allow(CRED_ID)),
+        assertion("discoverable-no-list", A + "step 5 \"If pkOptions.allowCredentials is not empty\" (an empty allow list adds no constraint; Allow::Discoverable)", OK | {"user_verified": True, "counter": 6}, **base, allow="discoverable", user_handle=UH.hex()),
+        assertion("stored-credential-other-id", A + "step 6 \"verify that the identified user account contains a credential record whose id equals credential.rawId\" (the stored credential's id is the response's; contract R65 CredentialMismatch)", NO, **dict(base, stored_credential_id=OTHER_ID.hex()), **allow(CRED_ID)),
+        assertion("user-stored-other", A + "step 6 \"verify that the identified user account contains a credential record whose id equals credential.rawId\" (the stored credential's user is the identified user; contract R66 UserHandleMismatch)", NO, **dict(base, stored_user_handle=UH2.hex()), **user(UH)),
+        assertion("user-stored-same", A + "step 6 \"verify that the identified user account contains a credential record whose id equals credential.rawId\" (contract R66)", OK | {"user_verified": True, "counter": 6}, **base, **user(UH)),
+        assertion("user-handle-other", A + "step 6 \"If response.userHandle is present, verify that it equals the user handle of the user account\" (a present userHandle equals the identified user; contract R67 UserHandleMismatch)", NO, **base, **user(UH), user_handle=UH2.hex()),
+        assertion("user-handle-same", A + "step 6 \"If response.userHandle is present, verify that it equals the user handle of the user account\" (contract R67)", OK | {"user_verified": True, "counter": 6}, **base, **user(UH), user_handle=UH.hex()),
+        assertion("user-handle-absent-ok", A + "step 6 \"If response.userHandle is present, verify that it equals the user handle of the user account\" (contract R67: a userHandle may be absent under Allow::User)", OK | {"user_verified": True, "counter": 6}, **base, **user(UH)),
+        assertion("user-handle-empty-reads-absent", "contract R16 (an empty userHandle reads as absent) with " + A + "step 6 \"If response.userHandle is present, verify that it equals the user handle of the user account\"", OK | {"user_verified": True, "counter": 6}, **base, **user(UH), user_handle=""),
+        assertion("discoverable-handle-missing", A + "step 6 \"verify that response.userHandle is present\" (a discoverable response must carry userHandle; contract R68 UserHandleMismatch)", NO, **base, allow="discoverable"),
         assertion("discoverable-handle-empty", "contract R16 and R68 (an empty userHandle reads as absent, so a discoverable response is refused)", NO, **base, allow="discoverable", user_handle=""),
-        assertion("discoverable-handle-other", A + "step 6 (the userHandle is the stored credential's user; contract R69 UserHandleMismatch)", NO, **base, allow="discoverable", user_handle=UH2.hex()),
-        assertion("discoverable-handle-same", A + "step 6 (contract R69)", OK | {"user_verified": True, "counter": 6}, **base, allow="discoverable", user_handle=UH.hex()),
-        assertion("discoverable-handle-one-bit", A + "step 6 (the handle compares in full: one bit differs; contract R69)", NO, **base, allow="discoverable", user_handle=(UH[:-1] + bytes([UH[-1] ^ 1])).hex()),
+        assertion("discoverable-handle-other", A + "step 6 \"Verify that the user account identified by response.userHandle contains a credential record whose id equals credential.rawId\" (the userHandle is the stored credential's user; contract R69 UserHandleMismatch)", NO, **base, allow="discoverable", user_handle=UH2.hex()),
+        assertion("discoverable-handle-same", A + "step 6 \"Verify that the user account identified by response.userHandle contains a credential record whose id equals credential.rawId\" (contract R69)", OK | {"user_verified": True, "counter": 6}, **base, allow="discoverable", user_handle=UH.hex()),
+        assertion("discoverable-handle-one-bit", A + "step 6 \"Verify that the user account identified by response.userHandle contains a credential record whose id equals credential.rawId\" (the handle compares in full: one bit differs; contract R69)", NO, **base, allow="discoverable", user_handle=(UH[:-1] + bytes([UH[-1] ^ 1])).hex()),
     ]
 
 
@@ -996,16 +996,16 @@ def ext_cases():
     REGX = lambda **o: REG_OK(outputs=o)
     ad_app = auth_data(rp_hash=sha(APPID.encode()))
     # appid (R120)
-    a("appid-used", "contract R120 and WebAuthn L3 10.1.1 (appid true: rpIdHash is the hash of the AppID, 7.2 step 15)", G(appid=True), {"appid": APPID}, {"appid": True}, ad=ad_app)
+    a("appid-used", "contract R120 and WebAuthn L3 10.1.1 (appid true: rpIdHash is the hash of the AppID, 7.2 step 15 \"If using the appid extension, this step needs some special logic\")", G(appid=True), {"appid": APPID}, {"appid": True}, ad=ad_app)
     a("appid-not-used", "contract R120 (appid false: rpIdHash is the hash of the RP ID)", G(appid=False), {"appid": APPID}, {"appid": False})
     a("appid-not-reported", "contract R120 (no output: the RP ID hash applies; the output reads Unreported)", G(appid="Unreported"), {"appid": APPID})
-    a("appid-true-with-rp-hash", "contract R120 (appid true selects the AppID hash: the RP ID hash fails 7.2 step 15)", NO, {"appid": APPID}, {"appid": True})
+    a("appid-true-with-rp-hash", "contract R120 (appid true selects the AppID hash: the RP ID hash fails 7.2 step 15 \"If using the appid extension, this step needs some special logic\")", NO, {"appid": APPID}, {"appid": True})
     a("appid-false-with-appid-hash", "contract R120 (appid false selects the RP ID hash)", NO, {"appid": APPID}, {"appid": False}, ad=ad_app)
     a("appid-not-reported-with-appid-hash", "contract R120 (no output: the AppID hash is not selected)", NO, {"appid": APPID}, ad=ad_app)
     a("appid-output-not-boolean", "contract R120 (the output is a boolean)", NO, {"appid": APPID}, {"appid": "true"})
     a("appid-unrequested-reject", "contract R120 and R128 (an unrequested output is refused by default)", NO, None, {"appid": True})
     a("appid-unrequested-ignore", "contract R128 (an unrequested output is dropped under Ignore; the RP ID hash applies)", G(appid="NotRequested"), None, {"appid": True}, unsol="ignore")
-    a("appid-unrequested-ignore-appid-hash", "contract R128 (a dropped output selects nothing: the AppID hash fails 7.2 step 15)", NO, None, {"appid": True}, unsol="ignore", ad=ad_app)
+    a("appid-unrequested-ignore-appid-hash", "contract R128 (a dropped output selects nothing: the AppID hash fails 7.2 step 15 \"If using the appid extension, this step needs some special logic\")", NO, None, {"appid": True}, unsol="ignore", ad=ad_app)
     # appidExclude (R121)
     r("appid-exclude-true", "contract R121 (the output is read and ignored when requested)", REGX(appidExclude=True), {"appidExclude": APPID}, {"appidExclude": True})
     r("appid-exclude-false", "contract R121", REGX(appidExclude=False), {"appidExclude": APPID}, {"appidExclude": False})

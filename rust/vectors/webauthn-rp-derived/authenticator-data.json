@@ -19,7 +19,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 15",
+   "spec": "WebAuthn L3 7.2 step 15 \"rpIdHash in authData is the SHA-256 hash of the RP ID expected by the Relying Party\"",
    "expect": {
     "ok": false
    }
@@ -42,7 +42,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 15 (the hash is of the RP ID, not the origin)",
+   "spec": "WebAuthn L3 7.2 step 15 \"rpIdHash in authData is the SHA-256 hash of the RP ID expected by the Relying Party\" (the hash is of the RP ID, not the origin)",
    "expect": {
     "ok": false
    }
@@ -65,7 +65,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 16 (UP MUST be set)",
+   "spec": "WebAuthn L3 7.2 step 16 \"Verify that the UP bit of the flags in authData is set\" (UP MUST be set)",
    "expect": {
     "ok": false
    }
@@ -88,7 +88,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 17 (UV required)",
+   "spec": "WebAuthn L3 7.2 step 17 \"If user verification was determined to be required, verify that the UV bit of the flags in authData is set\" (UV required)",
    "expect": {
     "ok": false
    }
@@ -111,7 +111,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 17 (only required checks UV)",
+   "spec": "WebAuthn L3 7.2 step 17 \"User verification SHOULD be required if, and only if, pkOptions.userVerification is set to required\" (only required checks UV)",
    "expect": {
     "ok": true,
     "user_verified": false,
@@ -136,7 +136,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 17",
+   "spec": "WebAuthn L3 7.2 step 17 \"If user verification was determined to be required, verify that the UV bit of the flags in authData is set\"",
    "expect": {
     "ok": true,
     "user_verified": true,
@@ -161,7 +161,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 6.1 (BS MUST be 0 when BE is 0) and 7.2 step 18",
+   "spec": "WebAuthn L3 6.1 (BS MUST be 0 when BE is 0) and 7.2 step 18 \"If the BE bit of the flags in authData is not set, verify that the BS bit is not set\"",
    "expect": {
     "ok": false
    }
@@ -184,7 +184,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 19 (backupEligible MUST NOT change; the condition holds because the credential record stores BE, so this is a policy of the crate: oracle choice)",
+   "spec": "WebAuthn L3 7.2 step 19 \"If credentialRecord.backupEligible is not set, verify that currentBe is not set\" (backupEligible MUST NOT change; the condition holds because the credential record stores BE, so this is a policy of the crate: oracle choice)",
    "expect": {
     "ok": false
    }
@@ -207,7 +207,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": true,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 19 (the stored BE is set and the response clears it; same condition: the credential record stores BE, oracle choice)",
+   "spec": "WebAuthn L3 7.2 step 19 \"If credentialRecord.backupEligible is set, verify that currentBe is set\" (the stored BE is set and the response clears it; same condition: the credential record stores BE, oracle choice)",
    "expect": {
     "ok": false
    }
@@ -230,7 +230,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": true,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 steps 18 and 19 (BS may change while BE is set and unchanged; the credential record stores BE)",
+   "spec": "WebAuthn L3 7.2 steps 18 and 19 \"Compare currentBe and currentBs with credentialRecord.backupEligible and credentialRecord.backupState\" (BS may change while BE is set and unchanged; the credential record stores BE)",
    "expect": {
     "ok": true,
     "user_verified": true,
@@ -255,7 +255,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 22",
+   "spec": "WebAuthn L3 7.2 step 22 \"authData.signCount is greater than credentialRecord.signCount\"",
    "expect": {
     "ok": true,
     "user_verified": true,
@@ -280,7 +280,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 22 with the contract (Reject)",
+   "spec": "WebAuthn L3 7.2 step 22 \"This is a signal, but not proof, that the authenticator may be cloned\" with the contract (Reject)",
    "expect": {
     "ok": false,
     "kind": "CounterRegressed"
@@ -304,7 +304,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 22 with the contract (Reject)",
+   "spec": "WebAuthn L3 7.2 step 22 \"This is a signal, but not proof, that the authenticator may be cloned\" with the contract (Reject)",
    "expect": {
     "ok": false,
     "kind": "CounterRegressed"
@@ -328,7 +328,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 22 with the contract (Reject)",
+   "spec": "WebAuthn L3 7.2 step 22 \"This is a signal, but not proof, that the authenticator may be cloned\" with the contract (Reject)",
    "expect": {
     "ok": false,
     "kind": "CounterRegressed"
@@ -352,7 +352,7 @@
    "stored_counter": 0,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 22 (no counter on either side)",
+   "spec": "WebAuthn L3 7.2 step 22 \"If authData.signCount is nonzero or credentialRecord.signCount is nonzero\" (no counter on either side)",
    "expect": {
     "ok": true,
     "user_verified": true,
@@ -377,7 +377,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 22 with the contract (Tolerate reports, never drops)",
+   "spec": "WebAuthn L3 7.2 step 22 \"This is a signal, but not proof, that the authenticator may be cloned\" with the contract (Tolerate reports, never drops)",
    "expect": {
     "ok": true,
     "user_verified": true,

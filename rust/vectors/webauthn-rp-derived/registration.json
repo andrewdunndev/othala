@@ -38,7 +38,7 @@
     -7
    ],
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.1 step 7 (type MUST be webauthn.create)",
+   "spec": "WebAuthn L3 7.1 step 7 \"C.type is webauthn.create\" (type MUST be webauthn.create)",
    "expect": {
     "ok": false
    }
@@ -56,7 +56,7 @@
     -7
    ],
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.1 step 8",
+   "spec": "WebAuthn L3 7.1 step 8 \"C.challenge equals the base64url encoding of pkOptions.challenge\"",
    "expect": {
     "ok": false
    }
@@ -74,7 +74,7 @@
     -7
    ],
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.1 step 9",
+   "spec": "WebAuthn L3 7.1 step 9 \"C.origin is an origin expected by the Relying Party\"",
    "expect": {
     "ok": false
    }
@@ -92,7 +92,7 @@
     -7
    ],
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.1 step 10 with the contract (deny-by-default)",
+   "spec": "WebAuthn L3 7.1 step 10 \"If C.crossOrigin is present and set to true\" with the contract (deny-by-default)",
    "expect": {
     "ok": false
    }
@@ -114,7 +114,7 @@
      "https://top.example"
     ]
    },
-   "spec": "WebAuthn L3 7.1 step 11",
+   "spec": "WebAuthn L3 7.1 step 11 \"If C.topOrigin is present\"",
    "expect": {
     "ok": false
    }
@@ -132,7 +132,7 @@
     -7
    ],
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.1 step 14",
+   "spec": "WebAuthn L3 7.1 step 14 \"rpIdHash in authData is the SHA-256 hash of the RP ID expected by the Relying Party\"",
    "expect": {
     "ok": false
    }
@@ -150,7 +150,7 @@
     -7
    ],
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.1 step 15 (mediation not conditional)",
+   "spec": "WebAuthn L3 7.1 step 15 \"If options.mediation is not set to conditional, verify that the UP bit of the flags in authData is set\" (mediation not conditional)",
    "expect": {
     "ok": false
    }
@@ -168,7 +168,7 @@
     -7
    ],
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.1 step 16",
+   "spec": "WebAuthn L3 7.1 step 16 \"verify that the UV bit of the flags in authData is set\"",
    "expect": {
     "ok": false
    }
@@ -186,7 +186,7 @@
     -7
    ],
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.1 step 16",
+   "spec": "WebAuthn L3 7.1 step 16 \"verify that the UV bit of the flags in authData is set\"",
    "expect": {
     "ok": true,
     "user_verified": false,
@@ -210,7 +210,7 @@
     -7
    ],
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.1 step 17",
+   "spec": "WebAuthn L3 7.1 step 17 \"If the BE bit of the flags in authData is not set, verify that the BS bit is not set\"",
    "expect": {
     "ok": false
    }
@@ -228,7 +228,7 @@
     -257
    ],
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.1 step 20 (alg among pubKeyCredParams)",
+   "spec": "WebAuthn L3 7.1 step 20 \"matches the alg attribute of one of the items in pkOptions.pubKeyCredParams\" (alg among pubKeyCredParams)",
    "expect": {
     "ok": false
    }
@@ -246,7 +246,7 @@
     -7
    ],
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.1 step 21 (case-sensitive match against supported formats)",
+   "spec": "WebAuthn L3 7.1 step 21 \"USASCII case-sensitive match on fmt against the set of supported WebAuthn Attestation Statement Format Identifier values\" (case-sensitive match against supported formats)",
    "expect": {
     "ok": false
    }
@@ -282,7 +282,7 @@
     -7
    ],
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.1 step 13 and 6.5.1 (registration carries attested credential data)",
+   "spec": "WebAuthn L3 7.1 step 13 and 6.5.1 \"the authenticator data authData\" (registration carries attested credential data)",
    "expect": {
     "ok": false
    }
@@ -300,7 +300,7 @@
     -7
    ],
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.1 step 25 (an id of at most 1023 bytes is within the limit)",
+   "spec": "WebAuthn L3 7.1 step 25 \"credentialId is \u2264 1023 bytes\" (an id of at most 1023 bytes is within the limit)",
    "expect": {
     "ok": true,
     "user_verified": true,
@@ -324,7 +324,7 @@
     -7
    ],
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.1 step 25 (an id over 1023 bytes SHOULD fail the ceremony: an oracle choice, the crate refuses)",
+   "spec": "WebAuthn L3 7.1 step 25 \"Credential IDs larger than this many bytes SHOULD cause the RP to fail this registration ceremony\" (an id over 1023 bytes SHOULD fail the ceremony: an oracle choice, the crate refuses)",
    "expect": {
     "ok": false
    }
