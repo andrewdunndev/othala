@@ -252,6 +252,7 @@ check-ownership:
   extends: .rust
   variables:
     GIT_DEPTH: "0"
+    GIT_LFS_SKIP_SMUDGE: "1"
   cache: []
   rules:
     - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^item\//'
@@ -273,6 +274,7 @@ check-rust-scheduled:
   script:
     - cargo install --locked cargo-mutants@27.1.0 cargo-fuzz@0.13.1
     - just mutants rows
+    - just mutants-off
     - rustup toolchain install nightly --profile minimal
     - just fuzz
 

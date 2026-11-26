@@ -81,6 +81,20 @@ mutants crate="":
             "{{target}}/mutants/$c/mutants.out/outcomes.json" > /dev/null || { echo "mutants $c: under the floor of $floor, or missed or timed out"; exit 1; }
     done <<< "$runs"
 
+# the features-off run of the jose files whose refusals are dead code with all features on; it skips when a file is absent, and the floor is the caught count of a real run
+mutants-off floor="3":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for f in jose/src/jws/header.rs jose/src/jwe/envelope.rs; do
+        [ -f "$f" ] || { echo "mutants-off: $f is absent, skipped"; exit 0; }
+    done
+    out="{{target}}/mutants/jose-off"
+    mkdir -p "$out"
+    cargo mutants -p jose --no-config --no-default-features --jobs 2 --no-shuffle --output "$out" \
+        --file jose/src/jws/header.rs --file jose/src/jwe/envelope.rs --re 'supported' -- -- --skip ledger < /dev/null
+    jq -e --argjson floor "{{floor}}" '.caught >= $floor and .missed == 0 and .timeout == 0' \
+        "$out/mutants.out/outcomes.json" > /dev/null || { echo "mutants-off: under the floor of {{floor}}, or missed or timed out"; exit 1; }
+
 wasm: (build "wasm32-unknown-unknown")
 
 thumb: (build "thumbv7em-none-eabi")
