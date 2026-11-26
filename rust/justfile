@@ -139,6 +139,7 @@ mutants-changed base="origin/main": (tool-pins "cargo-mutants" "jq")
         old=$(git show "$mb:./$c/gates.json" | jq -r '.mutants.floor // empty')
         [ -n "$old" ] || continue
         new=$(git show "HEAD:./$c/gates.json" 2> /dev/null | jq -r '.mutants.floor // empty' || true)
+        [[ "$old" =~ ^[0-9]+$ ]] && { [ -z "$new" ] || [[ "$new" =~ ^[0-9]+$ ]]; } || { echo "mutants-changed: $c's mutants.floor must be a non-negative integer (merge base '$old', head '$new')"; exit 1; }
         if [ -z "$new" ] || [ "$new" -lt "$old" ]; then
             grep -qE "^floor-lowered: $c .+" <<< "$msgs" || { echo "mutants-changed: $c's floor went from $old to ${new:-nothing}; a commit must say 'floor-lowered: $c <reason>'"; exit 1; }
         fi

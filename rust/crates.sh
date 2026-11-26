@@ -13,5 +13,6 @@ cargo metadata --locked --no-deps --format-version 1 | jq -r '.packages[] | "\(.
         [ "$dir" = "$name" ] || { echo "crates: member $name lives in $dir/; a member's directory is its name" >&2; exit 1; }
         [ -f "$name/gates.json" ] || { echo "crates: $name has no gates.json" >&2; exit 1; }
         jq -ce --arg name "$name" '(keys - ["published", "doc", "ui", "api", "targets", "mutants", "vectors", "allow", "expose"]) as $bad
-            | if $bad == [] then . + {name: $name} else error("crates: \($name)/gates.json: unknown \($bad)") end' "$name/gates.json"
+            | if $bad == [] then . + {name: $name} else error("crates: \($name)/gates.json: unknown \($bad)") end
+            | if (.mutants.floor // 0) | (type == "number" and . >= 0 and . == floor) then . else error("crates: \($name)/gates.json: mutants.floor must be a non-negative integer") end' "$name/gates.json"
     done
