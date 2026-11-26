@@ -189,7 +189,15 @@ impl StructuralPartialEq for Skew
 impl StructuralPartialEq for Throttle
 impl StructuralPartialEq for TotpStep
 impl StructuralPartialEq for Wait
+method Backoff::new const fn(free: FreeAttempts, first: Wait, cap: Cap) -> Self
+method Cap::new const fn(secs: u64) -> Result<Self, Error>
 method Error::kind const fn(self: &Self) -> ErrorKind
+method FreeAttempts::new const fn(attempts: u32) -> Result<Self, Error>
+method Throttle::check fn(self: &Self, attempts: Option<Row<&Attempts>>, now: UnixTime) -> Result<Permit, Closed>
+method Throttle::new const fn(policy: Backoff) -> Self
+method Throttle::reset fn(attempts: Row<&Attempts>, e: &mut impl Entropy) -> Effect
+method Throttle::unlimited const fn() -> Self
+method Wait::new const fn(secs: u64) -> Result<Self, Error>
 struct Attempts
 struct Backoff
 struct Cap
