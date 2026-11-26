@@ -20,6 +20,7 @@ field Guard::Unchanged::1: crate::Version
 field Slot::Row::0: &'a Row<R>
 function b64url_decode fn(text: &str) -> Result<vec::Vec<u8>, crate::Error>
 function b64url_encode fn(bytes: &[u8]) -> alloc::string::String
+impl Clone for BrowserBinding
 impl Clone for Conflict<K>
 impl Clone for Digest
 impl Clone for EffectId
@@ -33,6 +34,7 @@ impl Clone for Scope
 impl Clone for Slot<'a, R>
 impl Clone for UnixTime
 impl Clone for Version
+impl Copy for BrowserBinding
 impl Copy for Digest
 impl Copy for EffectId
 impl Copy for Error
@@ -44,6 +46,7 @@ impl Copy for Scope
 impl Copy for Slot<'a, R>
 impl Copy for UnixTime
 impl Copy for Version
+impl Debug for BrowserBinding
 impl Debug for Builder<K, R>
 impl Debug for Conflict<K>
 impl Debug for Digest
@@ -66,11 +69,13 @@ impl Debug for Slot<'a, R>
 impl Debug for UnixTime
 impl Debug for Version
 impl Default for Rows<K, R>
+impl Deserialize<'de> for BrowserBinding
 impl Deserialize<'de> for Digest
 impl Display for Error
 impl Drop for Secret<N>
 impl Drop for SecretBytes
 impl Entropy for RandCore<R>
+impl Eq for BrowserBinding
 impl Eq for Conflict<K>
 impl Eq for Digest
 impl Eq for EffectId
@@ -85,6 +90,7 @@ impl Eq for Slot<'a, R>
 impl Eq for UnixTime
 impl Eq for Version
 impl Error for Error
+impl From<&Secret<32>> for BrowserBinding
 impl From<SystemTime> for UnixTime
 impl Hash for Digest
 impl Hash for EffectId
@@ -96,6 +102,7 @@ impl Ord for Digest
 impl Ord for EffectId
 impl Ord for UnixTime
 impl Ord for Version
+impl PartialEq for BrowserBinding
 impl PartialEq for Conflict<K>
 impl PartialEq for Digest
 impl PartialEq for EffectId
@@ -113,6 +120,7 @@ impl PartialOrd for Digest
 impl PartialOrd for EffectId
 impl PartialOrd for UnixTime
 impl PartialOrd for Version
+impl Serialize for BrowserBinding
 impl Serialize for Digest
 impl StructuralPartialEq for Conflict<K>
 impl StructuralPartialEq for Digest
@@ -192,6 +200,7 @@ method UnixTime::saturating_sub const fn(self: Self, secs: u64) -> Self
 method UnixTime::secs const fn(self: Self) -> u64
 method Version::get const fn(self: Self) -> u64
 method Version::new const fn(v: u64) -> Self
+struct BrowserBinding
 struct Builder
 struct Conflict
 struct Digest

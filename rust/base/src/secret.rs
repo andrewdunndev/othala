@@ -20,6 +20,10 @@ pub struct SecretBytes(Vec<u8>);
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Digest([u8; 32]);
 
+/// Ties a ceremony to a browser through the secret it is built from: safe to store, compared in constant time.
+#[derive(Clone, Copy, Debug)]
+pub struct BrowserBinding(Digest);
+
 impl<const N: usize> Secret<N> {
     /// Draws `N` bytes from `e`.
     pub fn generate(e: &mut impl Entropy) -> Self {
@@ -102,6 +106,24 @@ impl Digest {
     }
 }
 
+// A labelled SHA-256, so a binding never equals the plain `digest` of the same secret that another record may store.
+impl From<&Secret<32>> for BrowserBinding {
+    fn from(secret: &Secret<32>) -> Self {
+        let hash = Sha256::new()
+            .chain_update(b"base browser binding v1")
+            .chain_update(secret.0);
+        Self(Digest(hash.finalize().into()))
+    }
+}
+
+impl PartialEq for BrowserBinding {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.0.as_slice().ct_eq(other.0.0.as_slice()).into()
+    }
+}
+
+impl Eq for BrowserBinding {}
+
 impl<const N: usize> Drop for Secret<N> {
     fn drop(&mut self) {
         self.0.zeroize();
@@ -159,9 +181,23 @@ impl<'de> serde::Deserialize<'de> for Digest {
     }
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for BrowserBinding {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        self.0.serialize(s)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for BrowserBinding {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        Digest::deserialize(d).map(Self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Digest, Secret, SecretBytes};
+    use super::{BrowserBinding, Digest, Secret, SecretBytes};
     use crate::{Entropy, Error, ErrorKind};
     use alloc::format;
     use alloc::string::ToString;
@@ -261,6 +297,42 @@ mod tests {
             "{e}"
         );
         assert!(!e.contains(presented), "the error echoes its input: {e}");
+    }
+
+    #[test]
+    fn browser_binding_is_labelled_sha256() {
+        let (a, b) = (Secret::new([5u8; 32]), Secret::new([6u8; 32]));
+        let want: [u8; 32] =
+            Sha256::digest([&b"base browser binding v1"[..], &[5; 32]].concat()).into();
+        assert_eq!(BrowserBinding::from(&a).0, Digest::from_bytes(want));
+        assert_eq!(
+            BrowserBinding::from(&a),
+            BrowserBinding::from(&Secret::new([5; 32]))
+        );
+        assert_ne!(BrowserBinding::from(&a).0, a.digest());
+        assert_ne!(BrowserBinding::from(&a), BrowserBinding::from(&b));
+    }
+
+    #[test]
+    fn browser_binding_eq_sees_the_last_byte() {
+        let mut bytes = [7u8; 32];
+        let a = BrowserBinding(Digest::from_bytes(bytes));
+        bytes[31] ^= 1;
+        assert_ne!(a, BrowserBinding(Digest::from_bytes(bytes)));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn browser_binding_serde_is_digest_text() {
+        let binding = BrowserBinding::from(&Secret::new([5u8; 32]));
+        let json = serde_json::to_string(&binding).map_err(|e| e.to_string());
+        let want = serde_json::to_string(&binding.0).map_err(|e| e.to_string());
+        assert_eq!(json, want);
+        let back = json
+            .ok()
+            .and_then(|j| serde_json::from_str::<BrowserBinding>(&j).ok());
+        assert_eq!(back, Some(binding));
+        assert!(serde_json::from_str::<BrowserBinding>("\"AQIDBA\"").is_err());
     }
 
     #[test]

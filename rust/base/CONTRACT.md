@@ -22,6 +22,7 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - T16 `SecretBytes` and `Secret<N>` hold their bytes in private fields, so only `expose` reads them: ui:secret_bytes_fields (E0423), api (no public field).
 - T17 `Pending` and `Builder` are `#[must_use]`, so an unsettled verdict dropped as a statement is the `unused_must_use` lint: ui:pending_unused (the lint at deny; the twin warns), api (`attr Pending must_use`, `attr Builder must_use`).
 - T18 Every public enum is `#[non_exhaustive]`, so a consumer's match keeps a wildcard arm: ui:error_kind_exhaustive (E0004), api (one `attr ... non_exhaustive` per enum).
+- T19 A `BrowserBinding` has no constructor other than `From<&Secret<32>>`; under `serde`, any digest text deserializes into one: ui:browser_binding_from (E0277), ui:browser_binding_fields (E0423), api (no public field; `From<&Secret<32>>` is the one constructor). `Secret::new` is a public `const fn`, so the type does not stop a constant secret; that is O16.
 
 ## Runtime
 - R1 `b64url_encode` and `b64url_decode` (a wrapper over `base64ct`'s unpadded base64url) agree with RFC 4648 section 10 under the section 5 alphabet: it:vectors::rfc4648_section10 (total 28, 7 checked), mutants:b64url.
@@ -57,6 +58,7 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - R31 `b64url_decode` reads at most `MAX_B64URL_TEXT` (65,536 symbols, asserted as a literal); longer text is `TooLarge` (displayed as `input or effect exceeds its bound`), before anything is allocated and before any `Malformed`: unit:b64url::text_past_the_cap_is_too_large, unit:error::too_large_names_text_and_effects, mutants:b64url.
 - R32 The storage a secret owns is wiped: a dropped `Secret<N>` leaves its slot zero, a dropped `SecretBytes` buffer is zero when freed, and a text `b64url_decode` refuses leaves its decode buffer zero when freed: wipe:owned_storage_is_wiped (a slot dropped in place, and a global allocator that reads each block as it is freed), mutants:secret.
 - R33 `Effect::created`, `updated`, `consumed` and `deleted` return, without a `Result`, the one-op effect the builder's `create`, `update`, `consume` and `delete` build from the same entropy: unit:effect::single_ops_are_the_builder_ops.
+- R34 `BrowserBinding::from` is SHA-256 of the label `base browser binding v1` then the 32 secret bytes: deterministic, unequal for unequal secrets, and never the secret's plain `digest`; `==` compares every byte; under `serde` it is its digest's text: unit:secret::browser_binding_is_labelled_sha256, unit:secret::browser_binding_serde_is_digest_text, unit:secret::browser_binding_eq_sees_the_last_byte, mutants:secret.
 
 ## Obligation (every host's; `testkit::store_conformance` on the shell's exact apply path)
 - O1 One transaction per apply: every guard holds or nothing is applied (puts, deletes and consumes alike), the `Conflict` names each failed guard, and every apply that commits answers its own effect's receipt: conf:atomic (every case checks each receipt it is given). Each case is proven sensitive by store:conformance::each_lie_is_caught_by_its_case, twenty-two stores with one lie each that must fail in the case named here, the same store without a lie passing (store:conformance::the_honest_liar_passes); atomic catches skipped writes, a conflict reported as `Error`, puts or deletes applied despite a conflict, and another effect's receipt.
@@ -74,6 +76,7 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - O13 No published crate reads a secret: `expose` is in clippy `disallowed_methods`, `forbid` in every published crate (B4, B6); `base`'s own `src/` does not resolve the `base::` path, so its unit tests call `expose` unflagged.
 - O14 After `Conflict` a decider re-decides at most `REDECIDE` (3) times; after `Error` the host re-applies the same effect with the decision's `now`, within `Retry`: consumers' contracts; unit:store::redecide_is_three, race:a_loser_redecides_up_to_three_times, race:a_loser_gives_up_after_three; the reference store's injected lost result commits and its re-apply settles: testkit unit:store::a_lost_result_commits_and_a_reapply_settles.
 - O15 A repeated effect id with other keys is never `Ok`, since it would settle a verdict with nothing written: conf:reused_id (a store that answers `Ok` for any applied id); the reference store records each applied id's keys and answers `Fault::ReusedId`. That the `Entropy` given to `Effect::builder` never repeats a 16-byte draw among effects one store sees is the host's obligation, unchecked; `testkit::seeded(n)` repeats for the same `n`, so a test draws every effect for one store from one advancing source.
+- O16 The `Secret<32>` a host gives `BrowserBinding::from` is derived from the host's cookie secret, never a constant or a value the client can choose, and `webauthn-rp` and `oidc-provider` pass only such a secret; the type cannot tell a derived secret from a literal, so this is the host's obligation, unchecked. A host deserializes a binding only from its own store, never from client-supplied text.
 
 ## Build
 - B1 `no_std` + `alloc` for wasm32-unknown-unknown and thumbv7em-none-eabi, with `std`, `rand_core` and `serde` features off and on: `just wasm`, `just thumb`.
@@ -85,13 +88,13 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - B7 Three members are not published and set their own lint tables in `Cargo.toml`: `store` (`disallowed_methods` at `deny`, for its one receipt mint), `testkit` (`unwrap_used`, `expect_used`, `panic` and the three disallowed lints at `deny`: a harness reports by panicking and reads fixtures from disk) and `wipe` (outside the lints: its probes need `unsafe`). None is a runtime dependency of a published crate: `just deps` (B12).
 - B8 A cargo config, `RUSTFLAGS` or `--cap-lints` that weakens a level fails B4 to B6, since `just canary` builds inside the tree with the caller's environment.
 - B12 Each member's direct runtime dependencies, every feature on, are the ones `deps.txt` lists: `just deps` (in `just all` and CI); `deny.toml` allows only this workspace's graph: `just deny`.
-- B13 The ledger measures what is on disk: `just ledger` hands trybuild each `.rs` file of `tests/ui/fail` and `tests/ui/pass` and asserts 20 of each.
-- B14 `just mutants` fails unless each package reaches its floor (base 137, store 28, testkit 83) with none missed or timed out; `just rows` counts the skipped as `cargo mutants --list --no-config` less `--list`.
+- B13 The ledger measures what is on disk: `just ledger` hands trybuild each `.rs` file of `tests/ui/fail` and `tests/ui/pass` and asserts 22 of each.
+- B14 `just mutants` fails unless each package reaches its floor (base 73, store 28, testkit 83) with none missed or timed out; `just rows` counts the skipped as `cargo mutants --list --no-config` less `--list`.
 
 ## Non-claim
 - N1 Copies and moves are not wiped: a `Secret<N>` moved by value, a buffer a caller copied out of `expose`, or a `Vec` handed to `SecretBytes::new` after it reallocated leaves bytes behind; the stack array a fixed-size decode fills, which is zeroed on failure but not measured; R32 covers only the storage a secret owns when dropped.
 - N2 The base64url codec is `base64ct`'s; its constant-time property is that crate's claim, not checked here.
 - N3 `UnixTime::from(SystemTime)` saturates instants before the epoch to 0.
-- N4 `ct_eq` runs in constant time by `subtle`'s claim; no check here measures time.
+- N4 `ct_eq` and `BrowserBinding`'s `==` run in constant time by `subtle`'s claim; no check here measures time.
 - N5 An effect of two or more ops is fallible (`build` is `Overlap`, `TooLarge` or `Empty`), so an entry point that builds one returns a `Result`; a one-op effect need not (R33).
 - N6 `assert!`, `assert_eq!` and arithmetic overflow still panic in shipped code: disallowing them would also reject the tests' assertions, which share the lint level.
