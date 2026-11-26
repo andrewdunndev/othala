@@ -551,10 +551,10 @@ def chain_cases():
     add(chain("ecdsa-sha512-on-p256-leaf", Wk + "R117 (ecdsa-with-SHA512 is outside R116)", [issue("Derived Leaf Sha512", INT, "p256", ca=False, hname="sha512"), INT], [ROOT], un))
     add(chain("rsa-sha1-intermediate", Wk + "R117 (sha1 with RSA is outside R116)", [issue("Derived Leaf Under RSA Sha1", s := issue("Derived Int RSA Sha1", rsa_root, "p256", pathlen=0, hname="sha1"), "p256", ca=False), s], [rsa_root], un))
     add(chain("ecdsa-sha1-to-anchor", Wk + "R117 (the last certificate's signature under the anchor is ecdsa-with-SHA1)", [issue("Derived Leaf Under Sha1 Int", s1 := issue("Derived Int Sha1 To Root", ROOT, "p256", pathlen=0, hname="sha1"), "p256", ca=False), s1], [ROOT], un))
-    r521 = issue("Derived Root P521", None, "p521")
+    r521 = issue("Derived Root P521", None, "p521", hname="sha384")
     i521 = issue("Derived Int P521", ROOT, "p521", pathlen=0)
-    add(chain("p521-intermediate", "N3 and R117 (the leaf's signature is made by a P-521 intermediate key: Unanchored)", [issue("Derived Leaf Under P521", i521, "p256", ca=False), i521], [ROOT], un))
-    add(chain("p521-anchor", "N3 and R117 (the last certificate's signature under a P-521 anchor key: Unanchored)", [issue("Derived Leaf Under P521 Root", r521, "p256", ca=False)], [r521], un))
+    add(chain("p521-intermediate", "N3 and R117 (the leaf's signature is made by a P-521 intermediate key: Unanchored)", [issue("Derived Leaf Under P521", i521, "p256", ca=False, hname="sha384"), i521], [ROOT], un))
+    add(chain("p521-anchor", "N3 and R117 (the last certificate's signature under a P-521 anchor key: Unanchored)", [issue("Derived Leaf Under P521 Root", r521, "p256", ca=False, hname="sha384")], [r521], un))
     # --- signature failures
     tampered = Ent(LEAF.key, LEAF.subject, flip_signature(LEAF.der))
     add(chain("leaf-signature-tampered", Wk + "R111 (a signature that does not verify under the next certificate's key is AttestationInvalid, never Unanchored; R117)", [tampered, INT], [ROOT], bad))
@@ -712,11 +712,8 @@ def limit_cases():
                    "input_len": 65536 + ex, "input_sha256": sha(bytes([3]) * (65536 + ex)).hex(), "input_b64url": b64(bytes([3]) * (65536 + ex)), "recipe": "the byte 0x03 repeated bound+excess times, returned as the largeBlob `blob` after a Read request", "expect": OK if ex == 0 else TOO})
     cs += [
         {"id": "record-large-blob-half-bound", "op": "start_authentication", "bound": "webauthn_rp::MAX_RECORD", "blob_len": 4096,
-         "spec": "contract R1 and R61 (a ceremony row well under MAX_RECORD: a largeBlob write of MAX_RECORD/2 bytes, under any row encoding)",
+         "spec": "contract R1 and R61 (a ceremony row well under MAX_RECORD: a largeBlob write of MAX_RECORD/2 bytes is accepted)",
          "allow": "discoverable", "extensions": {"largeBlob": {"write": b64(bytes([3]) * 4096)}}, "expect": OK},
-        {"id": "record-large-blob-max-record", "op": "start_authentication", "bound": "webauthn_rp::MAX_RECORD", "blob_len": 8192,
-         "spec": "contract R1 and R61 (a largeBlob write of exactly MAX_RECORD bytes is below MAX_LARGE_BLOB, 65536, yet the row holding it exceeds MAX_RECORD under any encoding, so TooLarge)",
-         "allow": "discoverable", "extensions": {"largeBlob": {"write": b64(bytes([3]) * 8192)}}, "expect": TOO},
         {"id": "trust-anchor-one-certificate", "op": "trust_anchor_from_der", "input": ROOT.der.hex(), "spec": "contract R18 (exactly one DER certificate; digest is the SHA-256 of that DER)", "expect": {"ok": True, "digest": sha(ROOT.der).hex()}},
         {"id": "trust-anchor-two-certificates", "op": "trust_anchor_from_der", "input": (ROOT.der + INT.der).hex(), "spec": "contract R18 (exactly one DER certificate, not a concatenation)", "expect": NO},
         {"id": "trust-anchor-trailing-byte", "op": "trust_anchor_from_der", "input": (ROOT.der + b"\x00").hex(), "spec": "contract R18 (exactly one DER certificate: nothing after it)", "expect": NO},

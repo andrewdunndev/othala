@@ -2,7 +2,7 @@
 // Re-verifies the generated webauthn-rp-derived extension families with Node's crypto, independent of the generator:
 // every certificate parses; every assertion signature verifies; each chains.json case's expected outcome agrees with the
 // signatures it contains (including ecdsa-with-SHA1, sha1 with RSA, ecdsa-with-SHA512 and P-521, which the walk refuses by
-// policy although they verify); Anchored needs every link's issuer name equal to the next subject (DER bytes), every
+// policy although they verify, and which must expect Unanchored); Anchored needs every link's issuer name equal to the next subject (DER bytes), every
 // signature, validity, CA rule and anchor, Unanchored needs all of those but the anchor, AttestationInvalid needs at
 // least one name, signature, CA-rule or validity fault; every attestation.json x5c chain verifies link by link (names too) and to its anchor; statement
 // signatures, TPM extraData and the TPM attested name verify or fail exactly where the case id names that fault, both ways.
@@ -91,7 +91,7 @@ for (const c of load("chains.json")) {
   const out = c.expect.outcome;
   // chains refused by algorithm policy alone: every name, signature and rule holds, the walk still reports Unanchored (R117)
   const policy = ["ecdsa-sha1-leaf", "ecdsa-sha512-on-p256-leaf", "rsa-sha1-intermediate", "ecdsa-sha1-to-anchor", "p521-intermediate", "p521-anchor"].includes(c.id);
-  if (policy) { if (faults.length || !viaAnchor) fail(`chains#${c.id}: policy case whose chain does not verify (${faults.join("; ") || "no anchor"})`); chains++; continue; }
+  if (policy) { if (out !== "Unanchored") fail(`chains#${c.id}: policy case must expect Unanchored, expects ${out}`); if (faults.length || !viaAnchor) fail(`chains#${c.id}: policy case whose chain does not verify (${faults.join("; ") || "no anchor"})`); chains++; continue; }
   if (out === "Anchored" && (faults.length || !viaAnchor)) fail(`chains#${c.id}: expected Anchored, found ${faults.join("; ") || "no anchor"}`);
   if (out === "Unanchored" && (faults.length || viaAnchor)) fail(`chains#${c.id}: expected Unanchored, ${faults.length ? "found " + faults.join("; ") : "the chain anchors"}`);
   if (out === "AttestationInvalid" && faults.length === 0) fail(`chains#${c.id}: expected AttestationInvalid but no name, signature, CA or validity fault exists`);
@@ -161,6 +161,8 @@ for (const c of load("attestation.json")) {
     tpms++;
   }
   if (({ [-7]: "ec", [-35]: "ec", [-257]: "rsa", [-65535]: "rsa" })[st.alg] !== key.asymmetricKeyType) ok = false; // alg must fit the key type
+  if (st.alg === -7 && key.asymmetricKeyDetails?.namedCurve !== "prime256v1") ok = false; // ES256 needs P-256
+  if (st.alg === -35 && key.asymmetricKeyDetails?.namedCurve !== "secp384r1") ok = false; // ES384 needs P-384
   if (c.expect.ok && !ok) fail(`attestation#${c.id}: expected ok but the statement signature does not verify`);
   if (ok === sigFault.test(c.id)) fail(`attestation#${c.id}: signature ${ok ? "verifies" : "fails"} against the case id`);
   atts++;
