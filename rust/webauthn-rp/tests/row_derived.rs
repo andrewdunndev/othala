@@ -9,6 +9,8 @@ use webauthn_rp::{MAX_CBOR_DEPTH, MAX_CBOR_ITEMS};
 
 #[path = "../src/cbor.rs"]
 mod cbor;
+#[path = "support/ceremony.rs"]
+mod ceremony;
 #[path = "../src/cose.rs"]
 pub mod cose;
 #[path = "../src/error.rs"]
@@ -19,6 +21,8 @@ mod hex;
 mod oracle_assertion;
 #[path = "support/cbor.rs"]
 mod oracle_cbor;
+#[path = "support/registration.rs"]
+mod oracle_registration;
 
 #[test]
 fn cbor() {
@@ -41,4 +45,9 @@ fn authenticator_data() {
         20,
         false,
     );
+}
+
+#[test]
+fn registration() {
+    oracle_registration::cases();
 }

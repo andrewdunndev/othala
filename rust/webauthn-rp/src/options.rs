@@ -177,7 +177,10 @@ pub struct AuthenticationOptions {
 
 /// `PublicKeyCredentialCreationOptionsJSON` (L3 5.1.8), for the client; serialized under `serde`.
 #[derive(Clone)]
-#[expect(dead_code, reason = "read by the serializer of webauthn-15")]
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "read by the serializer of webauthn-15")
+)]
 pub struct CreationOptions {
     pub(crate) challenge: [u8; 32],
     pub(crate) rp_id: RpId,
@@ -374,6 +377,74 @@ impl AuthenticationOptions {
     }
 }
 
+impl RegistrationOptions {
+    /// User verification and resident key are always chosen by the caller.
+    pub fn new(
+        user_verification: Requirement,
+        resident_key: ResidentKey,
+        timeout: Timeout,
+    ) -> Self {
+        Self {
+            user_verification,
+            resident_key,
+            timeout,
+            algorithms: Vec::new(),
+            attachment: None,
+            conveyance: Conveyance::None,
+            formats: Vec::new(),
+            hints: Vec::new(),
+            mediation: Mediation::Optional,
+            extensions: RegistrationExtensions::default(),
+        }
+    }
+
+    /// Offer one more algorithm, in preference order; with none offered, ES256, EdDSA, ES384 and RS256.
+    pub fn algorithm(mut self, alg: CoseAlgorithm) -> Self {
+        self.algorithms.push(alg);
+        self
+    }
+
+    /// Ask for an authenticator attachment.
+    pub fn attachment(mut self, attachment: Attachment) -> Self {
+        self.attachment = Some(attachment);
+        self
+    }
+
+    /// Set the attestation conveyance preference; the default is `Conveyance::None`.
+    pub fn attestation(mut self, conveyance: Conveyance) -> Self {
+        self.conveyance = conveyance;
+        self
+    }
+
+    /// Prefer one more attestation format (`attestationFormats`), in order.
+    pub fn attestation_format(mut self, format: Format) -> Self {
+        self.formats.push(format);
+        self
+    }
+
+    /// Add a user-agent hint, in order.
+    pub fn hint(mut self, hint: Hint) -> Self {
+        self.hints.push(hint);
+        self
+    }
+
+    /// Set the mediation the client will be called with.
+    pub fn mediation(mut self, mediation: Mediation) -> Self {
+        self.mediation = mediation;
+        self
+    }
+}
+
+impl fmt::Debug for CreationOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CreationOptions")
+            .field("rp_id", &self.rp_id)
+            .field("exclude", &self.exclude)
+            .field("options", &self.options)
+            .finish_non_exhaustive()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::format;
@@ -515,6 +586,103 @@ mod tests {
                 vec![Hint::Hybrid, Hint::SecurityKey]
             )
         );
+        Ok(())
+    }
+
+    #[test]
+    fn registration_options_collect_in_order() -> Result<(), crate::error::Error> {
+        use crate::cose::CoseAlgorithm;
+        use crate::options::{Attachment, Conveyance, Mediation, RegistrationOptions, ResidentKey};
+        use crate::trust::Format;
+        let o = RegistrationOptions::new(
+            Requirement::Required,
+            ResidentKey::Discouraged,
+            Timeout::from_secs(5)?,
+        );
+        assert_eq!(
+            (o.user_verification, o.resident_key, o.timeout.secs()),
+            (Requirement::Required, ResidentKey::Discouraged, 5)
+        );
+        assert_eq!(
+            (
+                o.algorithms.is_empty(),
+                o.attachment,
+                o.conveyance,
+                o.formats.is_empty(),
+                o.hints.is_empty(),
+                o.mediation
+            ),
+            (
+                true,
+                None,
+                Conveyance::None,
+                true,
+                true,
+                Mediation::Optional
+            )
+        );
+        let o = o
+            .algorithm(CoseAlgorithm::Rs256)
+            .algorithm(CoseAlgorithm::Es256)
+            .attachment(Attachment::Platform)
+            .attestation(Conveyance::Direct)
+            .attestation_format(Format::Packed)
+            .attestation_format(Format::None)
+            .hint(Hint::Hybrid)
+            .hint(Hint::ClientDevice)
+            .mediation(Mediation::Conditional);
+        assert_eq!(
+            o.algorithms,
+            vec![CoseAlgorithm::Rs256, CoseAlgorithm::Es256]
+        );
+        assert_eq!(
+            (o.attachment, o.conveyance, o.mediation),
+            (
+                Some(Attachment::Platform),
+                Conveyance::Direct,
+                Mediation::Conditional
+            )
+        );
+        assert_eq!(
+            (o.formats, o.hints),
+            (
+                vec![Format::Packed, Format::None],
+                vec![Hint::Hybrid, Hint::ClientDevice]
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn creation_options_print_no_name() -> Result<(), crate::error::Error> {
+        use crate::options::{CreationOptions, RegistrationOptions, ResidentKey};
+        use crate::policy::RpId;
+        let options = RegistrationOptions::new(
+            Requirement::Required,
+            ResidentKey::Preferred,
+            Timeout::from_secs(5)?,
+        );
+        let user = UserEntity::new(
+            UserHandle(vec![1]),
+            UserName("secret-name".into()),
+            DisplayName("secret-display".into()),
+        );
+        let creation = CreationOptions {
+            challenge: [7; 32],
+            rp_id: RpId::parse("example.org")?,
+            rp_name: DisplayName("secret-rp".into()),
+            user,
+            exclude: vec![],
+            options,
+        };
+        let shown = format!("{creation:?}");
+        assert!(
+            shown.starts_with("CreationOptions { rp_id: RpId(")
+                && shown.contains("example.org")
+                && shown.contains("exclude: []"),
+            "{shown}"
+        );
+        assert!(!shown.contains("secret") && !shown.contains('7'), "{shown}");
         Ok(())
     }
 }

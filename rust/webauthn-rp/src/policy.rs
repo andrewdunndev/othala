@@ -69,10 +69,6 @@ pub enum KeyEnforcement {
 
 /// One relying party's fixed policy: RP ID, origins and every ceremony option that is not per call.
 #[derive(Clone)]
-#[expect(
-    dead_code,
-    reason = "read by the ceremonies of webauthn-04 and webauthn-05"
-)]
 pub struct RelyingParty {
     pub(crate) id: RpId,
     pub(crate) name: DisplayName,

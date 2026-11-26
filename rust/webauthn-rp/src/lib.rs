@@ -37,6 +37,9 @@ mod trust;
 
 mod verify;
 
+#[cfg(test)]
+mod testing;
+
 pub use cose::CoseAlgorithm;
 
 pub use error::{Error, ErrorKind, SpecStep};

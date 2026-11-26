@@ -61,6 +61,50 @@ pub struct Attestation {
     pub(crate) anchor: Option<Digest>,
 }
 
+impl Attestation {
+    /// The statement format.
+    pub fn format(&self) -> Format {
+        self.format
+    }
+
+    /// The attestation type.
+    pub fn kind(&self) -> AttestationType {
+        self.kind
+    }
+
+    /// Whether it chained to an anchor.
+    pub fn trust(&self) -> Trust {
+        self.trust
+    }
+
+    /// The SHA-256 of each `x5c` certificate, leaf first; empty for none and self.
+    pub fn chain(&self) -> &[Digest] {
+        &self.chain
+    }
+
+    /// The SHA-256 of the anchor the chain met, when `Anchored`.
+    pub fn anchor(&self) -> Option<&Digest> {
+        self.anchor.as_ref()
+    }
+}
+
+impl TrustQuery<'_> {
+    /// The statement format.
+    pub fn format(&self) -> Format {
+        self.format
+    }
+
+    /// The AAGUID from the attested credential data, not yet authenticated.
+    pub fn aaguid(&self) -> Aaguid {
+        self.aaguid
+    }
+
+    /// The SHA-256 of each `x5c` certificate, leaf first, for a revocation or deny list.
+    pub fn chain(&self) -> &[Digest] {
+        self.chain
+    }
+}
+
 /// Where registrations find acceptable attestation roots and refusals (L3 7.1 step 23). Implemented by hosts and by `webauthn-mds`.
 pub trait TrustSource {
     /// Decide one statement with a trust path; never asked for none or self attestation.
@@ -81,7 +125,6 @@ pub enum TrustDecision<'a> {
 
 /// What a `TrustSource` is asked.
 #[derive(Clone, Copy, Debug)]
-#[expect(dead_code, reason = "read by its accessors, webauthn-05")]
 pub struct TrustQuery<'a> {
     pub(crate) format: Format,
     pub(crate) aaguid: Aaguid,
@@ -94,4 +137,48 @@ pub struct TrustQuery<'a> {
 pub struct TrustAnchor {
     pub(crate) der: Vec<u8>,
     pub(crate) digest: Digest,
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec;
+
+    use base::Digest;
+
+    use super::{Attestation, AttestationType, Format, Trust, TrustQuery};
+    use crate::record::Aaguid;
+
+    #[test]
+    fn accessors_read_their_fields() {
+        let (a, b) = (Digest::from_bytes([1; 32]), Digest::from_bytes([2; 32]));
+        let attestation = Attestation {
+            format: Format::Tpm,
+            kind: AttestationType::AttCa,
+            trust: Trust::Anchored,
+            chain: vec![a, b],
+            anchor: Some(b),
+        };
+        assert_eq!(
+            (
+                attestation.format(),
+                attestation.kind(),
+                attestation.trust()
+            ),
+            (Format::Tpm, AttestationType::AttCa, Trust::Anchored)
+        );
+        assert_eq!(
+            (attestation.chain(), attestation.anchor()),
+            (&[a, b][..], Some(&b))
+        );
+        let chain = [a];
+        let query = TrustQuery {
+            format: Format::Apple,
+            aaguid: Aaguid::from_bytes([3; 16]),
+            chain: &chain,
+        };
+        assert_eq!(
+            (query.format(), query.aaguid(), query.chain()),
+            (Format::Apple, Aaguid::from_bytes([3; 16]), &[a][..])
+        );
+    }
 }

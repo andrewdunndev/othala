@@ -1,23 +1,34 @@
 //! The ceremonies: start, finish and their verdicts (L3 7.1, 7.2); authentication with webauthn-04, registration with webauthn-05.
 use base::{BrowserBinding, Effect as BaseEffect, Entropy, Row, UnixTime};
 
+use crate::attestation::{Statement, verify as verify_statement};
 use crate::authdata::{BE, BS, UP, UV};
 use crate::client_data::ClientData;
+use crate::cose::CoseAlgorithm;
 use crate::error::{Error, ErrorKind, SpecStep};
 use crate::extensions::{
-    AppIdUsed, AuthenticationOutputs, LargeBlobOutcome, PrfResult, RegistrationOutputs,
+    AppIdUsed, AuthenticationOutputs, Discoverability, LargeBlobOutcome, LargeBlobSupport,
+    PrfResult, RegistrationOutputs,
 };
-use crate::options::{Allow, AuthenticationOptions, RequestOptions, Requirement, UserHandle};
-use crate::policy::{CounterPolicy, CrossOrigin, RelyingParty, UnsolicitedExtensions};
+use crate::options::{
+    Allow, AuthenticationOptions, CreationOptions, CredentialDescriptor, Mediation,
+    RegistrationOptions, RequestOptions, Requirement, UserEntity, UserHandle,
+};
+use crate::policy::{CounterPolicy, CrossOrigin, RelyingParty, TrustPolicy, UnsolicitedExtensions};
 use crate::record::{
-    AuthenticationCeremony, Credential, CredentialId, Key, Record, browser_digest,
+    AuthenticationCeremony, Credential, CredentialId, Key, Record, RegistrationCeremony,
+    browser_digest,
 };
-use crate::response::{AuthenticationResponse, sha256};
+use crate::response::{AuthenticationResponse, RegistrationResponse, sha256, split};
+use crate::trust::{Attestation, Format, Trust, TrustSource};
 use crate::{Effect, MAX_LISTED_CREDENTIALS, MAX_RECORD, Pending, Verdict};
 
 /// A verified registration; made only by `finish_registration`.
 #[derive(Debug)]
-#[expect(dead_code, reason = "read by its accessors, webauthn-05")]
+#[expect(
+    dead_code,
+    reason = "extensions is read by the accessors of webauthn-14"
+)]
 pub struct Registered {
     pub(crate) credential: Credential,
     pub(crate) user_verification: UserVerification,
@@ -102,12 +113,212 @@ const fn refuse(kind: ErrorKind, step: u8) -> Error {
     Error::at(kind, SpecStep::Authentication(step))
 }
 
+const fn refuse_registration(kind: ErrorKind, step: u8) -> Error {
+    Error::at(kind, SpecStep::Registration(step))
+}
+
+const DEFAULT_ALGORITHMS: [CoseAlgorithm; 4] = [
+    CoseAlgorithm::Es256,
+    CoseAlgorithm::EdDsa,
+    CoseAlgorithm::Es384,
+    CoseAlgorithm::Rs256,
+];
+
 // the same bytes, with no early exit
 fn same(a: &[u8], b: &[u8]) -> bool {
     a.len() == b.len() && a.iter().zip(b).fold(0, |d, (x, y)| d | (x ^ y)) == 0
 }
 
 impl RelyingParty {
+    /// L3 7.1 step 1, bound to the starting browser: options for the client, and the effect that creates the ceremony row under its challenge's digest, expiring at its deadline; an over-long list or salt is `TooLarge`.
+    pub fn start_registration(
+        &self,
+        user: &UserEntity,
+        exclude: &[CredentialDescriptor],
+        opts: &RegistrationOptions,
+        browser: &BrowserBinding,
+        now: UnixTime,
+        e: &mut impl Entropy,
+    ) -> Result<(CreationOptions, Effect), Error> {
+        if exclude.len() > MAX_LISTED_CREDENTIALS {
+            return Err(Error::new(ErrorKind::TooLarge));
+        }
+        let mut challenge = [0; 32];
+        e.fill(&mut challenge);
+        let digest = sha256(&challenge);
+        let deadline = now.saturating_add(u64::from(opts.timeout.secs()));
+        let record = Record::Registration(RegistrationCeremony {
+            challenge: digest,
+            browser: browser_digest(browser)?,
+            deadline,
+            user: user.handle.clone(),
+            options: opts.clone(),
+        });
+        if record.encode().len() > MAX_RECORD {
+            return Err(Error::new(ErrorKind::TooLarge));
+        }
+        let creation = CreationOptions {
+            challenge,
+            rp_id: self.id.clone(),
+            rp_name: self.name.clone(),
+            user: user.clone(),
+            exclude: exclude.to_vec(),
+            options: opts.clone(),
+        };
+        Ok((
+            creation,
+            BaseEffect::created(e, Key::Ceremony(digest), record, Some(deadline)),
+        ))
+    }
+
+    /// L3 7.1 steps 5-29, in the browser the ceremony started in. Every failure, expiry included, is inside the verdict; the effect always deletes the seen ceremony row, and on `Ok` also reserves the credential id.
+    pub fn finish_registration(
+        &self,
+        state: Row<RegistrationCeremony>,
+        response: &RegistrationResponse,
+        browser: &BrowserBinding,
+        trust: &dyn TrustSource,
+        now: UnixTime,
+        e: &mut impl Entropy,
+    ) -> Verdict<Registered> {
+        let ceremony = Key::Ceremony(state.record().challenge);
+        let (registered, credential) =
+            match self.verify_registration(state.record(), response, browser, trust, now) {
+                Ok(done) => done,
+                Err(err) => {
+                    return Pending::new(Err(err), BaseEffect::deleted(e, ceremony, &state));
+                }
+            };
+        let key = Key::Credential(credential.id.clone());
+        let built = BaseEffect::builder(&mut *e)
+            .delete(ceremony.clone(), &state)
+            .create(key, Record::Credential(credential), None)
+            .build();
+        match built {
+            Ok(effect) => Pending::new(Ok(registered), effect),
+            Err(_) => Pending::new(
+                Err(Error::new(ErrorKind::Corrupt)),
+                BaseEffect::deleted(e, ceremony, &state),
+            ),
+        }
+    }
+
+    fn verify_registration(
+        &self,
+        ceremony: &RegistrationCeremony,
+        response: &RegistrationResponse,
+        browser: &BrowserBinding,
+        _trust: &dyn TrustSource,
+        now: UnixTime,
+    ) -> Result<(Registered, Credential), Error> {
+        if !same(
+            browser_digest(browser)?.as_bytes(),
+            ceremony.browser.as_bytes(),
+        ) {
+            return Err(Error::new(ErrorKind::BrowserMismatch));
+        }
+        if now >= ceremony.deadline {
+            return Err(Error::new(ErrorKind::Expired));
+        }
+        let (data, auth) = (&response.client_data, &response.auth_data);
+        if data.kind != "webauthn.create" {
+            return Err(refuse_registration(ErrorKind::Type, 7));
+        }
+        if sha256(&data.challenge) != ceremony.challenge {
+            return Err(refuse_registration(ErrorKind::ChallengeMismatch, 8));
+        }
+        self.check_origins(data, SpecStep::Registration, [9, 10, 11])?;
+        let parts = split(&response.attestation_object)?;
+        if sha256(self.id.as_str().as_bytes()).as_bytes() != &auth.rp_id_hash {
+            return Err(refuse_registration(ErrorKind::RpIdHash, 14));
+        }
+        if auth.flags & UP == 0 && ceremony.options.mediation != Mediation::Conditional {
+            return Err(refuse_registration(ErrorKind::UserNotPresent, 15));
+        }
+        let verified = auth.flags & UV != 0;
+        if !verified && ceremony.options.user_verification == Requirement::Required {
+            return Err(refuse_registration(ErrorKind::UserNotVerified, 16));
+        }
+        let eligible = auth.flags & BE != 0;
+        if auth.flags & BS != 0 && !eligible {
+            return Err(refuse_registration(
+                ErrorKind::BackupStateWithoutEligibility,
+                17,
+            ));
+        }
+        let attested = auth
+            .attested
+            .as_ref()
+            .ok_or(refuse_registration(ErrorKind::Malformed, 13))?;
+        let offered: &[CoseAlgorithm] = if ceremony.options.algorithms.is_empty() {
+            &DEFAULT_ALGORITHMS
+        } else {
+            &ceremony.options.algorithms
+        };
+        if !offered.contains(&attested.public_key.algorithm()) {
+            return Err(refuse_registration(ErrorKind::Algorithm, 20));
+        }
+        let statement = Statement {
+            att_stmt: &parts.att_stmt,
+            auth_data: auth,
+            auth_data_bytes: parts.auth_data_bytes,
+            client_data_hash: *sha256(&response.client_data_json).as_bytes(),
+        };
+        let checked = verify_statement(parts.fmt, &statement).map_err(|e| {
+            refuse_registration(
+                e.kind(),
+                if e.kind() == ErrorKind::AttestationInvalid {
+                    22
+                } else {
+                    21
+                },
+            )
+        })?;
+        if self.trust == TrustPolicy::RequireTrusted {
+            return Err(refuse_registration(ErrorKind::Untrusted, 24));
+        }
+        if auth.extensions.is_some() && self.unsolicited == UnsolicitedExtensions::Reject {
+            return Err(refuse_registration(ErrorKind::Extension, 28));
+        }
+        let backup = match (eligible, auth.flags & BS != 0) {
+            (false, _) => Backup::SingleDevice,
+            (true, true) => Backup::MultiDevice(BackupState::BackedUp),
+            (true, false) => Backup::MultiDevice(BackupState::NotBackedUp),
+        };
+        let user_verification = if verified {
+            UserVerification::Verified
+        } else {
+            UserVerification::PresenceOnly
+        };
+        let credential = Credential {
+            id: attested.id.clone(),
+            public_key: attested.public_key.clone(),
+            sign_count: auth.sign_count,
+            uv_initialized: user_verification,
+            transports: response.transports.clone(),
+            backup,
+            user: ceremony.user.clone(),
+            aaguid: attested.aaguid,
+            attestation: Attestation {
+                format: Format::None,
+                kind: checked.kind,
+                trust: Trust::Unanchored,
+                chain: checked.x5c.iter().map(|c| sha256(c)).collect(),
+                anchor: None,
+            },
+        };
+        let registered = Registered {
+            credential: credential.clone(),
+            user_verification,
+            extensions: RegistrationOutputs {
+                discoverability: Discoverability::NotRequested,
+                prf: PrfResult::NotRequested,
+                large_blob: LargeBlobSupport::NotRequested,
+            },
+        };
+        Ok((registered, credential))
+    }
+
     /// L3 7.2 step 1, bound to the starting browser: options for the client, and the effect that creates the ceremony row.
     pub fn start_authentication(
         &self,
@@ -347,6 +558,18 @@ impl RelyingParty {
     }
 }
 
+impl Registered {
+    /// The credential record the effect reserves.
+    pub fn credential(&self) -> &Credential {
+        &self.credential
+    }
+
+    /// Whether the registration was user-verified; this becomes `uvInitialized`.
+    pub fn user_verification(&self) -> UserVerification {
+        self.user_verification
+    }
+}
+
 impl Assertion {
     /// The credential that signed.
     pub fn credential_id(&self) -> &CredentialId {
@@ -382,29 +605,35 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
 
-    use base::{BrowserBinding, Digest, Effect as BaseEffect, Secret, Slot, Store, UnixTime};
+    use base::{
+        BrowserBinding, Digest, Effect as BaseEffect, Entropy, Secret, Slot, Store, UnixTime,
+    };
     use p256::ecdsa::signature::Signer;
     use p256::ecdsa::{Signature, SigningKey};
     use store::MemStore;
 
     use super::{
-        Assertion, AssertionVerification, Backup, BackupState, Counter, UserVerification, same,
+        Assertion, AssertionVerification, Backup, BackupState, Counter, Registered,
+        UserVerification, same,
     };
     use crate::cose::CoseKey;
     use crate::error::{Error, ErrorKind, SpecStep};
-    use crate::extensions::LargeBlobOp;
+    use crate::extensions::{AppId, LargeBlobOp};
     use crate::options::{
-        Allow, AuthenticationOptions, CredentialDescriptor, DisplayName, Requirement, Timeout,
-        UserHandle,
+        Allow, AuthenticationOptions, CredentialDescriptor, DisplayName, Mediation,
+        RegistrationOptions, Requirement, ResidentKey, Timeout, Transport, UserEntity, UserHandle,
+        UserName,
     };
     use crate::policy::{
-        CounterPolicy, CrossOrigin, Origin, RelyingParty, RpId, UnsolicitedExtensions,
+        CounterPolicy, CrossOrigin, Origin, RelyingParty, RpId, TrustPolicy, UnsolicitedExtensions,
     };
     use crate::record::{
-        Aaguid, AuthenticationCeremony, Credential, CredentialId, Key, Record, browser_digest,
+        Aaguid, AuthenticationCeremony, Credential, CredentialId, Key, Record,
+        RegistrationCeremony, browser_digest,
     };
-    use crate::response::{AuthenticationResponse, sha256};
-    use crate::trust::{Attestation, AttestationType, Format, Trust};
+    use crate::response::{AuthenticationResponse, RegistrationResponse, sha256};
+    use crate::testing::{attestation, auth_data, key};
+    use crate::trust::{Attestation, AttestationType, Format, Trust, TrustSource};
     use crate::{MAX_LISTED_CREDENTIALS, MAX_RECORD};
 
     const NOW: u64 = 100;
@@ -1147,5 +1376,513 @@ mod tests {
         }
         assert!(!same(&[0b01], &[0b10]));
         assert!(!same(&[1, 1], &[0, 0]), "differences do not cancel");
+    }
+
+    struct Reg {
+        rp: RelyingParty,
+        ceremony: RegistrationCeremony,
+        browser: BrowserBinding,
+        extensions: bool,
+        now: u64,
+        flags: u8,
+        count: u32,
+        rp_hash: Digest,
+        kind: String,
+        origin: String,
+        cross: String,
+        challenge: [u8; 32],
+        fmt: String,
+        stmt: Vec<u8>,
+        transports: Vec<Transport>,
+    }
+
+    struct Registering {
+        result: Result<Registered, Error>,
+        left: BTreeMap<Key, Record>,
+    }
+
+    struct Unknown;
+
+    impl TrustSource for Unknown {
+        fn decide(&self, _: &crate::trust::TrustQuery<'_>) -> crate::trust::TrustDecision<'_> {
+            crate::trust::TrustDecision::Unknown
+        }
+    }
+
+    impl Reg {
+        fn new() -> Result<Self, Error> {
+            let browser = BrowserBinding::from(&Secret::new([5; 32]));
+            let challenge = [9; 32];
+            let options = RegistrationOptions::new(
+                Requirement::Preferred,
+                ResidentKey::Preferred,
+                Timeout::from_secs(60)?,
+            );
+            Ok(Self {
+                rp: Fx::new()?.rp,
+                ceremony: RegistrationCeremony {
+                    challenge: sha256(&challenge),
+                    browser: browser_digest(&browser)?,
+                    deadline: UnixTime::new(DEADLINE),
+                    user: UserHandle::from_stored(USER)?,
+                    options,
+                },
+                browser,
+                extensions: false,
+                now: NOW,
+                flags: 0x41,
+                count: 3,
+                rp_hash: sha256(b"example.org"),
+                kind: "webauthn.create".into(),
+                origin: "https://example.org".into(),
+                cross: String::new(),
+                challenge,
+                fmt: "none".into(),
+                stmt: vec![0xa0],
+                transports: vec![Transport::Usb, Transport::Usb, Transport::Nfc],
+            })
+        }
+
+        fn response(&self) -> Result<RegistrationResponse, Error> {
+            let json = format!(
+                r#"{{"type":"{}","challenge":"{}","origin":"{}"{}}}"#,
+                self.kind,
+                base::b64url_encode(&self.challenge),
+                self.origin,
+                self.cross
+            );
+            let (_, cose, _) = key()?;
+            let cose = [cose, if self.extensions { vec![0xa0] } else { vec![] }].concat();
+            let data = auth_data(
+                self.rp_hash.as_bytes(),
+                self.flags | if self.extensions { 0x80 } else { 0 },
+                self.count,
+                ID,
+                &cose,
+            );
+            RegistrationResponse::new(
+                ID,
+                json.as_bytes(),
+                &attestation(&self.fmt, &self.stmt, &data),
+                &self.transports,
+            )
+        }
+
+        fn run(&self) -> Result<Registering, Error> {
+            let start = UnixTime::new(0);
+            let mut store: MemStore<Key, Record> = MemStore::default();
+            let ceremony = Key::Ceremony(self.ceremony.challenge);
+            let seed = BaseEffect::created(
+                &mut testkit::seeded(11),
+                ceremony.clone(),
+                Record::Registration(self.ceremony.clone()),
+                None,
+            );
+            store.apply(&seed, start).map_err(bad)?.map_err(bad)?;
+            let rows = store
+                .load(core::slice::from_ref(&ceremony), start)
+                .map_err(bad)?;
+            let Some(Slot::Row(row)) = rows.get(&ceremony) else {
+                return Err(bad(()));
+            };
+            let state = RegistrationCeremony::from_row(row, |r| Some(r))?;
+            let verdict = self.rp.finish_registration(
+                state,
+                &self.response()?,
+                &self.browser,
+                &Unknown,
+                UnixTime::new(self.now),
+                &mut testkit::seeded(20),
+            );
+            let receipt = store
+                .apply(verdict.effect(), start)
+                .map_err(bad)?
+                .map_err(bad)?;
+            Ok(Registering {
+                result: verdict.settle(receipt).map_err(bad)?,
+                left: store.contents(start),
+            })
+        }
+
+        fn refused(&self) -> Result<(ErrorKind, Option<SpecStep>), Error> {
+            if let Err(e) = self.response() {
+                return Ok((e.kind(), e.spec_step()));
+            }
+            let done = self.run()?;
+            let err = done.result.err().ok_or(bad(()))?;
+            assert!(
+                done.left.is_empty(),
+                "a refusal deletes the ceremony and registers nothing"
+            );
+            Ok((err.kind(), err.spec_step()))
+        }
+    }
+
+    fn at(n: u8) -> Option<SpecStep> {
+        Some(SpecStep::Registration(n))
+    }
+
+    #[test]
+    fn a_valid_registration_reserves_the_credential_and_deletes_the_ceremony() -> Result<(), Error>
+    {
+        let done = Reg::new()?.run()?;
+        let registered = done.result?;
+        assert_eq!(
+            registered.user_verification(),
+            UserVerification::PresenceOnly
+        );
+        let c = registered.credential();
+        assert_eq!(
+            (c.id().as_bytes(), c.user().as_bytes(), c.sign_count()),
+            (ID, USER, 3)
+        );
+        assert_eq!(
+            (c.uv_initialized(), c.backup(), c.aaguid(), c.transports()),
+            (
+                UserVerification::PresenceOnly,
+                Backup::SingleDevice,
+                Aaguid::from_bytes([8; 16]),
+                &[Transport::Usb, Transport::Nfc][..]
+            )
+        );
+        assert_eq!(
+            (
+                c.attestation().format(),
+                c.attestation().kind(),
+                c.attestation().trust()
+            ),
+            (Format::None, AttestationType::None, Trust::Unanchored)
+        );
+        assert_eq!(
+            (c.attestation().chain(), c.attestation().anchor()),
+            (&[][..], None)
+        );
+        assert_eq!(c.algorithm(), crate::cose::CoseAlgorithm::Es256);
+        assert_eq!(
+            done.left.keys().collect::<Vec<_>>(),
+            vec![&Key::Credential(CredentialId::from_bytes(ID)?)]
+        );
+        assert_eq!(
+            done.left.values().next(),
+            Some(&Record::Credential(c.clone()))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn each_registration_check_names_its_kind_and_step() -> Result<(), Error> {
+        let case = |change: fn(&mut Reg) -> Result<(), Error>,
+                    kind: ErrorKind,
+                    step: Option<SpecStep>|
+         -> Result<(), Error> {
+            let mut fx = Reg::new()?;
+            change(&mut fx)?;
+            assert_eq!(fx.refused()?, (kind, step), "{kind:?}");
+            Ok(())
+        };
+        case(
+            |f| {
+                f.browser = BrowserBinding::from(&Secret::new([6; 32]));
+                Ok(())
+            },
+            ErrorKind::BrowserMismatch,
+            None,
+        )?;
+        case(
+            |f| {
+                f.now = DEADLINE;
+                Ok(())
+            },
+            ErrorKind::Expired,
+            None,
+        )?;
+        case(
+            |f| {
+                f.kind = "webauthn.get".into();
+                Ok(())
+            },
+            ErrorKind::Type,
+            at(7),
+        )?;
+        case(
+            |f| {
+                f.challenge = [8; 32];
+                Ok(())
+            },
+            ErrorKind::ChallengeMismatch,
+            at(8),
+        )?;
+        case(
+            |f| {
+                f.origin = "https://evil.example".into();
+                Ok(())
+            },
+            ErrorKind::OriginMismatch,
+            at(9),
+        )?;
+        case(
+            |f| {
+                f.cross = r#","crossOrigin":true"#.into();
+                Ok(())
+            },
+            ErrorKind::CrossOriginDenied,
+            at(10),
+        )?;
+        case(
+            |f| {
+                f.cross = r#","topOrigin":"https://a.example""#.into();
+                Ok(())
+            },
+            ErrorKind::TopOriginDenied,
+            at(11),
+        )?;
+        case(
+            |f| {
+                f.rp_hash = sha256(b"evil.example");
+                Ok(())
+            },
+            ErrorKind::RpIdHash,
+            at(14),
+        )?;
+        case(
+            |f| {
+                f.flags = 0x40;
+                Ok(())
+            },
+            ErrorKind::UserNotPresent,
+            at(15),
+        )?;
+        case(
+            |f| {
+                f.ceremony.options.user_verification = Requirement::Required;
+                Ok(())
+            },
+            ErrorKind::UserNotVerified,
+            at(16),
+        )?;
+        case(
+            |f| {
+                f.flags = 0x51;
+                Ok(())
+            },
+            ErrorKind::BackupStateWithoutEligibility,
+            at(17),
+        )?;
+        case(
+            |f| {
+                f.ceremony.options = f
+                    .ceremony
+                    .options
+                    .clone()
+                    .algorithm(crate::cose::CoseAlgorithm::Rs256);
+                Ok(())
+            },
+            ErrorKind::Algorithm,
+            at(20),
+        )?;
+        case(
+            |f| {
+                f.fmt = "None".into();
+                Ok(())
+            },
+            ErrorKind::UnknownFormat,
+            at(21),
+        )?;
+        case(
+            |f| {
+                f.fmt = "packed".into();
+                Ok(())
+            },
+            ErrorKind::UnknownFormat,
+            at(21),
+        )?;
+        case(
+            |f| {
+                f.stmt = vec![0xa1, 0x01, 0x02];
+                Ok(())
+            },
+            ErrorKind::AttestationInvalid,
+            at(22),
+        )?;
+        case(
+            |f| {
+                f.stmt = vec![0x80];
+                Ok(())
+            },
+            ErrorKind::Malformed,
+            at(13),
+        )?;
+        case(
+            |f| {
+                f.rp.trust = TrustPolicy::RequireTrusted;
+                Ok(())
+            },
+            ErrorKind::Untrusted,
+            at(24),
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn registration_options_choose_flags_and_algorithms() -> Result<(), Error> {
+        let mut fx = Reg::new()?;
+        fx.flags = 0x40;
+        fx.ceremony.options = fx
+            .ceremony
+            .options
+            .clone()
+            .mediation(Mediation::Conditional);
+        assert!(
+            fx.run()?.result.is_ok(),
+            "a conditional registration needs no UP"
+        );
+        let mut fx = Reg::new()?;
+        fx.flags = 0x45;
+        fx.ceremony.options.user_verification = Requirement::Required;
+        let done = fx.run()?;
+        assert_eq!(done.result?.user_verification(), UserVerification::Verified);
+        let mut fx = Reg::new()?;
+        fx.flags = 0x59;
+        let done = fx.run()?;
+        assert_eq!(
+            done.result?.credential().backup(),
+            Backup::MultiDevice(BackupState::BackedUp)
+        );
+        fx.flags = 0x49;
+        assert_eq!(
+            fx.run()?.result?.credential().backup(),
+            Backup::MultiDevice(BackupState::NotBackedUp)
+        );
+        let mut fx = Reg::new()?;
+        fx.ceremony.options = fx
+            .ceremony
+            .options
+            .clone()
+            .algorithm(crate::cose::CoseAlgorithm::Rs256)
+            .algorithm(crate::cose::CoseAlgorithm::Es256);
+        assert!(fx.run()?.result.is_ok());
+        let mut fx = Reg::new()?;
+        fx.cross = r#","crossOrigin":true"#.into();
+        fx.rp.cross_origin = CrossOrigin::AnyTop;
+        assert!(fx.run()?.result.is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn unsolicited_extensions_follow_the_policy() -> Result<(), Error> {
+        let mut fx = Reg::new()?;
+        fx.extensions = true;
+        assert_eq!(fx.refused()?, (ErrorKind::Extension, at(28)));
+        fx.rp.unsolicited = UnsolicitedExtensions::Ignore;
+        assert!(fx.run()?.result.is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn start_registration_emits_the_row_and_the_options() -> Result<(), Error> {
+        let fx = Reg::new()?;
+        let user = UserEntity::new(
+            UserHandle::from_stored(USER)?,
+            UserName::parse("ada")?,
+            DisplayName::parse("Ada")?,
+        );
+        let excluded = [CredentialDescriptor::new(
+            CredentialId::from_bytes(ID)?,
+            &[Transport::Usb],
+        )];
+        let options = fx.ceremony.options.clone();
+        let (creation, effect) = fx.rp.start_registration(
+            &user,
+            &excluded,
+            &options,
+            &fx.browser,
+            UnixTime::new(NOW),
+            &mut testkit::seeded(5),
+        )?;
+        let puts: Vec<_> = effect.puts().collect();
+        let [(key, Record::Registration(c), Some(expiry))] = puts.as_slice() else {
+            return Err(bad(()));
+        };
+        assert_eq!(**key, Key::Ceremony(sha256(&creation.challenge)));
+        assert_eq!(
+            (*expiry, c.deadline, c.challenge),
+            (
+                UnixTime::new(NOW + 60),
+                UnixTime::new(NOW + 60),
+                sha256(&creation.challenge)
+            )
+        );
+        assert_eq!(
+            (c.browser, c.user.clone(), c.options.clone()),
+            (
+                browser_digest(&fx.browser)?,
+                UserHandle::from_stored(USER)?,
+                options
+            )
+        );
+        assert_eq!(
+            (
+                creation.rp_id.as_str(),
+                creation.exclude.clone(),
+                creation.user == user
+            ),
+            ("example.org", excluded.to_vec(), true)
+        );
+        assert_eq!(creation.rp_name, DisplayName::parse("Example")?);
+        let mut drawn = [0; 32];
+        testkit::seeded(5).fill(&mut drawn);
+        assert_eq!(creation.challenge, drawn);
+        Ok(())
+    }
+
+    #[test]
+    fn start_registration_is_bounded() -> Result<(), Error> {
+        let fx = Reg::new()?;
+        let user = UserEntity::new(
+            UserHandle::from_stored(USER)?,
+            UserName::parse("ada")?,
+            DisplayName::parse("Ada")?,
+        );
+        let descriptor = CredentialDescriptor::new(CredentialId::from_bytes(ID)?, &[]);
+        let start = |n: usize, options: &RegistrationOptions| {
+            let listed = vec![descriptor.clone(); n];
+            fx.rp
+                .start_registration(
+                    &user,
+                    &listed,
+                    options,
+                    &fx.browser,
+                    UnixTime::new(NOW),
+                    &mut testkit::seeded(5),
+                )
+                .map(|(_, e)| e)
+        };
+        let options = fx.ceremony.options.clone();
+        assert!(start(MAX_LISTED_CREDENTIALS, &options).is_ok());
+        assert_eq!(
+            start(MAX_LISTED_CREDENTIALS + 1, &options)
+                .err()
+                .map(|e| e.kind()),
+            Some(ErrorKind::TooLarge)
+        );
+        let sized = |n: usize| {
+            let mut o = options.clone();
+            o.extensions.app_id_exclude = Some(AppId("a".repeat(n)));
+            o
+        };
+        let effect = start(0, &sized(0))?;
+        let Some((_, record, _)) = effect.puts().next() else {
+            return Err(bad(()));
+        };
+        let room = MAX_RECORD - record.encode().len();
+        assert!(
+            start(0, &sized(room)).is_ok(),
+            "a row of exactly MAX_RECORD"
+        );
+        assert_eq!(
+            start(0, &sized(room + 1)).err().map(|e| e.kind()),
+            Some(ErrorKind::TooLarge)
+        );
+        Ok(())
     }
 }

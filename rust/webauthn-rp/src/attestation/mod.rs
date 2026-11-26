@@ -1,4 +1,4 @@
-//! Attestation statement formats, each compiled only under its own feature (R100); dispatch and `none` (R90) with webauthn-05.
+//! Attestation statement formats, each compiled only under its own feature (R100); dispatch and `none` (R90).
 #[cfg(feature = "android-key")]
 mod android_key;
 
@@ -27,10 +27,11 @@ use alloc::vec::Vec;
 
 use crate::authdata::AuthData;
 use crate::cbor::Value;
+use crate::error::{Error, ErrorKind};
 use crate::trust::AttestationType;
 
 /// What every format's verification reads (L3 8, the verification procedure's inputs).
-#[expect(dead_code, reason = "built by the format dispatch of webauthn-05")]
+#[expect(dead_code, reason = "read by the formats of webauthn-08 and later")]
 pub(crate) struct Statement<'a> {
     /// `attStmt`.
     pub(crate) att_stmt: &'a Value<'a>,
@@ -43,13 +44,76 @@ pub(crate) struct Statement<'a> {
 }
 
 /// A format's verified result: its attestation type and trust path, leaf first (empty for none and self).
-#[expect(
-    dead_code,
-    reason = "built by each format, read by the dispatch of webauthn-05"
-)]
 pub(crate) struct Verified {
     /// The attestation type.
     pub(crate) kind: AttestationType,
     /// The `x5c` certificates in DER, leaf first.
     pub(crate) x5c: Vec<Vec<u8>>,
+}
+
+/// Every format name this crate dispatches, with whether its cargo feature is on.
+const FORMATS: [(&str, bool); 1] = [("none", cfg!(feature = "none"))];
+
+/// Verifies `att_stmt` by the procedure of the format named `fmt`, matched byte for byte: an unlisted name is `UnknownFormat`, one whose feature is off `FormatDisabled`.
+pub(crate) fn verify(fmt: &str, statement: &Statement<'_>) -> Result<Verified, Error> {
+    match FORMATS.iter().find(|(name, _)| *name == fmt) {
+        None => Err(Error::new(ErrorKind::UnknownFormat)),
+        Some((_, false)) => Err(Error::new(ErrorKind::FormatDisabled)),
+        Some((_, true)) => match statement.att_stmt {
+            Value::Map(entries) if entries.is_empty() => Ok(Verified {
+                kind: AttestationType::None,
+                x5c: Vec::new(),
+            }),
+            _ => Err(Error::new(ErrorKind::AttestationInvalid)),
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec;
+
+    use super::{Statement, verify};
+    use crate::authdata::AuthData;
+    use crate::cbor::Value;
+    use crate::error::{Error, ErrorKind};
+    use crate::testing::{auth_data, key};
+    use crate::trust::AttestationType;
+
+    fn check(fmt: &str, stmt: &Value<'_>) -> Result<Result<AttestationType, ErrorKind>, Error> {
+        let (_, cose, _) = key()?;
+        let bytes = auth_data(&[0; 32], 0x41, 0, b"c", &cose);
+        let parsed = AuthData::parse(&bytes)?;
+        let statement = Statement {
+            att_stmt: stmt,
+            auth_data: &parsed,
+            auth_data_bytes: &bytes,
+            client_data_hash: [0; 32],
+        };
+        Ok(verify(fmt, &statement)
+            .map(|v| v.kind)
+            .map_err(|e| e.kind()))
+    }
+
+    #[test]
+    fn none_takes_the_empty_statement_and_formats_match_byte_for_byte() -> Result<(), Error> {
+        let empty = Value::Map(vec![]);
+        assert_eq!(check("none", &empty)?, Ok(AttestationType::None));
+        assert_eq!(
+            check("none", &Value::Map(vec![(Value::Unsigned(1), Value::Null)]))?,
+            Err(ErrorKind::AttestationInvalid)
+        );
+        assert_eq!(
+            check("none", &Value::Array(vec![]))?,
+            Err(ErrorKind::AttestationInvalid)
+        );
+        for other in ["None", "NONE", "", "none ", "unknown"] {
+            assert_eq!(
+                check(other, &empty)?,
+                Err(ErrorKind::UnknownFormat),
+                "{other}"
+            );
+        }
+        Ok(())
+    }
 }

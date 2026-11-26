@@ -230,6 +230,7 @@ impl Debug for Conveyance
 impl Debug for CoseAlgorithm
 impl Debug for Counter
 impl Debug for CounterPolicy
+impl Debug for CreationOptions
 impl Debug for Credential
 impl Debug for CredentialDescriptor
 impl Debug for CredentialId
@@ -459,6 +460,11 @@ method Assertion::counter fn(self: &Self) -> Counter
 method Assertion::credential_id fn(self: &Self) -> &CredentialId
 method Assertion::user fn(self: &Self) -> &UserHandle
 method Assertion::user_verification fn(self: &Self) -> AssertionVerification
+method Attestation::anchor fn(self: &Self) -> Option<&Digest>
+method Attestation::chain fn(self: &Self) -> &[Digest]
+method Attestation::format fn(self: &Self) -> Format
+method Attestation::kind fn(self: &Self) -> AttestationType
+method Attestation::trust fn(self: &Self) -> Trust
 method AuthenticationCeremony::from_row fn<R>(row: &Row<R>, record: impl FnOnce(&R) -> Option<&Record>) -> Result<Row<Self>, Error>
 method AuthenticationOptions::hint fn(self: Self, hint: Hint) -> Self
 method AuthenticationOptions::new fn(user_verification: Requirement, timeout: Timeout) -> Self
@@ -491,12 +497,26 @@ method Origin::as_str fn(self: &Self) -> &str
 method Origin::parse fn(text: &str) -> Result<Self, Error>
 method Record::decode fn(bytes: &[u8]) -> Result<Self, Error>
 method Record::encode fn(self: &Self) -> Vec<u8>
+method Registered::credential fn(self: &Self) -> &Credential
+method Registered::user_verification fn(self: &Self) -> UserVerification
 method RegistrationCeremony::from_row fn<R>(row: &Row<R>, record: impl FnOnce(&R) -> Option<&Record>) -> Result<Row<Self>, Error>
+method RegistrationOptions::algorithm fn(self: Self, alg: CoseAlgorithm) -> Self
+method RegistrationOptions::attachment fn(self: Self, attachment: Attachment) -> Self
+method RegistrationOptions::attestation fn(self: Self, conveyance: Conveyance) -> Self
+method RegistrationOptions::attestation_format fn(self: Self, format: Format) -> Self
+method RegistrationOptions::hint fn(self: Self, hint: Hint) -> Self
+method RegistrationOptions::mediation fn(self: Self, mediation: Mediation) -> Self
+method RegistrationOptions::new fn(user_verification: Requirement, resident_key: ResidentKey, timeout: Timeout) -> Self
+method RegistrationResponse::id fn(self: &Self) -> &CredentialId
+method RegistrationResponse::locate fn(self: &Self) -> Key
+method RegistrationResponse::new fn(raw_id: &[u8], client_data_json: &[u8], attestation_object: &[u8], transports: &[Transport]) -> Result<Self, Error>
 method RelyingParty::builder fn(id: RpId, name: DisplayName, origin: Origin, counter: CounterPolicy) -> RelyingPartyBuilder
 method RelyingParty::confirm_user_verification fn(self: &Self, stored: &Row<Credential>, e: &mut impl Entropy) -> Effect
 method RelyingParty::finish_authentication fn(self: &Self, state: Row<AuthenticationCeremony>, stored: Row<Credential>, response: &AuthenticationResponse, browser: &BrowserBinding, now: UnixTime, e: &mut impl Entropy) -> Verdict<Assertion>
+method RelyingParty::finish_registration fn(self: &Self, state: Row<RegistrationCeremony>, response: &RegistrationResponse, browser: &BrowserBinding, trust: &dyn TrustSource, now: UnixTime, e: &mut impl Entropy) -> Verdict<Registered>
 method RelyingParty::id fn(self: &Self) -> &RpId
 method RelyingParty::start_authentication fn(self: &Self, allow: Allow<'_>, opts: &AuthenticationOptions, browser: &BrowserBinding, now: UnixTime, e: &mut impl Entropy) -> Result<(RequestOptions, Effect), Error>
+method RelyingParty::start_registration fn(self: &Self, user: &UserEntity, exclude: &[CredentialDescriptor], opts: &RegistrationOptions, browser: &BrowserBinding, now: UnixTime, e: &mut impl Entropy) -> Result<(CreationOptions, Effect), Error>
 method RelyingPartyBuilder::android_key fn(self: Self, policy: KeyEnforcement) -> Self
 method RelyingPartyBuilder::build fn(self: Self) -> Result<RelyingParty, Error>
 method RelyingPartyBuilder::cross_origin fn(self: Self, policy: CrossOrigin) -> Self
@@ -509,6 +529,9 @@ method Timeout::from_secs fn(secs: u32) -> Result<Self, Error>
 method Timeout::secs fn(self: &Self) -> u32
 method Transport::as_str fn(self: &Self) -> &'static str
 method Transport::parse fn(text: &str) -> Result<Self, Error>
+method TrustQuery::aaguid fn(self: &Self) -> Aaguid
+method TrustQuery::chain fn(self: &Self) -> &[Digest]
+method TrustQuery::format fn(self: &Self) -> Format
 method UserEntity::handle fn(self: &Self) -> &UserHandle
 method UserEntity::new fn(handle: UserHandle, name: UserName, display_name: DisplayName) -> Self
 method UserHandle::as_bytes fn(self: &Self) -> &[u8]
