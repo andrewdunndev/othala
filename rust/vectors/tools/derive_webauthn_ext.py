@@ -996,16 +996,16 @@ def ext_cases():
     REGX = lambda **o: REG_OK(outputs=o)
     ad_app = auth_data(rp_hash=sha(APPID.encode()))
     # appid (R120)
-    a("appid-used", "contract R120 and WebAuthn L3 10.1.1 (appid true: rpIdHash is the hash of the AppID, step 15)", G(appid=True), {"appid": APPID}, {"appid": True}, ad=ad_app)
+    a("appid-used", "contract R120 and WebAuthn L3 10.1.1 (appid true: rpIdHash is the hash of the AppID, 7.2 step 15)", G(appid=True), {"appid": APPID}, {"appid": True}, ad=ad_app)
     a("appid-not-used", "contract R120 (appid false: rpIdHash is the hash of the RP ID)", G(appid=False), {"appid": APPID}, {"appid": False})
     a("appid-not-reported", "contract R120 (no output: the RP ID hash applies; the output reads Unreported)", G(appid="Unreported"), {"appid": APPID})
-    a("appid-true-with-rp-hash", "contract R120 (appid true selects the AppID hash: the RP ID hash fails step 15)", NO, {"appid": APPID}, {"appid": True})
+    a("appid-true-with-rp-hash", "contract R120 (appid true selects the AppID hash: the RP ID hash fails 7.2 step 15)", NO, {"appid": APPID}, {"appid": True})
     a("appid-false-with-appid-hash", "contract R120 (appid false selects the RP ID hash)", NO, {"appid": APPID}, {"appid": False}, ad=ad_app)
     a("appid-not-reported-with-appid-hash", "contract R120 (no output: the AppID hash is not selected)", NO, {"appid": APPID}, ad=ad_app)
     a("appid-output-not-boolean", "contract R120 (the output is a boolean)", NO, {"appid": APPID}, {"appid": "true"})
     a("appid-unrequested-reject", "contract R120 and R128 (an unrequested output is refused by default)", NO, None, {"appid": True})
     a("appid-unrequested-ignore", "contract R128 (an unrequested output is dropped under Ignore; the RP ID hash applies)", G(appid="NotRequested"), None, {"appid": True}, unsol="ignore")
-    a("appid-unrequested-ignore-appid-hash", "contract R128 (a dropped output selects nothing: the AppID hash fails step 15)", NO, None, {"appid": True}, unsol="ignore", ad=ad_app)
+    a("appid-unrequested-ignore-appid-hash", "contract R128 (a dropped output selects nothing: the AppID hash fails 7.2 step 15)", NO, None, {"appid": True}, unsol="ignore", ad=ad_app)
     # appidExclude (R121)
     r("appid-exclude-true", "contract R121 (the output is read and ignored when requested)", REGX(appidExclude=True), {"appidExclude": APPID}, {"appidExclude": True})
     r("appid-exclude-false", "contract R121", REGX(appidExclude=False), {"appidExclude": APPID}, {"appidExclude": False})
@@ -1207,7 +1207,7 @@ def noncanonical_tail(raw):
 
 
 def response_cases():
-    S = "contract R132 and WebAuthn L3 5.1.7 "
+    S = "contract R132 and WebAuthn L3 5.1 "
     cdj, ao = CDJ_REG, att_object()
     reg = lambda **o: dict({"id": b64(CRED_ID), "rawId": b64(CRED_ID), "type": "public-key", "response": {"clientDataJSON": b64(cdj), "attestationObject": b64(ao)}, "clientExtensionResults": {}}, **o)
     rresp = lambda **o: dict(reg()["response"], **o)
@@ -1285,4 +1285,4 @@ write("chains.json", "x5c chain walk (contract R110-R117, ruling R-h W-S6); cert
 write("attestation.json", "attestation statements (WebAuthn L3 8.2-8.4, contract R92-R97); " + CTX + "; trust_anchors are DER certificates, now is a fixed unix time", packed_cases() + tpm_cases() + android_cases())
 write("extensions.json", "client and authenticator extension outputs (WebAuthn L3 10.1, contract R120-R128); " + CTX + "; unsolicited defaults to reject", ext_cases())
 write("options-json.json", "options JSON shapes, related origins and signals (WebAuthn L3 5.1.8-5.1.10, 5.11; contract R30, R31, R60, R121, R130, R131, R134, R135); the challenge is the first 32 bytes the Entropy yields; JSON is compared as a value, member order aside", options_cases())
-write("response-json.json", "registration and authentication response JSON (WebAuthn L3 5.1.7, contract R132, R16)", response_cases())
+write("response-json.json", "registration and authentication response JSON (WebAuthn L3 5.1, contract R132, R16)", response_cases())
