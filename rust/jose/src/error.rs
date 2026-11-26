@@ -46,5 +46,5 @@ pub enum ErrorKind {
 /// The crate's one error type: an [`ErrorKind`] and nothing else.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Error {
-    kind: ErrorKind,
+    pub(crate) kind: ErrorKind,
 }

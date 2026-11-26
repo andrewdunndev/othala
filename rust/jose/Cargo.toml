@@ -37,13 +37,15 @@ sha1 = { version = "0.11", default-features = false, optional = true }
 rand_core = { workspace = true, optional = true }
 
 [dev-dependencies]
+# the row files: case structs, the vector readers, fixed-seed properties
 serde = { workspace = true, features = ["derive"] }
-trybuild.workspace = true
+serde_json.workspace = true
 testkit.workspace = true
+proptest.workspace = true
+trybuild.workspace = true
 # the canary's path probes name these
 rand.workspace = true
 getrandom.workspace = true
-serde_json.workspace = true
 
 [lints]
 workspace = true
