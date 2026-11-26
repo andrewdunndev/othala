@@ -134,7 +134,7 @@ def keys():
         k("hs512-63-bytes", "RFC 7518 3.2", "HS512", oct_(63), kind("WeakKey")),
         k("hs256-use-enc", "RFC 7517 4.2 (use enc is not for signatures)", "HS256", dict(oct_(32), use="enc"), kind("KeyUse")),
         k("hs256-key-ops-encrypt", "RFC 7517 4.3 (key_ops without verify)", "HS256", dict(oct_(32), key_ops=["encrypt"]), kind("KeyUse")),
-        k("hs256-use-key-ops-disagree", "RFC 7517 4.3 (use and key_ops SHOULD NOT both be used; when they disagree the key is refused)", "HS256", dict(oct_(32), use="sig", key_ops=["encrypt"]), NO),
+        k("hs256-use-key-ops-disagree", "RFC 7517 4.3 (use and key_ops SHOULD NOT both be used; when they disagree the key is refused: oracle choice)", "HS256", dict(oct_(32), use="sig", key_ops=["encrypt"]), NO),
     ]
     a = lambda cid, spec, jwk, expect: case(cid, spec, expect, op="any_verify_key", jwk=jwk)
     c += [
@@ -223,17 +223,41 @@ def thumbprint():
 
 
 def limits():
-    l = lambda cid, spec, bound, recipe: case(cid, spec, kind("TooLarge"), op="limit", bound=bound, excess=1, recipe=recipe, alg="HS256", jwk=HS)
-    return [
-        l("compact-bytes", "contract rule 5.7 (compact token bytes)", "jose::MAX_COMPACT_LEN",
-          "compact JWS, header {\"alg\":\"HS256\"}, payload the ASCII byte 'a' repeated, HS256 with jwk; the shortest such token longer than the bound"),
-        l("header-depth", "contract rule 5.7 (header JSON depth)", "jose::MAX_JSON_DEPTH",
-          "compact JWS whose header is {\"alg\":\"HS256\",\"x\":V} with V nested arrays [[...[]...]] so that the header's depth (the outer object is 1, each nested array or object adds 1) is the bound plus one; payload {}, HS256 with jwk"),
-        l("claims-depth", "contract rule 5.7 (claims JSON depth)", "jose::MAX_JSON_DEPTH",
-          "compact JWS, header {\"alg\":\"HS256\"}, payload {\"x\":V} with V nested arrays so that the claims depth (counted as for the header) is the bound plus one; HS256 with jwk"),
-        l("jwks-key-count", "contract rule 5.7 (JWKS key count)", "jose::MAX_JWKS_KEYS",
-          "{\"keys\":[...]} holding the bound plus one copies of jwk, the i-th (from 0) with kid \"k<i>\""),
-    ]
+    # each bound at the crate constant (excess 0: accepted) and one past it (excess 1: TooLarge); each case carries its exact input
+    # the constants of rust/jose/CONTRACT.md, Signatures: MAX_COMPACT_LEN = 16_384, MAX_JSON_DEPTH = 32 (header, claims and JWK depth), MAX_JWKS_KEYS = 32
+    MAX_COMPACT, MAX_DEPTH, MAX_KEYS = 16384, 32, 32
+    l = lambda cid, spec, bound, ex, recipe, expect=None, **inp: case(cid, spec, expect or (OK if ex == 0 else kind("TooLarge")), op="limit", bound=bound, excess=ex, recipe=recipe, **inp, alg="HS256", jwk=HS)
+    # a JWS is given as its header text and payload text (token = base64url(header) "." base64url(payload) "." base64url(HS256 MAC over those two parts with jwk)),
+    # not as a ready token: a whole token reads as a credential to the repository secret scan
+    jws = lambda header, payload: {"header_json": header, "payload_json": payload}
+
+    def compact(total):
+        for m in range(total * 3 // 4 - 200, total * 3 // 4 + 1):
+            if len(hs256('{"alg":"HS256"}', b"a" * m)) == total:
+                return {"header_json": '{"alg":"HS256"}', "payload_repeat": {"byte": "a", "count": m}, "token_len": total}
+        raise ValueError(total)
+
+    def nested(depth):
+        return "[" * (depth - 1) + "]" * (depth - 1)
+
+    out = []
+    for ex in (0, 1):
+        sfx = "" if ex else "-at-bound"
+        tail = "" if ex else " (accepted: the input is exactly at the bound)"
+        out += [
+            l("compact-bytes" + sfx, "contract rule 5.7 (compact token bytes)" + tail, "jose::MAX_COMPACT_LEN", ex,
+              "compact JWS, header {\"alg\":\"HS256\"}, payload the ASCII byte 'a' repeated, HS256 with jwk; the token is exactly the bound plus excess bytes long", **compact(MAX_COMPACT + ex)),
+            l("header-depth" + sfx, "contract rule 5.7 (header JSON depth)" + tail, "jose::MAX_JSON_DEPTH", ex,
+              "compact JWS whose header is {\"alg\":\"HS256\",\"x\":V} with V nested arrays [[...[]...]] so that the header's depth (the outer object is 1, each nested array or object adds 1) is the bound plus excess; payload {}, HS256 with jwk",
+              **jws('{"alg":"HS256","x":' + nested(MAX_DEPTH + ex) + "}", "{}")),
+            l("claims-depth" + sfx, "contract rule 5.7 (claims JSON depth)" + tail.replace("accepted", "not TooLarge"), "jose::MAX_JSON_DEPTH", ex,
+              "compact JWS, header {\"alg\":\"HS256\"}, payload {\"x\":V} with V nested arrays so that the claims depth (counted as for the header) is the bound plus excess; HS256 with jwk; the claims are read through VerifiedJwt::claims with some Policy, so at excess 0 the expectation is {\"not_kind\": \"TooLarge\"}, not ok (a policy refusal such as MissingClaim is not the depth bound) and at excess 1 it is TooLarge",
+              expect=None if ex else {"not_kind": "TooLarge"}, **jws('{"alg":"HS256"}', '{"x":' + nested(MAX_DEPTH + ex) + "}")),
+            l("jwks-key-count" + sfx, "contract rule 5.7 (JWKS key count)" + tail, "jose::MAX_JWKS_KEYS", ex,
+              "{\"keys\":[...]} holding the bound plus excess copies of jwk, the i-th (from 0) with kid \"k<i>\"",
+              input=json.dumps({"keys": [dict(HS, kid=f"k{i}") for i in range(MAX_KEYS + ex)]}, separators=(",", ":"))),
+        ]
+    return out
 
 
 def write(name, source, cases):
@@ -252,4 +276,4 @@ write("keys.json", "key and algorithm binding; " + SRC, keys())
 write("jwks.json", "JWK Set decoding and lookup; " + SRC, jwks())
 write("claims.json", "JWT claims validation under a Policy (iss, aud, typ at+jwt, leeway 60, now 1700000000); " + SRC, claims())
 write("thumbprint.json", "JWK thumbprints computed per RFC 7638 3.2 (SHA-256 of the required members, sorted, no whitespace); " + SRC, thumbprint())
-write("limits.json", "one oversize input per bound of contract rule 5.7; the rule states no number, so each case is parametric: build the input per `recipe` at the named crate constant plus `excess`", limits())
+write("limits.json", "each bound of contract rule 5.7 at the crate constant (excess 0, accepted by the reader the bound names; for claims-depth-at-bound, whose public reader VerifiedJwt::claims needs a Policy, the expectation is not_kind TooLarge: any outcome but TooLarge) and one past it (excess 1, TooLarge); the rule states no number, so `bound` names the crate constant, whose value is read from rust/jose/CONTRACT.md Signatures (MAX_COMPACT_LEN 16384, MAX_JSON_DEPTH 32 for header, claims and JWK depth, MAX_JWKS_KEYS 32), and each case carries its exact input (header_json and payload_json or payload_repeat for a JWS, `input` for the JWKS text) built per `recipe`", limits())

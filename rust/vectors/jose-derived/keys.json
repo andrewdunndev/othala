@@ -363,7 +363,7 @@
      "encrypt"
     ]
    },
-   "spec": "RFC 7517 4.3 (use and key_ops SHOULD NOT both be used; when they disagree the key is refused)",
+   "spec": "RFC 7517 4.3 (use and key_ops SHOULD NOT both be used; when they disagree the key is refused: oracle choice)",
    "expect": {
     "ok": false
    }
