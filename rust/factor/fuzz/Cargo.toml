@@ -1,0 +1,23 @@
+[package]
+name = "factor-fuzz"
+version = "0.0.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+factor = { path = ".." }
+libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "record_decode"
+path = "fuzz_targets/record_decode.rs"
+test = false
+doc = false
+bench = false
+
+# its own workspace, so the root's `members = ["*"]` never reaches it
+[workspace]

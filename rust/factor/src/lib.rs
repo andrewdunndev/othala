@@ -18,8 +18,11 @@ use core::fmt;
 pub use otp::{Digits, OtpAlg, OtpCode, OtpKey, OtpMatch, Period, Skew, Totp, TotpStep};
 pub use password::{
     Cost, Lanes, Memory, Minimum, NewPassword, Passes, Password, PasswordMatch, Phc, Rehash,
+    password_hash, password_verify,
 };
-pub use recovery::{RecoveryCode, RecoveryCount, RecoveryHash, RecoveryMatch};
+pub use recovery::{
+    RecoveryCode, RecoveryCount, RecoveryHash, RecoveryMatch, recovery_generate, recovery_verify,
+};
 pub use store::{Effect, Key, Pending, Record, Rejected};
 pub use throttle::{Attempts, Backoff, Cap, Closed, FreeAttempts, Permit, Throttle, Wait};
 
@@ -81,8 +84,16 @@ impl core::error::Error for Error {}
 #[cfg(test)]
 mod tests {
     use alloc::string::ToString;
+    use alloc::vec::Vec;
 
     use super::{Error, ErrorKind};
+
+    pub(crate) fn unhex(text: &str) -> Option<Vec<u8>> {
+        text.as_bytes()
+            .chunks(2)
+            .map(|pair| u8::from_str_radix(core::str::from_utf8(pair).ok()?, 16).ok())
+            .collect()
+    }
 
     #[test]
     fn display_names_the_kind_only() {
