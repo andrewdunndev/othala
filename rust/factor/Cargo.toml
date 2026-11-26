@@ -1,0 +1,32 @@
+[package]
+name = "factor"
+description = "Argon2id passwords under a PHC policy, TOTP, look-up recovery codes and one attempt throttle, as sans-IO verdicts over the base store effect"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+std = ["base/std"]
+
+[dependencies]
+base.workspace = true
+sha2.workspace = true
+subtle.workspace = true
+zeroize.workspace = true
+argon2 = { version = "0.6", default-features = false, features = ["alloc", "password-hash", "zeroize"] }
+hmac = { version = "0.13", default-features = false }
+sha1 = { version = "0.11", default-features = false }
+
+# rand, getrandom and serde_json resolve the paths `just canary` plants in tests/
+[dev-dependencies]
+testkit.workspace = true
+trybuild.workspace = true
+proptest.workspace = true
+rand.workspace = true
+getrandom.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

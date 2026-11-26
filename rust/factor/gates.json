@@ -1,0 +1,12 @@
+{
+  "published": true,
+  "doc": true,
+  "ui": true,
+  "api": true,
+  "targets": {
+    "wasm32-unknown-unknown": ["--no-default-features"],
+    "thumbv7em-none-eabi": ["--no-default-features"]
+  },
+  "vectors": ["rfc4226", "rfc6238", "rfc9106"],
+  "allow": ["argon2", "blake2", "cmov", "ctutils", "hmac", "password-hash", "phc", "sha1"]
+}
