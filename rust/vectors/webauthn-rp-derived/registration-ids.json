@@ -1,0 +1,125 @@
+{
+ "source": "registration raw id against the attested credential id (WebAuthn L3 13.1, contract R17); assertions and attestation signed with a P-256 key derived from a label in tools/derive_webauthn_ext.py (RFC 6979 deterministic k); rp example.org, origin https://example.org, stored counter 5, BE stored clear, cross-origin denied unless the case says otherwise",
+ "cases": [
+  {
+   "id": "raw-id-equals-attested",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "spec": "contract R17 and WebAuthn L3 13.1 (the outer id is unsigned; the attested credential id is the credential's id; CredentialIdInvalid)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    }
+   }
+  },
+  {
+   "id": "raw-id-one-bit-differs",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "raw_id": "7217953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "spec": "contract R17 and WebAuthn L3 13.1 (the outer id is unsigned; the attested credential id is the credential's id; CredentialIdInvalid)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "raw-id-longer",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a348200",
+   "spec": "contract R17 and WebAuthn L3 13.1 (the outer id is unsigned; the attested credential id is the credential's id; CredentialIdInvalid): raw id has one extra byte",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "raw-id-prefix",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a34",
+   "spec": "contract R17 and WebAuthn L3 13.1 (the outer id is unsigned; the attested credential id is the credential's id; CredentialIdInvalid): raw id is a prefix of the attested id",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "raw-id-empty",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "raw_id": "",
+   "spec": "contract R17 and WebAuthn L3 13.1 (the outer id is unsigned; the attested credential id is the credential's id; CredentialIdInvalid)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "raw-id-unrelated",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "raw_id": "b843ec497b9f452b8867b92268ef95dac37c255dbf71eb2596aaeeaca0269f5d",
+   "spec": "contract R17 and WebAuthn L3 13.1 (the outer id is unsigned; the attested credential id is the credential's id; CredentialIdInvalid)",
+   "expect": {
+    "ok": false
+   }
+  }
+ ]
+}

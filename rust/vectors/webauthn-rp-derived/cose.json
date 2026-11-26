@@ -1,0 +1,468 @@
+{
+ "source": "COSE_Key reading (RFC 9053 7.1.1, 2.2, RFC 8812; contract R5 and N2); the key bytes are public values derived from labels, hex CBOR written by tools/derive_webauthn_ext.py",
+ "cases": [
+  {
+   "id": "es256-valid",
+   "op": "cose_key",
+   "input": "a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "RFC 9053 7.1.1 and contract R5 (kty 2, crv 1, 32-byte x and y on the curve)",
+   "expect": {
+    "ok": true,
+    "alg": -7
+   }
+  },
+  {
+   "id": "es384-valid",
+   "op": "cose_key",
+   "input": "a5010203382220022158301b8a7914c8a3f8343a5ec4454a99f518fc4b07cc14bc0acc337a65262fdab2dc4f926a6d390a5593b35cc12c2bc82411225830a96acd4a18be99d584a7b39a55918447a8c0e6aeb5fd6dfd5f1856a2fc29866f2b29ae2fa1a714a74e3d616a10fccc3e",
+   "spec": "RFC 9053 7.1.1 and contract R5 (crv 2, 48-byte x and y on the curve)",
+   "expect": {
+    "ok": true,
+    "alg": -35
+   }
+  },
+  {
+   "id": "eddsa-valid",
+   "op": "cose_key",
+   "input": "a40101032720062158205866666666666666666666666666666666666666666666666666666666666666",
+   "spec": "RFC 9053 2.2 and contract R5 (kty 1, crv 6, a 32-byte valid point; the RFC 8032 base point)",
+   "expect": {
+    "ok": true,
+    "alg": -8
+   }
+  },
+  {
+   "id": "eddsa-rfc8032-key",
+   "op": "cose_key",
+   "input": "a4010103272006215820d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+   "spec": "RFC 8032 7.1 test 1 public key as a COSE_Key (contract R5)",
+   "expect": {
+    "ok": true,
+    "alg": -8
+   }
+  },
+  {
+   "id": "rs256-valid",
+   "op": "cose_key",
+   "input": "a401030339010020590100cb28b1300d40c893dc5890968637f7275fe8a0703641c9d99cd577ec2c7938cea5fa4f0e4e98c6055c053d6c695c9f13984304844d53052253ac0d57f9d80de1342b3b4eeed70e7a9cb7fed49744b457e00041b1715e9984a3a4bf8483cbd845eeed7695b6097541e0a56ceb01fac643c4f8ccf61440775a22e2050883df410634d7da42884d7c9b8e3bf277bb3da78292fa31fac953dc2a5703cd157c1964e01895be9e0bbdfafb0efd9c5c65b75b674fd60fe2126e928a0291d35320cc17407e23f6719ca24aec20a370d17df84e1dc061881021326fa55a3d79ef22c67fb66714e96626c60d6c969a031c80b9333ef00e9fde032bfc36cc7555cd5f93f34d2143010001",
+   "spec": "RFC 8812 2 and contract R5 (kty 3, a 2048-bit n, e 65537)",
+   "expect": {
+    "ok": true,
+    "alg": -257
+   }
+  },
+  {
+   "id": "rsa-4096-bit-n",
+   "op": "cose_key",
+   "input": "a401030339010020590200935b257048517f6974cb645edf3f06d7a634129911c80d2b451b43b44a93ac98dbc6b859350742cc252b161fbf3fcfb60ee0a2e0c05ff564830fceaafda0c580f1d48b17c9c934ba748cc886410283cafe7e5f9333e536698004a908182843adf2cfa466102006ecce3a524d79ade7e792214329f1a6844a2232a12326e1a31c7dc906c41c29c12a2e9fa50c612fdbdd4dde9c87a9cdcda8b9f5d5018ef479ef2f441f9b528ab3ed371d78bfbec4f8ed7309d1ff5c7da6f27ad3e2cb653bad1ca1dc9438c2eab0ac1adbca66811634df3a6dccf301350ec5cfce0a196539fcb60778e463392eb281244daf352742cb87ac779974e0b7c6898c1c086620a79b8314cee01158aea5d8fd954c02bcc410cc83d8393ac413f84a6acdf3b0c35b073c4a1193d2af915bae4160488fa774ee92ab53f4a1214747a567b6e289ad1110ce9f6fd31fadcbc8a4bd01996721abc191f1554fa2b0a06da120eb1ba0308d888ee5c70fe423cb5d592d83d3dcd183d460d548ed6388c5b5f686d48c2fe96134c658c0eaba9e1737cb31321510ea944032f6e0a7fea4c35c3ac8b54520ddcc8cdb29d9d0e666f28d5303c12e8092f3af761158a0ac6dba55c1cbf8fb10adca417b80542b8c83ae06f454110a7fead2f40ae35acd75b0067f9e8d0c2cd165f7ed5e4a289cdbfb582be2b3a9321545d009a5c193bb842ab8cb10bb3afe2a7e0509ab2143010001",
+   "spec": "contract R5 (MAX_RSA_BITS 4096 is accepted; n is an odd 4096-bit integer, not a product of primes)",
+   "expect": {
+    "ok": true,
+    "alg": -257
+   },
+   "bound": "webauthn_rp::MAX_RSA_BITS",
+   "excess": 0
+  },
+  {
+   "id": "unknown-label-ignored",
+   "op": "cose_key",
+   "input": "a601020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10186301",
+   "spec": "contract R5 (unknown labels are ignored)",
+   "expect": {
+    "ok": true,
+    "alg": -7
+   }
+  },
+  {
+   "id": "unknown-text-label-ignored",
+   "op": "cose_key",
+   "input": "a601020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa1065657874726101",
+   "spec": "contract R5 (unknown labels are ignored); a text label sorts after the integer labels",
+   "expect": {
+    "ok": true,
+    "alg": -7
+   }
+  },
+  {
+   "id": "es256-x-31-bytes",
+   "op": "cose_key",
+   "input": "a501020326200121581fa521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "contract R5 (x is 32 bytes)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es256-x-33-bytes",
+   "op": "cose_key",
+   "input": "a50102032620012158210066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "contract R5 (x is 32 bytes)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es256-y-31-bytes",
+   "op": "cose_key",
+   "input": "a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22581f913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "contract R5 (y is 32 bytes)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es256-off-curve",
+   "op": "cose_key",
+   "input": "a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa11",
+   "spec": "contract R5 (the point is on the curve)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es256-x-zero-y-zero",
+   "op": "cose_key",
+   "input": "a501020326200121582000000000000000000000000000000000000000000000000000000000000000002258200000000000000000000000000000000000000000000000000000000000000000",
+   "spec": "contract R5 (the point is on the curve: (0, 0) is not on P-256)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es256-x-missing",
+   "op": "cose_key",
+   "input": "a401020326200122582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "contract R5 (x is required)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es256-y-missing",
+   "op": "cose_key",
+   "input": "a401020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+   "spec": "contract R5 (y is required)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es256-crv-missing",
+   "op": "cose_key",
+   "input": "a40102032621582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "contract R5 (crv is required)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es256-crv-p384-with-32-byte-coordinates",
+   "op": "cose_key",
+   "input": "a501020326200221582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "contract R5 (crv 2 needs 48-byte coordinates)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es256-alg-p384",
+   "op": "cose_key",
+   "input": "a50102033822200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "contract R5 (alg fits kty and crv: -35 is ES384, crv 1 is P-256)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es384-alg-es256",
+   "op": "cose_key",
+   "input": "a50102032620022158301b8a7914c8a3f8343a5ec4454a99f518fc4b07cc14bc0acc337a65262fdab2dc4f926a6d390a5593b35cc12c2bc82411225830a96acd4a18be99d584a7b39a55918447a8c0e6aeb5fd6dfd5f1856a2fc29866f2b29ae2fa1a714a74e3d616a10fccc3e",
+   "spec": "contract R5 (alg -7 is ES256, crv 2 is P-384)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "ec2-crv-ed25519",
+   "op": "cose_key",
+   "input": "a501020326200621582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "contract R5 (kty 2 with crv 6 is not an EC2 curve)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "okp-crv-p256",
+   "op": "cose_key",
+   "input": "a40101032720012158205866666666666666666666666666666666666666666666666666666666666666",
+   "spec": "contract R5 (kty 1 with crv 1 is not an OKP curve)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "alg-missing",
+   "op": "cose_key",
+   "input": "a40102200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "contract R5 (alg is present)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "alg-rs256-on-ec2",
+   "op": "cose_key",
+   "input": "a5010203390100200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "contract R5 (alg fits kty)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "alg-es256-on-rsa",
+   "op": "cose_key",
+   "input": "a40103032620590100cb28b1300d40c893dc5890968637f7275fe8a0703641c9d99cd577ec2c7938cea5fa4f0e4e98c6055c053d6c695c9f13984304844d53052253ac0d57f9d80de1342b3b4eeed70e7a9cb7fed49744b457e00041b1715e9984a3a4bf8483cbd845eeed7695b6097541e0a56ceb01fac643c4f8ccf61440775a22e2050883df410634d7da42884d7c9b8e3bf277bb3da78292fa31fac953dc2a5703cd157c1964e01895be9e0bbdfafb0efd9c5c65b75b674fd60fe2126e928a0291d35320cc17407e23f6719ca24aec20a370d17df84e1dc061881021326fa55a3d79ef22c67fb66714e96626c60d6c969a031c80b9333ef00e9fde032bfc36cc7555cd5f93f34d2143010001",
+   "spec": "contract R5 (alg fits kty)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "kty-text",
+   "op": "cose_key",
+   "input": "a501634543320326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "contract R5 (a defined label of the wrong type is Malformed)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "alg-text",
+   "op": "cose_key",
+   "input": "a5010203654553323536200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "contract R5 (a defined label of the wrong type is Malformed)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "x-integer",
+   "op": "cose_key",
+   "input": "a5010203262001210122582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "contract R5 (a defined label of the wrong type is Malformed)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "crv-text",
+   "op": "cose_key",
+   "input": "a5010203262065502d32353621582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "contract R5 (a defined label of the wrong type is Malformed)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "kty-symmetric",
+   "op": "cose_key",
+   "input": "a501040326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "RFC 9053 7.1 (kty 4 is not a public key type this crate reads)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "eddsa-point-not-on-curve",
+   "op": "cose_key",
+   "input": "a40101032720062158200200000000000000000000000000000000000000000000000000000000000000",
+   "spec": "contract R5 (a 32-byte valid point; the encoded y has no x on the curve)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "eddsa-31-bytes",
+   "op": "cose_key",
+   "input": "a401010327200621581f58666666666666666666666666666666666666666666666666666666666666",
+   "spec": "contract R5 (a 32-byte point)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "eddsa-33-bytes",
+   "op": "cose_key",
+   "input": "a4010103272006215821586666666666666666666666666666666666666666666666666666666666666600",
+   "spec": "contract R5 (a 32-byte point)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "eddsa-y-not-reduced",
+   "op": "cose_key",
+   "input": "a4010103272006215820edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+   "spec": "RFC 8032 5.1.3 (y must be below p; this is y = p, whose encoding is not canonical)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rsa-1024-bit-n",
+   "op": "cose_key",
+   "input": "a4010303390100205880bb53331f7c409cbe6e68431610b4e20b905167842b7a1be60ba4c9bedf1abeffcb27222b0342cb2256cfcb61f13792941c6bf51ad46a54b7738ae12d83272011d5ac4f69854c5dec27d8699d9191544aa64a124153016cea1e060f1d67b2d77a896dfdba7137cdcbbb9bc4585996d8aaa4bdfc87f23c14fad57973e15e6480f92143010001",
+   "spec": "contract R5 and RFC 8725 3.5 (n below MIN_RSA_BITS, taken as 2048; n is an odd 1024-bit integer)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rsa-4097-bit-n",
+   "op": "cose_key",
+   "input": "a401030339010020590201017c6fe25637eed9b952094028c13b2431652e0a702112bb19b91fd245169ca2f15c99e710ef5cd41364eea87d665bab675418fe68435a9cc095058b24d23b90bba816998ce3237a6ac741977e9eae3842efbe46f3fd7dc672b2ac4fd3b38d68beea10d352a231ff7e557085840444939ae5070b20e547c393afdc2843c05a095cdb098ab4816f191890e09e3ea60d4a3b1423b25c15f09d8f4e67ef41373668926784171cea4c9258880034bc22538d27abf6ac497abfe436af5c8ef294f2465a2a5a52618c56d6ec81c03430e1e50f6a0f539e548e72e8ad4c5d5b73b0c93dc346c2ec87fa344963672f7c1892aa3ab0fedf41d2fa58f418a2cdd34db06b2723d350b26733adf3b957c3e7617de2327b5656d180675f96affeb7969ebe37744075f4036f328abcea211bb6472365a4bda0f196c99c45b3c3d8bdc171560d0edbe36ecc33c5888c9ea8b99700bc0a965b8905206d5bcee1c44e4829d35403d2320de8bf5eccafcb5e74f5900fe6faf97b9c9e26e4db0ab06b8bba5e11c276b0a20998be3593ebb8ae72579075101090e4d652abb43d5358c5b790c506ced636e19e04c421da600b4a1735df423734ec8eda2c551f486a27a2e6a666397d35394986201af02afaaf2a87328a83e4647b3d718186ea7885d71512046517c25f741bbfef0a4dfa2d7604de9c748f93a2d07ae03f146993d61273940d19adbac1e0a32143010001",
+   "spec": "contract R1 and R5 (n past MAX_RSA_BITS 4096 is TooLarge; the excess is in bits; n is an odd 4097-bit integer)",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   },
+   "bound": "webauthn_rp::MAX_RSA_BITS",
+   "excess": 1
+  },
+  {
+   "id": "rsa-2047-bit-n",
+   "op": "cose_key",
+   "input": "a401030339010020590100457b2fccfd790da9a3326dd4b30eceb195450c697a0920ff99bc8e3fc4b87886c37fc48790a780f6c00c70ade8624a8394c35602278c39efe6a2a45d98977a87155de9b1368c0201166a53d5d037865631683ba00247041879b569dd8dfdbb323458294e7dd41309af78af6e8df7d81dd83a10ecd96b391c39ecf4fa909cfc64bf5221ade09e7e81d6bb9c9a6128ba28b6bfe4be5d5d3df401d07e9336c1d01e08fc8af2636893d12999523d5c6e0dbcc23caa16a0d4b0d8fe0e0b1d100d2e030412d21b01112a1741d1b5503159f116f80ed35bcc1127a2365cca9ab2d372aa529a966b12f5a2ddeec211e1b75159cb292da82e38d1bcda7e5120f16b1e4f652143010001",
+   "spec": "contract R5 (n below MIN_RSA_BITS 2048 by one bit; n is an odd 2047-bit integer)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rsa-e-3",
+   "op": "cose_key",
+   "input": "a401030339010020590100cb28b1300d40c893dc5890968637f7275fe8a0703641c9d99cd577ec2c7938cea5fa4f0e4e98c6055c053d6c695c9f13984304844d53052253ac0d57f9d80de1342b3b4eeed70e7a9cb7fed49744b457e00041b1715e9984a3a4bf8483cbd845eeed7695b6097541e0a56ceb01fac643c4f8ccf61440775a22e2050883df410634d7da42884d7c9b8e3bf277bb3da78292fa31fac953dc2a5703cd157c1964e01895be9e0bbdfafb0efd9c5c65b75b674fd60fe2126e928a0291d35320cc17407e23f6719ca24aec20a370d17df84e1dc061881021326fa55a3d79ef22c67fb66714e96626c60d6c969a031c80b9333ef00e9fde032bfc36cc7555cd5f93f34d214103",
+   "spec": "contract R5 (e is 65537)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rsa-e-65537-padded",
+   "op": "cose_key",
+   "input": "a401030339010020590100cb28b1300d40c893dc5890968637f7275fe8a0703641c9d99cd577ec2c7938cea5fa4f0e4e98c6055c053d6c695c9f13984304844d53052253ac0d57f9d80de1342b3b4eeed70e7a9cb7fed49744b457e00041b1715e9984a3a4bf8483cbd845eeed7695b6097541e0a56ceb01fac643c4f8ccf61440775a22e2050883df410634d7da42884d7c9b8e3bf277bb3da78292fa31fac953dc2a5703cd157c1964e01895be9e0bbdfafb0efd9c5c65b75b674fd60fe2126e928a0291d35320cc17407e23f6719ca24aec20a370d17df84e1dc061881021326fa55a3d79ef22c67fb66714e96626c60d6c969a031c80b9333ef00e9fde032bfc36cc7555cd5f93f34d214400010001",
+   "spec": "contract R5 (e is 65537; a leading zero byte is not the integer's minimal form)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rsa-n-missing",
+   "op": "cose_key",
+   "input": "a30103033901002143010001",
+   "spec": "contract R5 (n is required)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es512-p521",
+   "op": "cose_key",
+   "input": "a501020338232003215842010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101225842020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202",
+   "spec": "N2 (ES512 is never offered; P-521 is outside the crate's curves)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "ed448",
+   "op": "cose_key",
+   "input": "a4010103272007215839010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+   "spec": "N2 (Ed448 is never offered)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "x25519-ecdh",
+   "op": "cose_key",
+   "input": "a4010103381820042158205866666666666666666666666666666666666666666666666666666666666666",
+   "spec": "contract R5 and ruling R-e (an OKP key for ECDH, crv 4, is not a signature key)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "ps256-alg",
+   "op": "cose_key",
+   "input": "a4010303382420590100cb28b1300d40c893dc5890968637f7275fe8a0703641c9d99cd577ec2c7938cea5fa4f0e4e98c6055c053d6c695c9f13984304844d53052253ac0d57f9d80de1342b3b4eeed70e7a9cb7fed49744b457e00041b1715e9984a3a4bf8483cbd845eeed7695b6097541e0a56ceb01fac643c4f8ccf61440775a22e2050883df410634d7da42884d7c9b8e3bf277bb3da78292fa31fac953dc2a5703cd157c1964e01895be9e0bbdfafb0efd9c5c65b75b674fd60fe2126e928a0291d35320cc17407e23f6719ca24aec20a370d17df84e1dc061881021326fa55a3d79ef22c67fb66714e96626c60d6c969a031c80b9333ef00e9fde032bfc36cc7555cd5f93f34d2143010001",
+   "spec": "N2 (PS256 is never offered)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rs1-alg",
+   "op": "cose_key",
+   "input": "a401030339fffe20590100cb28b1300d40c893dc5890968637f7275fe8a0703641c9d99cd577ec2c7938cea5fa4f0e4e98c6055c053d6c695c9f13984304844d53052253ac0d57f9d80de1342b3b4eeed70e7a9cb7fed49744b457e00041b1715e9984a3a4bf8483cbd845eeed7695b6097541e0a56ceb01fac643c4f8ccf61440775a22e2050883df410634d7da42884d7c9b8e3bf277bb3da78292fa31fac953dc2a5703cd157c1964e01895be9e0bbdfafb0efd9c5c65b75b674fd60fe2126e928a0291d35320cc17407e23f6719ca24aec20a370d17df84e1dc061881021326fa55a3d79ef22c67fb66714e96626c60d6c969a031c80b9333ef00e9fde032bfc36cc7555cd5f93f34d2143010001",
+   "spec": "N2 (RS1 is never offered as a credential algorithm)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "fully-specified-esp256",
+   "op": "cose_key",
+   "input": "a501020328200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "N2 (the fully-specified -9 is never offered)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "fully-specified-ed25519",
+   "op": "cose_key",
+   "input": "a40101033220062158205866666666666666666666666666666666666666666666666666666666666666",
+   "spec": "N2 (the fully-specified -19 is never offered)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "fully-specified-esp384",
+   "op": "cose_key",
+   "input": "a5010203383220022158301b8a7914c8a3f8343a5ec4454a99f518fc4b07cc14bc0acc337a65262fdab2dc4f926a6d390a5593b35cc12c2bc82411225830a96acd4a18be99d584a7b39a55918447a8c0e6aeb5fd6dfd5f1856a2fc29866f2b29ae2fa1a714a74e3d616a10fccc3e",
+   "spec": "N2 (the fully-specified -51 is never offered)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "fully-specified-esp512",
+   "op": "cose_key",
+   "input": "a50102033833200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "spec": "N2 (the fully-specified -52 is never offered)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "not-a-map",
+   "op": "cose_key",
+   "input": "820102",
+   "spec": "RFC 9052 7 (a COSE_Key is a map)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "empty-map",
+   "op": "cose_key",
+   "input": "a0",
+   "spec": "contract R5 (kty is required)",
+   "expect": {
+    "ok": false
+   }
+  }
+ ]
+}
