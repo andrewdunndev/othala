@@ -270,6 +270,27 @@ check-claims:
     - cd rust
     - just claims
 
+# check-vectors: `just vectors` in rust/, on the image that bakes node and python3 (ci-rust is not known to); the recipe fails with a message if either is missing, and runs offline.
+check-vectors:
+  stage: verify
+  image: registry.gitlab.com/dunn.dev/pipeline/ci:4.16.0@sha256:7f2f7c1c9fe4ec3a8f4a4c51b6c2eba0ff452de662e2ab4ef8a18d685ecc58d1
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - rust/vectors/**/*
+        - rust/justfile
+        - .gitlab-ci.yml
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
+  before_script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+  script:
+    - just node-guard
+    - cd rust
+    - just vectors
+
 # check-ownership: a branch item/<id> changes only the paths its primitives/queue.json item owns, and no oracle path.
 check-ownership:
   extends: .rust
