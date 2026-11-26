@@ -97,7 +97,7 @@ mutants-off floor="5":
     jq -e --argjson floor "{{floor}}" '.caught >= $floor and .missed == 0 and .timeout == 0' \
         "$out/mutants.out/outcomes.json" > /dev/null || { echo "mutants-off: under the floor of {{floor}}, or missed or timed out"; exit 1; }
 
-# MR gate: on each crate this branch changes since its merge base with origin/main, cargo mutants --in-diff with none missed or timed out and no floor (the floors are the scheduled run's); a change to Cargo.toml, Cargo.lock, rust-toolchain.toml, .cargo/ or vectors/, or to a crate whose tests a mutants run uses, runs the whole crate (all crates for the former); a changed jose also runs mutants-off; no merge base is an error, not a skip
+# MR gate: on each crate this branch changes since its merge base with origin/main, cargo mutants --in-diff with none missed or timed out and no floor (the floors are the scheduled run's); a change to a crate whose tests a mutants run uses runs that whole crate, and a change to Cargo.toml, Cargo.lock, rust-toolchain.toml, .cargo/ or vectors/ only prints that the floor runs are left to the scheduled job; a changed jose also runs mutants-off; no merge base is an error, not a skip
 mutants-changed base="origin/main":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -106,14 +106,13 @@ mutants-changed base="origin/main":
     files=$(git diff --no-renames --name-only --relative "$mb" -- .)
     runs=$(./crates.sh | jq -r 'select(.mutants) | "\(.name) \(.mutants.tests // [] | join(","))"')
     touched() { grep -q "^$1/" <<< "$files"; }
-    everything=0
-    grep -qE '^(Cargo\.toml|Cargo\.lock|rust-toolchain\.toml|\.cargo/|vectors/)' <<< "$files" && everything=1
+    glob=$(grep -E '^(Cargo\.toml|Cargo\.lock|rust-toolchain\.toml|\.cargo/|vectors/)' <<< "$files" | head -1 || true)
+    [ -z "$glob" ] || echo "global change ($glob): the whole-crate floor runs are left to check-rust-scheduled"
     plan=""
     while read -r c tests; do
         mode=""
         touched "$c" && mode=diff
         for t in ${tests//,/ }; do [ "$t" != "$c" ] && touched "$t" && mode=whole; done
-        [ "$everything" = 1 ] && mode=whole
         [ -n "$mode" ] && plan="$plan$c $mode"$'\n'
     done <<< "$runs"
     [ -n "$plan" ] || { echo "mutants-changed: no crate with a mutants floor changed since $mb"; exit 0; }
