@@ -57,14 +57,25 @@ impl JwkSet {
     /// Decodes `{"keys": [...]}`: a member that is not a supported key (an unknown `kty`, X25519, a weak modulus) is
     /// skipped and not counted; a malformed one, a name used twice or more than `MAX_JWKS_KEYS` kept keys is refused.
     pub fn decode(json: &[u8]) -> Result<Self, Error> {
+        Self::read(json, false)
+    }
+
+    /// As [`Self::decode`] for a document fetched from a remote `jwks_uri`: a private or `oct` member is dropped and
+    /// not counted, so the set holds asymmetric public keys only and no secret an issuer published is ever a key.
+    pub fn decode_public(json: &[u8]) -> Result<Self, Error> {
+        Self::read(json, true)
+    }
+
+    fn read(json: &[u8], public_only: bool) -> Result<Self, Error> {
         scan(json)?;
         let document: Document<'_> =
             serde_json::from_slice(json).map_err(|_| ErrorKind::Malformed)?;
         let mut keys = Vec::new();
         for raw in document.keys {
             match parse(raw.get().as_bytes()) {
+                Ok((_, Key::Private(_))) if public_only => {}
                 Ok((meta, Key::Public(material))) => {
-                    keys.push(Member::Public(Jwk { meta, material }))
+                    keys.push(Member::Public(Jwk { meta, material }));
                 }
                 Ok((meta, Key::Private(material))) => {
                     keys.push(Member::Secret(SecretJwk { meta, material }));
@@ -73,9 +84,10 @@ impl JwkSet {
                     if matches!(error.kind(), ErrorKind::UnsupportedAlg | ErrorKind::WeakKey) => {}
                 Err(error) => return Err(error),
             }
-        }
-        if keys.len() > MAX_JWKS_KEYS {
-            return Err(ErrorKind::TooLarge.into());
+            // refused as soon as it is over, not after every member is parsed
+            if keys.len() > MAX_JWKS_KEYS {
+                return Err(ErrorKind::TooLarge.into());
+            }
         }
         Ok(Self { keys })
     }
@@ -180,6 +192,33 @@ mod tests {
         assert_eq!(set(&[oct(0), weak, unknown]), Ok(1));
         assert_eq!(set(&[oct(0), broken]), Err(ErrorKind::Malformed));
         assert_eq!(set(&[]), Ok(0));
+    }
+
+    #[test]
+    fn remote_sets_keep_asymmetric_public_keys_only() {
+        let private = r#"{"kty":"OKP","crv":"Ed25519","kid":"p","d":"nWGxne_9WmC6hEr0kuwsxERJxWl7MmkZcDusAxyuf2A","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}"#.to_owned();
+        let public = r#"{"kty":"OKP","crv":"Ed25519","kid":"q","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}"#.to_owned();
+        let text = format!(r#"{{"keys":[{},{},{}]}}"#, oct(0), private, public);
+        let kept = |decode: fn(&[u8]) -> Result<JwkSet, crate::Error>| {
+            decode(text.as_bytes()).map(|s| s.entries().len()).ok()
+        };
+        assert_eq!(kept(JwkSet::decode), Some(3));
+        assert_eq!(kept(JwkSet::decode_public), Some(1));
+        let many: Vec<String> = (0..=MAX_JWKS_KEYS).map(oct).collect();
+        let text = format!(r#"{{"keys":[{}]}}"#, many.join(","));
+        assert_eq!(
+            JwkSet::decode_public(text.as_bytes())
+                .map(|s| s.entries().len())
+                .ok(),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn key_count_is_refused_before_later_members_are_read() {
+        let mut keys: Vec<String> = (0..=MAX_JWKS_KEYS).map(oct).collect();
+        keys.push(r#"{"kty":"EC","crv":"P-256"}"#.to_owned());
+        assert_eq!(set(&keys), Err(ErrorKind::TooLarge));
     }
 
     #[test]

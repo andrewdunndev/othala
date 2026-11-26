@@ -238,7 +238,7 @@ mod tests {
     use testkit::vector;
     use testkit::vectors::{Json, Vector, wycheproof};
 
-    use super::{EcdhEs, EcdhEsA128Kw, EcdhEsA192Kw, EcdhEsA256Kw, agree, derive};
+    use super::{EcdhEs, EcdhEsA128Kw, EcdhEsA192Kw, EcdhEsA256Kw, agree, derive, unwrap_key};
     use crate::jwe::envelope::{Params, sealed::KeyAlg as _, sealed::Unwrap as _};
     use crate::jwk::decode::{Key, parse};
     use crate::key::{Private, Public};
@@ -471,6 +471,39 @@ mod tests {
                 .map(|(cek, wrapped)| (cek.expose().len(), wrapped.len()))
         });
         assert_eq!(kw.and_then(Result::ok), Some((16, 24)));
+    }
+
+    #[test]
+    fn key_wrap_algs_derive_their_own_key_length() {
+        let secret = p256::SecretKey::from_slice(&[1; 32]).ok();
+        let public = secret.as_ref().map(|k| Public::P256(k.public_key()));
+        let private = secret.map(Private::P256);
+        // the wrapping key is re-derived here at the RFC 7518 4.6.2 length, so a wrong length cannot open the key
+        fn opens<A: crate::jwe::envelope::sealed::KeyAlg>(
+            keys: Option<(&Private, &Public)>,
+            name: &str,
+            len: usize,
+        ) -> bool {
+            let Some((private, public)) = keys else {
+                return false;
+            };
+            let mut params = blank();
+            let Ok((cek, wrapped)) = A::wrap(public, JweEnc::A128Gcm, &mut params, &mut Counter(9))
+            else {
+                return false;
+            };
+            let Some(epk) = params.epk.as_deref() else {
+                return false;
+            };
+            let kek = agree(private, epk).and_then(|z| derive(&z, name, &params, len));
+            kek.and_then(|kek| unwrap_key(&kek, &wrapped))
+                .is_ok_and(|opened| opened.expose() == cek.expose())
+        }
+        let keys = private.as_ref().zip(public.as_ref());
+        assert!(opens::<EcdhEsA128Kw>(keys, "ECDH-ES+A128KW", 16));
+        assert!(opens::<EcdhEsA192Kw>(keys, "ECDH-ES+A192KW", 24));
+        assert!(opens::<EcdhEsA256Kw>(keys, "ECDH-ES+A256KW", 32));
+        assert!(!opens::<EcdhEsA192Kw>(keys, "ECDH-ES+A192KW", 16));
     }
 
     fn blank() -> Params {

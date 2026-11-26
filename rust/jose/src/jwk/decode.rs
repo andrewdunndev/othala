@@ -15,10 +15,45 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::alg::SIGNING;
 use crate::key::{Private, Public};
 use crate::{
-    Alg, DecryptKey, EncryptKey, Error, ErrorKind, JweAlg, KeyAlg, MAX_JSON_DEPTH, MAX_JSON_LEN,
-    MAX_NAME_LEN, MAX_RSA_BITS, MAX_RSA_EXPONENT, MIN_RSA_BITS, PublicAlg, PublicKeyAlg, SignAlg,
-    SigningAlg, SigningKey, VerifyKey,
+    Alg, DecryptKey, EncryptKey, Error, ErrorKind, JweAlg, KeyAlg, MAX_ENTRIES, MAX_JSON_DEPTH,
+    MAX_JSON_LEN, MAX_NAME_LEN, MAX_RSA_BITS, MAX_RSA_EXPONENT, MIN_RSA_BITS, PublicAlg,
+    PublicKeyAlg, SignAlg, SigningAlg, SigningKey, VerifyKey,
 };
+
+/// A JSON array read into at most `MAX_ENTRIES + 1` elements, the rest skipped unbuilt: a caller that sees more than
+/// `MAX_ENTRIES` refuses the document without ever holding it all.
+pub(crate) struct Capped<T>(pub(crate) Vec<T>);
+
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Capped<T> {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct Cap<T>(core::marker::PhantomData<T>);
+
+        impl<'de, T: serde::Deserialize<'de>> serde::de::Visitor<'de> for Cap<T> {
+            type Value = Capped<T>;
+
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("an array")
+            }
+
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(
+                self,
+                mut seq: A,
+            ) -> Result<Capped<T>, A::Error> {
+                let mut kept = Vec::new();
+                while kept.len() <= MAX_ENTRIES {
+                    match seq.next_element()? {
+                        Some(item) => kept.push(item),
+                        None => return Ok(Capped(kept)),
+                    }
+                }
+                while seq.next_element::<serde::de::IgnoredAny>()?.is_some() {}
+                Ok(Capped(kept))
+            }
+        }
+
+        d.deserialize_seq(Cap(core::marker::PhantomData))
+    }
+}
 
 /// A key id: an opaque lookup hint, compared byte for byte, never trusted.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -333,6 +368,10 @@ fn okp(r: &Raw<'_>) -> Result<Key, Error> {
 
 fn rsa(r: &Raw<'_>) -> Result<Key, Error> {
     let (n, e) = (uint(r.n)?, uint(r.e)?);
+    // a first octet that is not zero makes a longer `n` past the bit bound, so no big integer is built for it
+    if n.expose().len() > MAX_RSA_BITS / 8 {
+        return Err(ErrorKind::TooLarge.into());
+    }
     let bits = usize::try_from(big(&n).bit_width_vartime()).unwrap_or(usize::MAX);
     if bits < MIN_RSA_BITS {
         return Err(ErrorKind::WeakKey.into());
@@ -813,7 +852,7 @@ mod tests {
     use alloc::borrow::ToOwned as _;
     use alloc::collections::BTreeMap;
     use alloc::format;
-    use alloc::string::String;
+    use alloc::string::{String, ToString as _};
     use alloc::vec;
     use alloc::vec::Vec;
 
@@ -825,7 +864,10 @@ mod tests {
         DECRYPT, DERIVE, ENCRYPT, Key, REGISTRY, SIGN, SIGNING, UNWRAP, VERIFY, WRAP, parse,
         private_info, public_info, scan,
     };
-    use crate::{ErrorKind, Jwk, Kid, Kty, MAX_JSON_DEPTH, MAX_JSON_LEN, MAX_NAME_LEN, SecretJwk};
+    use crate::{
+        ErrorKind, Jwk, Kid, Kty, MAX_ENTRIES, MAX_JSON_DEPTH, MAX_JSON_LEN, MAX_NAME_LEN,
+        SecretJwk,
+    };
 
     /// A JWK as members: a value that opens with `[` is written as JSON, any other as a string.
     type Members = BTreeMap<String, String>;
@@ -907,6 +949,21 @@ mod tests {
         alg: Option<String>,
         jwk: Json,
         expect: Expect,
+    }
+
+    #[test]
+    fn capped_arrays_keep_one_past_the_bound() {
+        let json = |n: usize| format!("[{}]", vec!["1"; n].join(","));
+        let read = |n: usize| {
+            serde_json::from_str::<super::Capped<u8>>(&json(n))
+                .map(|c| c.0.len())
+                .ok()
+        };
+        assert_eq!(read(MAX_ENTRIES), Some(MAX_ENTRIES));
+        assert_eq!(read(MAX_ENTRIES + 1), Some(MAX_ENTRIES + 1));
+        assert_eq!(read(1000), Some(MAX_ENTRIES + 1));
+        let wrong = serde_json::from_str::<super::Capped<u8>>("5").err();
+        assert!(wrong.is_some_and(|e| e.to_string().contains("an array")));
     }
 
     #[test]

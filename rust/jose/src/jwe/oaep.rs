@@ -131,7 +131,7 @@ mod tests {
     fn file(vector: Vector, text: &str, sha1: bool, total: usize) {
         let seen = wycheproof(vector, 1, |_, _| Outcome::Checked);
         let parsed: File = serde_json::from_str(text).unwrap_or(File { groups: Vec::new() });
-        let (mut checked, mut skipped) = (0, 0);
+        let (mut checked, mut skipped, mut deviating) = (0, 0, 0);
         for group in &parsed.groups {
             let key = parse(group.key.text().as_bytes())
                 .ok()
@@ -141,9 +141,7 @@ mod tests {
                 });
             assert!(key.is_some());
             for test in &group.tests {
-                // the `rsa` crate ignores the first octet of the encoded message on purpose (its own test
-                // `decrypt_ignores_first_octet`), so that case is not applicable by name
-                if !test.label.is_empty() || test.comment == "First byte is 1" {
+                if !test.label.is_empty() {
                     skipped += 1;
                     continue;
                 }
@@ -155,13 +153,20 @@ mod tests {
                         RsaOaep256::open(k, &ct, &mut testkit::seeded(1))
                     }
                 });
+                // a known deviation of the `rsa` dependency (NC2): it opens these where the vector says invalid
+                if test.comment == "First byte is 1" {
+                    assert!(opened.is_some(), "{}", test.id);
+                    deviating += 1;
+                    continue;
+                }
                 let want = (test.result == "valid").then(|| hex(&test.msg));
                 assert_eq!(opened, want, "{}", test.id);
                 checked += 1;
             }
         }
+        assert_eq!(deviating, 1);
         assert_eq!(seen.total(), total);
-        assert_eq!(checked + skipped, total);
+        assert_eq!(checked + skipped + deviating, total);
     }
 
     #[test]

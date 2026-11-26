@@ -14,7 +14,7 @@ use serde::Deserialize;
 use serde::de::IgnoredAny;
 use serde_json::value::RawValue;
 
-use crate::jwk::decode::{Key, parse, scan};
+use crate::jwk::decode::{Capped, Key, parse, scan};
 use crate::jwk::thumbprint::members;
 use crate::jws::header::REGISTERED;
 use crate::key::{Private, Public};
@@ -349,7 +349,7 @@ struct Document<'a> {
     unprotected: Option<&'a RawValue>,
     header: Option<&'a RawValue>,
     encrypted_key: Option<&'a str>,
-    recipients: Option<Vec<Entry<'a>>>,
+    recipients: Option<Capped<Entry<'a>>>,
     aad: Option<&'a str>,
     iv: &'a str,
     ciphertext: &'a str,
@@ -396,7 +396,7 @@ impl<'a> Jwe<'a> {
         let document: Document<'a> = serde_json::from_slice(json).map_err(|_| malformed())?;
         let entries = match document.recipients {
             Some(entries) if document.header.is_none() && document.encrypted_key.is_none() => {
-                entries
+                entries.0
             }
             None => vec![Entry {
                 header: document.header,

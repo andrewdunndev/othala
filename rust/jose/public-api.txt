@@ -515,6 +515,7 @@ method Jwk::sig_alg fn(self: &Self) -> Option<SigningAlg>
 method Jwk::thumbprint fn(self: &Self) -> Digest
 method Jwk::verify_key fn<A: PublicAlg>(self: &Self) -> Result<VerifyKey<A>, Error>
 method JwkSet::decode fn(json: &[u8]) -> Result<Self, Error>
+method JwkSet::decode_public fn(json: &[u8]) -> Result<Self, Error>
 method JwkSet::entries fn(self: &Self) -> impl ExactSizeIterator<Item = JwkEntry<'_>>
 method JwkSet::find fn(self: &Self, kid: &Kid) -> Result<JwkEntry<'_>, Error>
 method JwkSet::new fn(keys: Vec<Jwk>) -> Result<Self, Error>

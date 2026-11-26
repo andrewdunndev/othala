@@ -1,6 +1,6 @@
 //! JWT claims under a policy (RFC 7519 section 4.1, RFC 8725 sections 3.8 to 3.12).
 use alloc::borrow::ToOwned as _;
-use alloc::string::{String, ToString as _};
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 use core::marker::PhantomData;
@@ -262,20 +262,38 @@ struct Registered {
     iat: Claim<Number>,
 }
 
-/// A JSON number as whole seconds, rounded down or up; a form with an exponent or past `i64` is not a time.
+/// A JSON number as whole seconds, rounded down or up; an exponent form is a number like any other, and a value
+/// outside `i64` is not a time.
 fn seconds(number: &Number, up: bool) -> Option<i64> {
-    let text = number.to_string();
-    let (whole, fraction) = text.split_once('.').unwrap_or((&text, ""));
-    if !fraction.chars().all(|c| c.is_ascii_digit()) {
+    if let Some(whole) = number.as_i64() {
+        return Some(whole);
+    }
+    if number.is_u64() {
         return None;
     }
-    let part = fraction.chars().any(|c| c != '0');
-    let step = match (part, up, text.starts_with('-')) {
-        (true, true, false) => 1,
-        (true, false, true) => -1,
-        _ => 0,
+    // the float's own bits give the integer and fraction parts without a cast
+    let bits = number.as_f64()?.to_bits();
+    let negative = bits >> 63 == 1;
+    let exponent = u32::try_from((bits >> 52) & 0x7ff).ok()?;
+    let mantissa = (bits & ((1 << 52) - 1)) + (1 << 52);
+    let (whole, part) = match exponent {
+        ..1023 => (0, bits << 1 != 0),
+        _ => match exponent - 1023 {
+            shift @ 52..63 => (mantissa << (shift - 52), false),
+            shift @ ..52 => {
+                let dropped = 52 - shift;
+                (mantissa >> dropped, mantissa & ((1 << dropped) - 1) != 0)
+            }
+            _ => return None,
+        },
     };
-    whole.parse::<i64>().ok()?.checked_add(step)
+    let whole = i64::try_from(whole).ok()?;
+    match (part, up, negative) {
+        (true, true, false) => whole.checked_add(1),
+        (true, false, true) => Some(-whole).and_then(|n| n.checked_sub(1)),
+        (_, _, true) => Some(-whole),
+        _ => Some(whole),
+    }
 }
 
 /// Lower case, with an `application/` prefix removed (RFC 7515 4.1.9).
@@ -364,7 +382,7 @@ pub(crate) fn check<K: TokenKind>(
 #[cfg(test)]
 mod tests {
     use alloc::format;
-    use alloc::string::{String, ToString as _};
+    use alloc::string::String;
     use alloc::vec::Vec;
 
     use base::UnixTime;
@@ -688,6 +706,39 @@ mod tests {
         assert_eq!(both("-0.5"), Some((Some(-1), Some(0))));
         assert_eq!(both("-3"), Some((Some(-3), Some(-3))));
         assert_eq!(both("1e300"), Some((None, None)));
+        assert_eq!(both("0.0"), Some((Some(0), Some(0))));
+        assert_eq!(both("-0.0"), Some((Some(0), Some(0))));
+        assert_eq!(both("3.5"), Some((Some(3), Some(4))));
+        assert_eq!(both("-3.5"), Some((Some(-4), Some(-3))));
+        assert_eq!(
+            both("1e17"),
+            Some((Some(100_000_000_000_000_000), Some(100_000_000_000_000_000)))
+        );
+        assert_eq!(
+            both("-1e17"),
+            Some((
+                Some(-100_000_000_000_000_000),
+                Some(-100_000_000_000_000_000)
+            ))
+        );
+        assert_eq!(both("1e-9"), Some((Some(0), Some(1))));
+        assert_eq!(
+            both("2251799813685248.5"),
+            Some((Some(2_251_799_813_685_248), Some(2_251_799_813_685_249)))
+        );
+        assert_eq!(both("1e3"), Some((Some(1000), Some(1000))));
+        assert_eq!(both("1.5e3"), Some((Some(1500), Some(1500))));
+        assert_eq!(both("-1.5e0"), Some((Some(-2), Some(-1))));
+        assert_eq!(both("18446744073709551615"), Some((None, None)));
+        assert_eq!(
+            both("9223372036854775807"),
+            Some((Some(i64::MAX), Some(i64::MAX)))
+        );
+        assert_eq!(both("9223372036854775808.0"), Some((None, None)));
+        assert_eq!(
+            both("-9223372036854775808"),
+            Some((Some(i64::MIN), Some(i64::MIN)))
+        );
     }
 
     #[test]
@@ -789,6 +840,5 @@ mod tests {
         assert_eq!(SigningAlg::Hs256.half_hash(octets).len(), 22);
         assert_eq!(SigningAlg::Hs384.half_hash(octets).len(), 32);
         assert_eq!(SigningAlg::Hs512.half_hash(octets).len(), 43);
-        let _ = 5.to_string();
     }
 }

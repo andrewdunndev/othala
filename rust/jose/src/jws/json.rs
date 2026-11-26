@@ -6,7 +6,7 @@ use base::b64url_decode;
 use serde::Deserialize;
 use serde_json::value::RawValue;
 
-use crate::jwk::decode::scan;
+use crate::jwk::decode::{Capped, scan};
 use crate::jws::compact::Signature;
 use crate::jws::header::Parsed;
 use crate::{Compact, Error, ErrorKind, Jws, MAX_ENTRIES};
@@ -24,7 +24,7 @@ struct Document<'a> {
     protected: Option<&'a str>,
     header: Option<&'a RawValue>,
     signature: Option<&'a str>,
-    signatures: Option<Vec<Entry<'a>>>,
+    signatures: Option<Capped<Entry<'a>>>,
 }
 
 impl<'a> Jws<'a> {
@@ -37,7 +37,7 @@ impl<'a> Jws<'a> {
             serde_json::from_slice(json).map_err(|_| ErrorKind::Malformed)?;
         let entries = match (document.signatures, document.signature) {
             (Some(entries), None) if document.protected.is_none() && document.header.is_none() => {
-                entries
+                entries.0
             }
             (None, Some(signature)) => alloc::vec![Entry {
                 protected: document.protected,

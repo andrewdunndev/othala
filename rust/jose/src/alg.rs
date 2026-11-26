@@ -277,8 +277,9 @@ macro_rules! registry {
 
         impl<'de> serde::Deserialize<'de> for $type {
             fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-                let name = <&str>::deserialize(deserializer)?;
-                Self::parse(name).map_err(serde::de::Error::custom)
+                // an owned string, so an escaped name or a deserializer that cannot lend still reads
+                let name = <alloc::string::String>::deserialize(deserializer)?;
+                Self::parse(&name).map_err(serde::de::Error::custom)
             }
         }
     };
@@ -287,3 +288,29 @@ macro_rules! registry {
 registry!(SigningAlg, SIGNING);
 registry!(JweAlg, KEY_MANAGEMENT);
 registry!(JweEnc, CONTENT);
+
+#[cfg(test)]
+mod tests {
+    use alloc::borrow::ToOwned as _;
+
+    use serde::Deserialize as _;
+    use serde::de::value::StringDeserializer;
+
+    use crate::SigningAlg;
+
+    #[test]
+    fn registry_names_read_escaped_and_from_owned_values() {
+        assert_eq!(
+            serde_json::from_str::<SigningAlg>(r#""ES256""#).ok(),
+            Some(SigningAlg::Es256)
+        );
+        assert_eq!(
+            SigningAlg::deserialize(StringDeserializer::<serde_json::Error>::new(
+                "HS256".to_owned()
+            ))
+            .ok(),
+            Some(SigningAlg::Hs256)
+        );
+        assert!(serde_json::from_str::<SigningAlg>(r#""none""#).is_err());
+    }
+}
