@@ -231,7 +231,7 @@ check-purity:
     - cd rust
     - rustup toolchain install
     - rustup toolchain install 1.89.0 nightly-2026-11-24 --profile minimal
-    - cargo install --locked cargo-deny@0.22.1
+    - cargo install --locked cargo-deny@$(just deny-pin)
 
 check-rust:
   extends: .rust

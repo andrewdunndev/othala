@@ -71,13 +71,18 @@ twins:
 mutants-pin:
     @sed -n 's/^"cargo:cargo-mutants" = "\([0-9][0-9.]*\)"$/\1/p' ../mise.toml
 
-# the installed cargo-mutants and jq must be the versions ../mise.toml pins; CI installs by the same pin and is graded here
-tool-pins *tools="cargo-mutants jq":
+# the cargo-deny version ../mise.toml pins, for CI's cargo install
+deny-pin:
+    @sed -n 's/^"cargo:cargo-deny" = "\([0-9][0-9.]*\)"$/\1/p' ../mise.toml
+
+# the installed cargo-mutants, cargo-deny and jq must be the versions ../mise.toml pins; CI installs by the same pin and is graded here
+tool-pins *tools="cargo-mutants cargo-deny jq":
     #!/usr/bin/env bash
     set -euo pipefail
     for t in {{tools}}; do
         case "$t" in
             cargo-mutants) key='"cargo:cargo-mutants"'; have=$(cargo mutants --version | sed -n 's/^cargo-mutants \([0-9][0-9.]*\).*/\1/p') ;;
+            cargo-deny) key='"cargo:cargo-deny"'; have=$(cargo deny --version | sed -n 's/^cargo-deny \([0-9][0-9.]*\).*/\1/p') ;;
             jq) key='jq'; have=$(jq --version | sed -n 's/^jq-\([0-9][0-9.]*\).*/\1/p') ;;
             *) echo "tool-pins: unknown tool $t"; exit 1 ;;
         esac
@@ -202,7 +207,7 @@ msrv:
     cargo +1.89.0 check --workspace --all-features --all-targets --locked
 
 # deny.toml is the policy; bans.allow is appended from every member's name and the crates its gates.json allows
-deny:
+deny: (tool-pins "cargo-deny")
     #!/usr/bin/env bash
     set -euo pipefail
     mkdir -p "{{target}}"
