@@ -1,0 +1,2214 @@
+{
+ "source": "client and authenticator extension outputs (WebAuthn L3 10.1, contract R120-R128); assertions and attestation signed with a P-256 key derived from a label in tools/derive_webauthn_ext.py (RFC 6979 deterministic k); rp example.org, origin https://example.org, stored counter 5, BE stored clear, cross-origin denied unless the case says otherwise; unsolicited defaults to reject",
+ "cases": [
+  {
+   "id": "appid-used",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "5b781fc015a01c5099faf4ac92b17e0094a19c903ba35de4c95972216d8405900500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "304502207d33ef7da109c9914255eb7a517a44e12cc34381189ef953318283cd858ea17b022100eb1850605693165962e182232ff16620ad0f5e31d0e9ff9ac18d8c4cca43db29",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "appid": "https://example.org/app-id.json"
+   },
+   "client_extension_results": {
+    "appid": true
+   },
+   "spec": "contract R120 and WebAuthn L3 10.1.1 (appid true: rpIdHash is the hash of the AppID, 7.2 step 15)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6,
+    "outputs": {
+     "appid": true
+    }
+   }
+  },
+  {
+   "id": "appid-not-used",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "appid": "https://example.org/app-id.json"
+   },
+   "client_extension_results": {
+    "appid": false
+   },
+   "spec": "contract R120 (appid false: rpIdHash is the hash of the RP ID)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6,
+    "outputs": {
+     "appid": false
+    }
+   }
+  },
+  {
+   "id": "appid-not-reported",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "appid": "https://example.org/app-id.json"
+   },
+   "spec": "contract R120 (no output: the RP ID hash applies; the output reads Unreported)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6,
+    "outputs": {
+     "appid": "Unreported"
+    }
+   }
+  },
+  {
+   "id": "appid-true-with-rp-hash",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "appid": "https://example.org/app-id.json"
+   },
+   "client_extension_results": {
+    "appid": true
+   },
+   "spec": "contract R120 (appid true selects the AppID hash: the RP ID hash fails 7.2 step 15)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "appid-false-with-appid-hash",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "5b781fc015a01c5099faf4ac92b17e0094a19c903ba35de4c95972216d8405900500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "304502207d33ef7da109c9914255eb7a517a44e12cc34381189ef953318283cd858ea17b022100eb1850605693165962e182232ff16620ad0f5e31d0e9ff9ac18d8c4cca43db29",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "appid": "https://example.org/app-id.json"
+   },
+   "client_extension_results": {
+    "appid": false
+   },
+   "spec": "contract R120 (appid false selects the RP ID hash)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "appid-not-reported-with-appid-hash",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "5b781fc015a01c5099faf4ac92b17e0094a19c903ba35de4c95972216d8405900500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "304502207d33ef7da109c9914255eb7a517a44e12cc34381189ef953318283cd858ea17b022100eb1850605693165962e182232ff16620ad0f5e31d0e9ff9ac18d8c4cca43db29",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "appid": "https://example.org/app-id.json"
+   },
+   "spec": "contract R120 (no output: the AppID hash is not selected)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "appid-output-not-boolean",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "appid": "https://example.org/app-id.json"
+   },
+   "client_extension_results": {
+    "appid": "true"
+   },
+   "spec": "contract R120 (the output is a boolean)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "appid-unrequested-reject",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "client_extension_results": {
+    "appid": true
+   },
+   "spec": "contract R120 and R128 (an unrequested output is refused by default)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "appid-unrequested-ignore",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "client_extension_results": {
+    "appid": true
+   },
+   "unsolicited": "ignore",
+   "spec": "contract R128 (an unrequested output is dropped under Ignore; the RP ID hash applies)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6,
+    "outputs": {
+     "appid": "NotRequested"
+    }
+   }
+  },
+  {
+   "id": "appid-unrequested-ignore-appid-hash",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "5b781fc015a01c5099faf4ac92b17e0094a19c903ba35de4c95972216d8405900500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "304502207d33ef7da109c9914255eb7a517a44e12cc34381189ef953318283cd858ea17b022100eb1850605693165962e182232ff16620ad0f5e31d0e9ff9ac18d8c4cca43db29",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "client_extension_results": {
+    "appid": true
+   },
+   "unsolicited": "ignore",
+   "spec": "contract R128 (a dropped output selects nothing: the AppID hash fails 7.2 step 15)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "appid-exclude-true",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "appidExclude": "https://example.org/app-id.json"
+   },
+   "client_extension_results": {
+    "appidExclude": true
+   },
+   "spec": "contract R121 (the output is read and ignored when requested)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "appidExclude": true
+    }
+   }
+  },
+  {
+   "id": "appid-exclude-false",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "appidExclude": "https://example.org/app-id.json"
+   },
+   "client_extension_results": {
+    "appidExclude": false
+   },
+   "spec": "contract R121",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "appidExclude": false
+    }
+   }
+  },
+  {
+   "id": "appid-exclude-unrequested-reject",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "client_extension_results": {
+    "appidExclude": true
+   },
+   "spec": "contract R121 and R128",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "appid-exclude-unrequested-ignore",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "client_extension_results": {
+    "appidExclude": true
+   },
+   "unsolicited": "ignore",
+   "spec": "contract R128",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "appidExclude": "NotRequested"
+    }
+   }
+  },
+  {
+   "id": "appid-exclude-not-boolean",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "appidExclude": "https://example.org/app-id.json"
+   },
+   "client_extension_results": {
+    "appidExclude": 1
+   },
+   "spec": "contract R121 (the output is a boolean)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "cred-props-discoverable",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "credProps": true
+   },
+   "client_extension_results": {
+    "credProps": {
+     "rk": true
+    }
+   },
+   "spec": "contract R123 (rk true is Discoverable)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "credProps": "Discoverable"
+    }
+   }
+  },
+  {
+   "id": "cred-props-non-discoverable",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "credProps": true
+   },
+   "client_extension_results": {
+    "credProps": {
+     "rk": false
+    }
+   },
+   "spec": "contract R123 (rk false is NonDiscoverable)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "credProps": "NonDiscoverable"
+    }
+   }
+  },
+  {
+   "id": "cred-props-no-rk",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "credProps": true
+   },
+   "client_extension_results": {
+    "credProps": {}
+   },
+   "spec": "contract R122 (requested and rk absent reads Unreported)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "credProps": "Unreported"
+    }
+   }
+  },
+  {
+   "id": "cred-props-no-output",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "credProps": true
+   },
+   "client_extension_results": {},
+   "spec": "contract R122 (requested and no output reads Unreported)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "credProps": "Unreported"
+    }
+   }
+  },
+  {
+   "id": "cred-props-not-requested",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "client_extension_results": {},
+   "spec": "contract R122 (not requested reads NotRequested)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "credProps": "NotRequested"
+    }
+   }
+  },
+  {
+   "id": "cred-props-rk-not-boolean",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "credProps": true
+   },
+   "client_extension_results": {
+    "credProps": {
+     "rk": "yes"
+    }
+   },
+   "spec": "contract R123 (rk is a boolean)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "cred-props-unrequested-reject",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "client_extension_results": {
+    "credProps": {
+     "rk": true
+    }
+   },
+   "spec": "contract R128 (an unrequested client output is Extension by default)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "cred-props-unrequested-ignore",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "client_extension_results": {
+    "credProps": {
+     "rk": true
+    }
+   },
+   "unsolicited": "ignore",
+   "spec": "contract R128 (dropped under Ignore)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "credProps": "NotRequested"
+    }
+   }
+  },
+  {
+   "id": "prf-reg-enabled",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "prf": {
+     "enable": true
+    }
+   },
+   "client_extension_results": {
+    "prf": {
+     "enabled": true
+    }
+   },
+   "spec": "contract R124 (Enable emits prf {}; enabled becomes PrfResult)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "prf": {
+      "enabled": true,
+      "first": null,
+      "second": null
+     }
+    }
+   }
+  },
+  {
+   "id": "prf-reg-not-enabled",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "prf": {
+     "enable": true
+    }
+   },
+   "client_extension_results": {
+    "prf": {
+     "enabled": false
+    }
+   },
+   "spec": "contract R124 (enabled false)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "prf": {
+      "enabled": false,
+      "first": null,
+      "second": null
+     }
+    }
+   }
+  },
+  {
+   "id": "prf-reg-no-output",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "prf": {
+     "enable": true
+    }
+   },
+   "client_extension_results": {},
+   "spec": "contract R122 (requested and no output reads Unreported)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "prf": "Unreported"
+    }
+   }
+  },
+  {
+   "id": "prf-reg-not-requested",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "client_extension_results": {},
+   "spec": "contract R122 (not requested reads NotRequested)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "prf": "NotRequested"
+    }
+   }
+  },
+  {
+   "id": "prf-reg-eval-first",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "prf": {
+     "eval": {
+      "first": "c2FsdCBvbmU"
+     }
+    }
+   },
+   "client_extension_results": {
+    "prf": {
+     "enabled": true,
+     "results": {
+      "first": "FdcP5pT30I5rvuaJXOhdPH0fmxNlQ7agYh26xejvVsk"
+     }
+    }
+   },
+   "spec": "contract R124 (Eval: results become PrfResult)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "prf": {
+      "enabled": true,
+      "first": "15d70fe694f7d08e6bbee6895ce85d3c7d1f9b136543b6a0621dbac5e8ef56c9",
+      "second": null
+     }
+    }
+   }
+  },
+  {
+   "id": "prf-reg-eval-both",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "prf": {
+     "eval": {
+      "first": "c2FsdCBvbmU",
+      "second": "c2FsdCB0d28"
+     }
+    }
+   },
+   "client_extension_results": {
+    "prf": {
+     "enabled": true,
+     "results": {
+      "first": "FdcP5pT30I5rvuaJXOhdPH0fmxNlQ7agYh26xejvVsk",
+      "second": "Hz3aWMP1ycwmc535a3Oy3j0bQjw-pdzoVt68WNX2w8E"
+     }
+    }
+   },
+   "spec": "contract R124 (two salts, two results)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "prf": {
+      "enabled": true,
+      "first": "15d70fe694f7d08e6bbee6895ce85d3c7d1f9b136543b6a0621dbac5e8ef56c9",
+      "second": "1f3dda58c3f5c9cc26739df96b73b2de3d1b423c3ea5dce856debc58d5f6c3c1"
+     }
+    }
+   }
+  },
+  {
+   "id": "prf-reg-eval-no-results",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "prf": {
+     "eval": {
+      "first": "c2FsdCBvbmU"
+     }
+    }
+   },
+   "client_extension_results": {
+    "prf": {
+     "enabled": true
+    }
+   },
+   "spec": "contract R124 (Eval requested but the client returned only enabled)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "prf": {
+      "enabled": true,
+      "first": null,
+      "second": null
+     }
+    }
+   }
+  },
+  {
+   "id": "prf-reg-results-without-eval",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "prf": {
+     "enable": true
+    }
+   },
+   "client_extension_results": {
+    "prf": {
+     "enabled": true,
+     "results": {
+      "first": "FdcP5pT30I5rvuaJXOhdPH0fmxNlQ7agYh26xejvVsk"
+     }
+    }
+   },
+   "spec": "contract R124 (results without Eval are Extension)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "prf-reg-second-without-second-salt",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "prf": {
+     "eval": {
+      "first": "c2FsdCBvbmU"
+     }
+    }
+   },
+   "client_extension_results": {
+    "prf": {
+     "enabled": true,
+     "results": {
+      "first": "FdcP5pT30I5rvuaJXOhdPH0fmxNlQ7agYh26xejvVsk",
+      "second": "Hz3aWMP1ycwmc535a3Oy3j0bQjw-pdzoVt68WNX2w8E"
+     }
+    }
+   },
+   "spec": "contract R124 (a second result without a second salt is Extension)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "prf-reg-first-31-bytes",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "prf": {
+     "eval": {
+      "first": "c2FsdCBvbmU"
+     }
+    }
+   },
+   "client_extension_results": {
+    "prf": {
+     "enabled": true,
+     "results": {
+      "first": "FdcP5pT30I5rvuaJXOhdPH0fmxNlQ7agYh26xejvVg"
+     }
+    }
+   },
+   "spec": "contract R124 (a result that is not 32 bytes is Malformed)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "prf-reg-first-33-bytes",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "prf": {
+     "eval": {
+      "first": "c2FsdCBvbmU"
+     }
+    }
+   },
+   "client_extension_results": {
+    "prf": {
+     "enabled": true,
+     "results": {
+      "first": "FdcP5pT30I5rvuaJXOhdPH0fmxNlQ7agYh26xejvVskA"
+     }
+    }
+   },
+   "spec": "contract R124 (a result that is not 32 bytes is Malformed)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "prf-reg-first-padded-base64",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "prf": {
+     "eval": {
+      "first": "c2FsdCBvbmU"
+     }
+    }
+   },
+   "client_extension_results": {
+    "prf": {
+     "enabled": true,
+     "results": {
+      "first": "FdcP5pT30I5rvuaJXOhdPH0fmxNlQ7agYh26xejvVsk="
+     }
+    }
+   },
+   "spec": "contract R124 and R132 (base64url members are canonical: no padding)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "prf-reg-unrequested-reject",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "client_extension_results": {
+    "prf": {
+     "enabled": true
+    }
+   },
+   "spec": "contract R128",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "prf-reg-unrequested-ignore",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "client_extension_results": {
+    "prf": {
+     "enabled": true
+    }
+   },
+   "unsolicited": "ignore",
+   "spec": "contract R128",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "prf": "NotRequested"
+    }
+   }
+  },
+  {
+   "id": "prf-auth-eval",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "prf": {
+     "eval": {
+      "first": "c2FsdCBvbmU"
+     }
+    }
+   },
+   "client_extension_results": {
+    "prf": {
+     "results": {
+      "first": "FdcP5pT30I5rvuaJXOhdPH0fmxNlQ7agYh26xejvVsk"
+     }
+    }
+   },
+   "spec": "contract R125 (eval: results become PrfResult)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6,
+    "outputs": {
+     "prf": {
+      "enabled": null,
+      "first": "15d70fe694f7d08e6bbee6895ce85d3c7d1f9b136543b6a0621dbac5e8ef56c9",
+      "second": null
+     }
+    }
+   }
+  },
+  {
+   "id": "prf-auth-eval-both",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "prf": {
+     "eval": {
+      "first": "c2FsdCBvbmU",
+      "second": "c2FsdCB0d28"
+     }
+    }
+   },
+   "client_extension_results": {
+    "prf": {
+     "results": {
+      "first": "FdcP5pT30I5rvuaJXOhdPH0fmxNlQ7agYh26xejvVsk",
+      "second": "Hz3aWMP1ycwmc535a3Oy3j0bQjw-pdzoVt68WNX2w8E"
+     }
+    }
+   },
+   "spec": "contract R125",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6,
+    "outputs": {
+     "prf": {
+      "enabled": null,
+      "first": "15d70fe694f7d08e6bbee6895ce85d3c7d1f9b136543b6a0621dbac5e8ef56c9",
+      "second": "1f3dda58c3f5c9cc26739df96b73b2de3d1b423c3ea5dce856debc58d5f6c3c1"
+     }
+    }
+   }
+  },
+  {
+   "id": "prf-auth-by-credential",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "prf": {
+     "evalByCredential": {
+      "cxeVPnOZLwWxRDtCtno7RJHUOKCyaP6a9LA8u29qNII": {
+       "first": "c2FsdCBvbmU"
+      }
+     }
+    }
+   },
+   "client_extension_results": {
+    "prf": {
+     "results": {
+      "first": "FdcP5pT30I5rvuaJXOhdPH0fmxNlQ7agYh26xejvVsk"
+     }
+    }
+   },
+   "allow": {
+    "credentials": [
+     "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482"
+    ]
+   },
+   "spec": "contract R125 (evalByCredential keyed by a listed credential id)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6,
+    "outputs": {
+     "prf": {
+      "enabled": null,
+      "first": "15d70fe694f7d08e6bbee6895ce85d3c7d1f9b136543b6a0621dbac5e8ef56c9",
+      "second": null
+     }
+    }
+   }
+  },
+  {
+   "id": "prf-auth-no-results",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "prf": {
+     "eval": {
+      "first": "c2FsdCBvbmU"
+     }
+    }
+   },
+   "client_extension_results": {},
+   "spec": "contract R122 (requested and no output reads Unreported)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6,
+    "outputs": {
+     "prf": "Unreported"
+    }
+   }
+  },
+  {
+   "id": "prf-auth-second-without-second-salt",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "prf": {
+     "eval": {
+      "first": "c2FsdCBvbmU"
+     }
+    }
+   },
+   "client_extension_results": {
+    "prf": {
+     "results": {
+      "first": "FdcP5pT30I5rvuaJXOhdPH0fmxNlQ7agYh26xejvVsk",
+      "second": "Hz3aWMP1ycwmc535a3Oy3j0bQjw-pdzoVt68WNX2w8E"
+     }
+    }
+   },
+   "spec": "contract R125 and R124 (a second result without a second salt)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "prf-auth-result-31-bytes",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "prf": {
+     "eval": {
+      "first": "c2FsdCBvbmU"
+     }
+    }
+   },
+   "client_extension_results": {
+    "prf": {
+     "results": {
+      "first": "FdcP5pT30I5rvuaJXOhdPH0fmxNlQ7agYh26xejvVg"
+     }
+    }
+   },
+   "spec": "contract R125 and R124 (a result of 31 bytes is Malformed)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "prf-auth-unrequested-reject",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "client_extension_results": {
+    "prf": {
+     "results": {
+      "first": "FdcP5pT30I5rvuaJXOhdPH0fmxNlQ7agYh26xejvVsk"
+     }
+    }
+   },
+   "spec": "contract R128",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "prf-auth-by-credential-unlisted-key",
+   "op": "start_authentication",
+   "allow_credentials": [
+    "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482"
+   ],
+   "extensions": {
+    "prf": {
+     "evalByCredential": {
+      "uEPsSXufRSuIZ7kiaO-V2sN8JV2_cesllqrurKAmn10": {
+       "first": "c2FsdCBvbmU"
+      }
+     }
+    }
+   },
+   "spec": "contract R125 (an evalByCredential key that is not in Allow::User is Extension at start_authentication)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "prf-auth-by-credential-discoverable",
+   "op": "start_authentication",
+   "allow": "discoverable",
+   "extensions": {
+    "prf": {
+     "evalByCredential": {
+      "cxeVPnOZLwWxRDtCtno7RJHUOKCyaP6a9LA8u29qNII": {
+       "first": "c2FsdCBvbmU"
+      }
+     }
+    }
+   },
+   "spec": "contract R125 (keys must be listed in Allow::User; Allow::Discoverable lists none)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "prf-auth-by-credential-not-base64url",
+   "op": "start_authentication",
+   "allow_credentials": [
+    "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482"
+   ],
+   "extensions": {
+    "prf": {
+     "evalByCredential": {
+      "not base64url!": {
+       "first": "c2FsdCBvbmU"
+      }
+     }
+    }
+   },
+   "spec": "contract R125 (the keys are base64url credential ids)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "prf-auth-eval-and-by-credential",
+   "op": "start_authentication",
+   "allow_credentials": [
+    "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482"
+   ],
+   "extensions": {
+    "prf": {
+     "eval": {
+      "first": "ZGVmYXVsdCBzYWx0"
+     },
+     "evalByCredential": {
+      "cxeVPnOZLwWxRDtCtno7RJHUOKCyaP6a9LA8u29qNII": {
+       "first": "c2FsdCBvbmU"
+      }
+     }
+    }
+   },
+   "spec": "contract R125 and WebAuthn L3 10.1.4 (eval is the default for credentials without an evalByCredential entry)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "large-blob-reg-supported",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "largeBlob": {
+     "support": "required"
+    }
+   },
+   "client_extension_results": {
+    "largeBlob": {
+     "supported": true
+    }
+   },
+   "spec": "contract R126 (supported true)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "largeBlob": "Supported"
+    }
+   }
+  },
+  {
+   "id": "large-blob-reg-not-supported",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "largeBlob": {
+     "support": "preferred"
+    }
+   },
+   "client_extension_results": {
+    "largeBlob": {
+     "supported": false
+    }
+   },
+   "spec": "contract R126 (supported false)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "largeBlob": "NotSupported"
+    }
+   }
+  },
+  {
+   "id": "large-blob-reg-no-output",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "largeBlob": {
+     "support": "preferred"
+    }
+   },
+   "client_extension_results": {},
+   "spec": "contract R122 (requested and no output reads Unreported)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "largeBlob": "Unreported"
+    }
+   }
+  },
+  {
+   "id": "large-blob-reg-not-requested",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "client_extension_results": {},
+   "spec": "contract R122",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    },
+    "outputs": {
+     "largeBlob": "NotRequested"
+    }
+   }
+  },
+  {
+   "id": "large-blob-reg-written",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "largeBlob": {
+     "support": "required"
+    }
+   },
+   "client_extension_results": {
+    "largeBlob": {
+     "supported": true,
+     "written": true
+    }
+   },
+   "spec": "contract R126 (only supported is a registration output)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "large-blob-reg-unrequested-reject",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "client_extension_results": {
+    "largeBlob": {
+     "supported": true
+    }
+   },
+   "spec": "contract R128",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "large-blob-read",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "largeBlob": {
+     "read": true
+    }
+   },
+   "client_extension_results": {
+    "largeBlob": {
+     "blob": "ZGVyaXZlZCBsYXJnZSBibG9i"
+    }
+   },
+   "spec": "contract R127 (blob only after Read)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6,
+    "outputs": {
+     "largeBlob": {
+      "blob": "64657269766564206c6172676520626c6f62"
+     }
+    }
+   }
+  },
+  {
+   "id": "large-blob-read-no-blob",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "largeBlob": {
+     "read": true
+    }
+   },
+   "client_extension_results": {},
+   "spec": "contract R122 (requested and no output reads Unreported)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6,
+    "outputs": {
+     "largeBlob": "Unreported"
+    }
+   }
+  },
+  {
+   "id": "large-blob-read-written",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "largeBlob": {
+     "read": true
+    }
+   },
+   "client_extension_results": {
+    "largeBlob": {
+     "written": true
+    }
+   },
+   "spec": "contract R127 (written only after Write: it follows a Read here)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "large-blob-write-written",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "largeBlob": {
+     "write": "ZGVyaXZlZCBsYXJnZSBibG9i"
+    }
+   },
+   "client_extension_results": {
+    "largeBlob": {
+     "written": true
+    }
+   },
+   "spec": "contract R127 (written only after Write)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6,
+    "outputs": {
+     "largeBlob": {
+      "written": true
+     }
+    }
+   }
+  },
+  {
+   "id": "large-blob-write-not-written",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "largeBlob": {
+     "write": "ZGVyaXZlZCBsYXJnZSBibG9i"
+    }
+   },
+   "client_extension_results": {
+    "largeBlob": {
+     "written": false
+    }
+   },
+   "spec": "contract R127 (written false is reported)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6,
+    "outputs": {
+     "largeBlob": {
+      "written": false
+     }
+    }
+   }
+  },
+  {
+   "id": "large-blob-write-blob",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "largeBlob": {
+     "write": "ZGVyaXZlZCBsYXJnZSBibG9i"
+    }
+   },
+   "client_extension_results": {
+    "largeBlob": {
+     "blob": "ZGVyaXZlZCBsYXJnZSBibG9i"
+    }
+   },
+   "spec": "contract R127 (blob only after Read: it follows a Write here)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "large-blob-read-not-base64url",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "extensions_requested": {
+    "largeBlob": {
+     "read": true
+    }
+   },
+   "client_extension_results": {
+    "largeBlob": {
+     "blob": "!!!!"
+    }
+   },
+   "spec": "contract R127 and R132 (the blob is canonical base64url)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "large-blob-unrequested-reject",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "client_extension_results": {
+    "largeBlob": {
+     "blob": "ZGVyaXZlZCBsYXJnZSBibG9i"
+    }
+   },
+   "spec": "contract R128",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "authenticator-output-reject",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b58500000006a16b6372656450726f7465637401",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3046022100e31f7071bbdb93ab1cd123ed741df8f661b6be05cdb45257f5031a0141920add02210092e4865565292042c013129cea1dc0df59190817d035c8c10592ef391df1343a",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "spec": "contract R128 and N6 (this crate requests no authenticator extension, so each output is unsolicited: Extension by default)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "authenticator-output-ignore",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b58500000006a16b6372656450726f7465637401",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3046022100e31f7071bbdb93ab1cd123ed741df8f661b6be05cdb45257f5031a0141920add02210092e4865565292042c013129cea1dc0df59190817d035c8c10592ef391df1343a",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "unsolicited": "ignore",
+   "spec": "contract R128 (dropped under Ignore)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6,
+    "outputs": {}
+   }
+  },
+  {
+   "id": "authenticator-output-integer-key",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b58500000006a10101",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "304502205442847db27f573357c57c6a6546aba5b531db61902b3ddd0b4190d402fb0c59022100cfb923c465625b0c1361464abc5d3e1e496a27ef32625a1e850312ee6b6aab17",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "unsolicited": "ignore",
+   "spec": "contract R128 (authenticator outputs are a CBOR map with text keys), even under Ignore",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "authenticator-output-not-a-map",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b585000000068101",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "304402204c1bf1d4b9e00726a1d28aa080921b2ec43727acf96e7cd6bda7f293a0ca474c02202d1d3db8293430571d8359a3eafcb43b15446bb520ac37e224764a3e616f6c90",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "unsolicited": "ignore",
+   "spec": "contract R128 (a CBOR map), even under Ignore",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "authenticator-output-unordered",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b58500000006a262626201616101",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "304502204feef8e78176df7ba47e89b5baed3aeaa67ab026b4d4b21bccdbd7899cab3cca0221008eb58e0a0715d007f547c08126482e3b11590d9fbe96eb5da048b9bd8573cc98",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "unsolicited": "ignore",
+   "spec": "ruling R-n (authenticator-produced CBOR is read in CTAP2 canonical order: the keys 'bb' then 'a')",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "authenticator-output-trailing-byte",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b58500000006a16b6372656450726f746563740100",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022029ad537812cacfdd629576ed8d5f14ad429b0656a41df4862bda152bdee81046022100b2636abda0d33d4f189974cc7c080bb506e1ca9fa1a056c1dfb731501fc3b43f",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "unsolicited": "ignore",
+   "spec": "contract R4 (nothing after the extensions map)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "authenticator-output-registration-reject",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158b2bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5c50000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10a16b6372656450726f7465637401",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "spec": "contract R128 (an extensions map in a registration's authenticator data is unsolicited too)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "authenticator-output-registration-ignore",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158b2bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5c50000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10a16b6372656450726f7465637401",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "unsolicited": "ignore",
+   "spec": "contract R128 (dropped under Ignore)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    }
+   }
+  }
+ ]
+}

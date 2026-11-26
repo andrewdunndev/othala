@@ -1,0 +1,494 @@
+{
+ "source": "authentication steps 5 and 6 (WebAuthn L3 7.2; contract R16, R64-R69); assertions and attestation signed with a P-256 key derived from a label in tools/derive_webauthn_ext.py (RFC 6979 deterministic k); rp example.org, origin https://example.org, stored counter 5, BE stored clear, cross-origin denied unless the case says otherwise; allow is {credentials, identified_user} or discoverable",
+ "cases": [
+  {
+   "id": "allow-listed",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "allow": {
+    "credentials": [
+     "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+     "b843ec497b9f452b8867b92268ef95dac37c255dbf71eb2596aaeeaca0269f5d"
+    ]
+   },
+   "spec": "WebAuthn L3 7.2 step 5 (the credential is among allowCredentials)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6
+   }
+  },
+  {
+   "id": "allow-not-listed",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "allow": {
+    "credentials": [
+     "b843ec497b9f452b8867b92268ef95dac37c255dbf71eb2596aaeeaca0269f5d"
+    ]
+   },
+   "spec": "WebAuthn L3 7.2 step 5 (id not in allowCredentials; contract R64 NotAllowed)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "allow-list-of-one-other",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "raw_id": "b843ec497b9f452b8867b92268ef95dac37c255dbf71eb2596aaeeaca0269f5d",
+   "stored_credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "allow": {
+    "credentials": [
+     "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482"
+    ]
+   },
+   "spec": "WebAuthn L3 7.2 step 5 (a single listed credential that is not the response's; contract R64)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "discoverable-no-list",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "allow": "discoverable",
+   "user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "spec": "WebAuthn L3 7.2 step 5 (an empty allow list adds no constraint; Allow::Discoverable)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6
+   }
+  },
+  {
+   "id": "stored-credential-other-id",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_credential_id": "b843ec497b9f452b8867b92268ef95dac37c255dbf71eb2596aaeeaca0269f5d",
+   "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "allow": {
+    "credentials": [
+     "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482"
+    ]
+   },
+   "spec": "WebAuthn L3 7.2 step 6 (the stored credential's id is the response's; contract R65 CredentialMismatch)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "user-stored-other",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_user_handle": "0202020202020202020202020202020202020202020202020202020202020202",
+   "allow": {
+    "credentials": [],
+    "identified_user": "0101010101010101010101010101010101010101010101010101010101010101"
+   },
+   "spec": "WebAuthn L3 7.2 step 6 (the stored credential's user is the identified user; contract R66 UserHandleMismatch)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "user-stored-same",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "allow": {
+    "credentials": [],
+    "identified_user": "0101010101010101010101010101010101010101010101010101010101010101"
+   },
+   "spec": "WebAuthn L3 7.2 step 6 (contract R66)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6
+   }
+  },
+  {
+   "id": "user-handle-other",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "allow": {
+    "credentials": [],
+    "identified_user": "0101010101010101010101010101010101010101010101010101010101010101"
+   },
+   "user_handle": "0202020202020202020202020202020202020202020202020202020202020202",
+   "spec": "WebAuthn L3 7.2 step 6 (a present userHandle equals the identified user; contract R67 UserHandleMismatch)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "user-handle-same",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "allow": {
+    "credentials": [],
+    "identified_user": "0101010101010101010101010101010101010101010101010101010101010101"
+   },
+   "user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "spec": "WebAuthn L3 7.2 step 6 (contract R67)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6
+   }
+  },
+  {
+   "id": "user-handle-absent-ok",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "allow": {
+    "credentials": [],
+    "identified_user": "0101010101010101010101010101010101010101010101010101010101010101"
+   },
+   "spec": "WebAuthn L3 7.2 step 6 (contract R67: a userHandle may be absent under Allow::User)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6
+   }
+  },
+  {
+   "id": "user-handle-empty-reads-absent",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "allow": {
+    "credentials": [],
+    "identified_user": "0101010101010101010101010101010101010101010101010101010101010101"
+   },
+   "user_handle": "",
+   "spec": "contract R16 (an empty userHandle reads as absent) with WebAuthn L3 7.2 step 6",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6
+   }
+  },
+  {
+   "id": "discoverable-handle-missing",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "allow": "discoverable",
+   "spec": "WebAuthn L3 7.2 step 6 (a discoverable response must carry userHandle; contract R68 UserHandleMismatch)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "discoverable-handle-empty",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "allow": "discoverable",
+   "user_handle": "",
+   "spec": "contract R16 and R68 (an empty userHandle reads as absent, so a discoverable response is refused)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "discoverable-handle-other",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "allow": "discoverable",
+   "user_handle": "0202020202020202020202020202020202020202020202020202020202020202",
+   "spec": "WebAuthn L3 7.2 step 6 (the userHandle is the stored credential's user; contract R69 UserHandleMismatch)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "discoverable-handle-same",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "allow": "discoverable",
+   "user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "spec": "WebAuthn L3 7.2 step 6 (contract R69)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6
+   }
+  },
+  {
+   "id": "discoverable-handle-one-bit",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+   "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
+   "allow": "discoverable",
+   "user_handle": "0101010101010101010101010101010101010101010101010101010101010100",
+   "spec": "WebAuthn L3 7.2 step 6 (the handle compares in full: one bit differs; contract R69)",
+   "expect": {
+    "ok": false
+   }
+  }
+ ]
+}

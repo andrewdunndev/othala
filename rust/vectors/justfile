@@ -1,0 +1,17 @@
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+# run as `just --justfile rust/vectors/justfile webauthn-ext`; the oracle gate for webauthn-rp-derived: the committed files equal a fresh derivation, Node re-verifies them, and a planted TPM alg/key mismatch fails with its own fault id
+webauthn-ext:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd "{{ justfile_directory() }}"
+    t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
+    python3 -I tools/derive_webauthn_ext.py "$t" > /dev/null
+    for f in "$t"/webauthn-rp-derived/*.json; do
+        cmp -s "$f" "webauthn-rp-derived/${f##*/}" || { echo "stale: ${f##*/} differs from a fresh derivation"; exit 1; }
+    done
+    node tools/check_webauthn_ext.mjs .
+    python3 -I tools/plant_webauthn_ext.py "$t" > /dev/null
+    if out=$(node tools/check_webauthn_ext.mjs "$t"); then echo "plant not caught"; exit 1; fi
+    [ "$(grep -c '^FAIL' <<< "$out")" = 1 ] && grep -q 'tpm-plant-es256-p384-aik: fault tpm-alg-key-mismatch' <<< "$out" || { echo "plant caught by the wrong fault: $out"; exit 1; }
+    echo "webauthn-ext: ok (plant fails as tpm-alg-key-mismatch)"
