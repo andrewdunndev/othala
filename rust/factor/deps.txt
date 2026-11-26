@@ -1,0 +1,7 @@
+argon2
+base
+expose
+hmac
+sha1
+sha2
+subtle

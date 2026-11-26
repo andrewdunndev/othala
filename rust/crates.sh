@@ -4,7 +4,7 @@
 # gates.json keys, each optional: published (canary), doc, ui (trybuild twins in tests/ui), api (public-api.txt),
 # targets {triple: [cargo feature args]}, mutants {floor, tests: [packages], default the workspace},
 # vectors [SOURCES.toml source names], allow [crates its graph adds to deny.toml's bans.allow],
-# expose [modules that may read Secret::expose, R-j; the canary's feature-graph check is item base-expose].
+# expose [src modules that read secrets, R-j; a member with a direct dependency on the expose crate, base apart, must name them, and the canary checks both ways].
 set -euo pipefail
 cd "$(dirname "$0")"
 cargo metadata --locked --no-deps --format-version 1 | jq -r '.packages[] | "\(.name)\t\(.manifest_path)"' | sort |

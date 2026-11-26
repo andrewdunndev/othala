@@ -1,0 +1,12 @@
+error[E0277]: can't compare `Phc` with `Phc`
+ --> tests/ui/fail/phc_eq.rs:6:13
+  |
+6 |     needs::<T>();
+  |             ^ no implementation for `Phc == Phc`
+  |
+  = help: the trait `PartialEq` is not implemented for `Phc`
+note: required by a bound in `needs`
+ --> tests/ui/fail/phc_eq.rs:4:13
+  |
+4 | fn needs<C: PartialEq>() {}
+  |             ^^^^^^^^^ required by this bound in `needs`
