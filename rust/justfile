@@ -97,20 +97,34 @@ mutants-off floor="5":
     jq -e --argjson floor "{{floor}}" '.caught >= $floor and .missed == 0 and .timeout == 0' \
         "$out/mutants.out/outcomes.json" > /dev/null || { echo "mutants-off: under the floor of {{floor}}, or missed or timed out"; exit 1; }
 
-# MR gate: `just mutants` on each crate this branch changes since its merge base with origin/main (a change to Cargo.toml, Cargo.lock or .cargo/ means all); no merge base is an error, not a skip
+# MR gate: cargo mutants --in-diff on each crate this branch changes since its merge base with origin/main, none missed or timed out and no floor (the floors are the scheduled run's); a change to Cargo.toml, Cargo.lock, rust-toolchain.toml, .cargo/ or vectors/ means all crates, a crate whose mutants tests include a changed crate counts as changed, a changed jose also runs mutants-off; no merge base is an error, not a skip
 mutants-changed base="origin/main":
     #!/usr/bin/env bash
     set -euo pipefail
     mb=$(git merge-base "{{base}}" HEAD) || { echo "mutants-changed: no merge base with {{base}}"; exit 1; }
     [ -n "$mb" ] || { echo "mutants-changed: no merge base with {{base}}"; exit 1; }
-    files=$(git diff --name-only --relative "$mb" -- .)
-    members=$(./crates.sh | jq -r 'select(.mutants) | .name')
-    if grep -qE '^(Cargo\.toml|Cargo\.lock|\.cargo/)' <<< "$files"; then changed=$members
-    else
-        changed=$(for c in $members; do grep -q "^$c/" <<< "$files" && echo "$c"; done || true)
-    fi
+    files=$(git diff --no-renames --name-only --relative "$mb" -- .)
+    runs=$(./crates.sh | jq -r 'select(.mutants) | "\(.name) \(.mutants.tests // [] | join(","))"')
+    touched() { grep -q "^$1/" <<< "$files"; }
+    changed=""
+    while read -r c tests; do
+        hit=0
+        if grep -qE '^(Cargo\.toml|Cargo\.lock|rust-toolchain\.toml|\.cargo/|vectors/)' <<< "$files"; then hit=1; fi
+        touched "$c" && hit=1
+        for t in ${tests//,/ }; do touched "$t" && hit=1; done
+        [ "$hit" = 1 ] && changed="$changed $c"
+    done <<< "$runs"
     [ -n "$changed" ] || { echo "mutants-changed: no crate with a mutants floor changed since $mb"; exit 0; }
-    for c in $changed; do just mutants "$c"; done
+    for c in $changed; do
+        tests=$(grep "^$c " <<< "$runs" | cut -d' ' -f2)
+        if [ -n "$tests" ]; then scope=(--test-package "$tests"); else scope=(--test-workspace=true); fi
+        diff="{{target}}/mutants/$c.diff"
+        mkdir -p "{{target}}/mutants/$c"
+        git diff --no-renames "$mb" -- "$c/" > "$diff"
+        cargo mutants --package "$c" "${scope[@]}" --no-shuffle --in-diff "$diff" --output "{{target}}/mutants/$c" < /dev/null
+        jq -e '.missed == 0 and .timeout == 0' "{{target}}/mutants/$c/mutants.out/outcomes.json" > /dev/null || { echo "mutants-changed $c: a mutant in the diff was missed or timed out"; exit 1; }
+    done
+    if grep -qx jose <<< "${changed// /$'\n'}"; then just mutants-off; fi
 
 wasm: (build "wasm32-unknown-unknown")
 

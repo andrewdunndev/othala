@@ -4,7 +4,7 @@ exclude_re = [
   "replace \\|\\| with && in <impl Store<K, R> for MemStore<K, R>>::apply",
   # an off feature's refusal is dead code in this all-features run; a features-off pass of mutants kills these
   "in Parsed::supported",
-  "replace supported -> Result<\\(\\), Error> with Ok\\(\\(\\)\\)",
+  "replace (Parsed::)?supported -> Result<\\(\\), Error> with Ok\\(\\(\\)\\)",
   "replace == with != in Jws<'a>::parse_json",
   "replace == with != in Jwe<'a>::parse_json",
   # a no-op fill leaves rsa's blinding factor unusable, so the mutant spins until the timeout instead of failing a test
