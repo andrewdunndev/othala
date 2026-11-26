@@ -2,7 +2,9 @@
 // Re-verifies the generated webauthn-rp-derived extension families with Node's crypto, independent of the generator:
 // every certificate parses; every assertion signature verifies; each chains.json case's expected outcome agrees with the
 // signatures it contains (including ecdsa-with-SHA1, sha1 with RSA, ecdsa-with-SHA512 and P-521, which the walk refuses by
-// policy although they verify); every attestation.json x5c chain verifies link by link and to its anchor; statement
+// policy although they verify); Anchored needs every link's issuer name equal to the next subject (DER bytes), every
+// signature, validity, CA rule and anchor, Unanchored needs all of those but the anchor, AttestationInvalid needs at
+// least one name, signature, CA-rule or validity fault; every attestation.json x5c chain verifies link by link (names too) and to its anchor; statement
 // signatures, TPM extraData and the TPM attested name verify or fail exactly where the case id names that fault, both ways.
 // Licence: MIT OR Apache-2.0.
 import { X509Certificate, createPublicKey, verify, createHash } from "node:crypto";
@@ -27,23 +29,73 @@ for (const f of ["authentication.json", "extensions.json", "browser-binding.json
   }
 }
 
-// chains: expected outcome against the signatures in the chain
+// X.509 fields Node does not expose, read with a small DER reader: the exact issuer and subject DER, version, extensions
+const der = (b, o) => {
+  let l = b[o + 1], h = 2;
+  if (l & 0x80) { const n = l & 0x7f; l = 0; for (let i = 0; i < n; i++) l = l * 256 + b[o + 2 + i]; h = 2 + n; }
+  return { tag: b[o], s: o, vs: o + h, e: o + h + l };
+};
+const kids = (b, n) => { const r = []; for (let o = n.vs; o < n.e;) { const k = der(b, o); r.push(k); o = k.e; } return r; };
+const oidStr = (b) => { const v = [...b]; const a = [Math.floor(v[0] / 40), v[0] % 40]; let x = 0; for (const c of v.slice(1)) { x = x * 128 + (c & 127); if (!(c & 128)) { a.push(x); x = 0; } } return a.join("."); };
+function parts(c) {
+  const raw = c.raw, t = kids(raw, kids(raw, der(raw, 0))[0]);
+  let i = 0, version = 1;
+  if (t[0].tag === 0xa0) { version = raw[t[0].vs + 2] + 1; i = 1; }
+  const exts = {};
+  const e = t.find((x) => x.tag === 0xa3);
+  if (e) for (const x of kids(raw, kids(raw, e)[0])) {
+    const f = kids(raw, x);
+    exts[oidStr(raw.subarray(f[0].vs, f[0].e))] = { crit: f.length === 3 && raw[f[1].vs] !== 0, val: raw.subarray(f[f.length - 1].vs, f[f.length - 1].e) };
+  }
+  return { version, issuer: raw.subarray(t[i + 2].s, t[i + 2].e), subject: raw.subarray(t[i + 4].s, t[i + 4].e), exts };
+}
+const okVerify = (c, by) => { try { return c.verify(by.publicKey); } catch { return false; } };
+// link faults: the issuer name is byte for byte the next certificate's subject, and the signature verifies under its key
+function linkFaults(x) {
+  const out = [];
+  x.slice(0, -1).forEach((e, i) => {
+    if (!parts(e).issuer.equals(parts(x[i + 1]).subject)) out.push(`link ${i} issuer name differs from the next subject`);
+    if (!okVerify(e, x[i + 1])) out.push(`link ${i} signature fails`);
+  });
+  return out;
+}
+const CA_CRIT_OK = new Set(["2.5.29.19", "2.5.29.15", "2.5.29.37", "2.5.29.17"]);
+// a certificate used as a CA: version 3, basicConstraints CA true, keyCertSign if keyUsage, critical extensions in the allowed set, pathLen respected
+function caFaults(c, below) {
+  const p = parts(c), out = [];
+  const bc = p.exts["2.5.29.19"];
+  let ca = false, pathLen = null;
+  if (p.version === 3 && bc) { const f = kids(bc.val, der(bc.val, 0)); ca = f.length > 0 && f[0].tag === 1 && bc.val[f[0].vs] !== 0; const n = f.find((k) => k.tag === 2); if (n) pathLen = bc.val[n.vs]; }
+  if (!ca) out.push("not a CA");
+  const ku = p.exts["2.5.29.15"];
+  if (ku && !(ku.val[3] & 0x04)) out.push("keyUsage lacks keyCertSign");
+  if (pathLen !== null && pathLen < below) out.push("pathLen exceeded");
+  for (const [o, v] of Object.entries(p.exts)) if (v.crit && !CA_CRIT_OK.has(o)) out.push(`critical extension ${o}`);
+  return out;
+}
+const validAt = (c, now) => { const ms = now * 1000; return Date.parse(c.validFrom) <= ms && ms <= Date.parse(c.validTo); };
+
+// chains: expected outcome against names, signatures, CA rules and validity in the chain
 let chains = 0;
 for (const c of load("chains.json")) {
   if (c.expect.kind) continue;
   const x = c.x5c.map(cert);
   const anchors = c.anchors.map(cert);
-  const linkOk = x.slice(0, -1).map((e, i) => { try { return e.verify(x[i + 1].publicKey); } catch { return false; } });
+  const faults = linkFaults(x);
+  x.forEach((e, i) => { if (!validAt(e, c.now)) faults.push(`certificate ${i} outside its validity`); if (i > 0) faults.push(...caFaults(e, i - 1).map((m) => `certificate ${i}: ${m}`)); });
   const last = x[x.length - 1];
-  const viaAnchor = anchors.some((a) => a.raw.equals(last.raw) || (a.subject === last.issuer && (() => { try { return last.verify(a.publicKey); } catch { return false; } })()));
-  const all = linkOk.every(Boolean) && viaAnchor;
+  const exact = anchors.some((a) => a.raw.equals(last.raw));
+  const matching = anchors.filter((a) => parts(a).subject.equals(parts(last).issuer) && okVerify(last, a));
+  if (!exact && matching.length > 0 && matching.every((a) => !validAt(a, c.now) || caFaults(a, x.length - 1).length > 0)) faults.push("every matching anchor is unusable");
+  const viaAnchor = exact || matching.length > 0;
   const out = c.expect.outcome;
-  // chains refused by algorithm policy alone: every signature verifies, the walk still reports Unanchored (R117)
-  const policy = ["ecdsa-sha1-leaf", "ecdsa-sha512-on-p256-leaf", "rsa-sha1-intermediate", "ecdsa-sha1-to-anchor", "p521-anchor"].includes(c.id);
-  if (policy) { if (!all) fail(`chains#${c.id}: policy case whose chain does not verify (links ${linkOk} anchor ${viaAnchor})`); chains++; continue; }
-  if (out === "Anchored" && !all) fail(`chains#${c.id}: expected Anchored, links ${linkOk} anchor ${viaAnchor}`);
-  if (/tampered/.test(c.id) && all) fail(`chains#${c.id}: tampered chain verifies`);
-  if (out === "Unanchored" && all) fail(`chains#${c.id}: expected Unanchored but the chain anchors`);
+  // chains refused by algorithm policy alone: every name, signature and rule holds, the walk still reports Unanchored (R117)
+  const policy = ["ecdsa-sha1-leaf", "ecdsa-sha512-on-p256-leaf", "rsa-sha1-intermediate", "ecdsa-sha1-to-anchor", "p521-intermediate", "p521-anchor"].includes(c.id);
+  if (policy) { if (faults.length || !viaAnchor) fail(`chains#${c.id}: policy case whose chain does not verify (${faults.join("; ") || "no anchor"})`); chains++; continue; }
+  if (out === "Anchored" && (faults.length || !viaAnchor)) fail(`chains#${c.id}: expected Anchored, found ${faults.join("; ") || "no anchor"}`);
+  if (out === "Unanchored" && (faults.length || viaAnchor)) fail(`chains#${c.id}: expected Unanchored, ${faults.length ? "found " + faults.join("; ") : "the chain anchors"}`);
+  if (out === "AttestationInvalid" && faults.length === 0) fail(`chains#${c.id}: expected AttestationInvalid but no name, signature, CA or validity fault exists`);
+  if (/tampered/.test(c.id) && !(faults.length || !viaAnchor)) fail(`chains#${c.id}: tampered chain verifies`);
   chains++;
 }
 
@@ -85,10 +137,10 @@ for (const c of load("attestation.json")) {
   if (!st.x5c || st.x5c.length === 0) { atts++; continue; }
   const x = st.x5c.map((d) => cert(d.toString("hex")));
   // every link verifies under the next certificate; the last verifies under an anchor naming its issuer, except in the unanchored cases
-  const links = x.slice(0, -1).every((e, i) => { try { return e.verify(x[i + 1].publicKey); } catch { return false; } });
+  const lf = linkFaults(x);
   const last = x[x.length - 1];
-  const anchored = anchors.some((a) => a.subject === last.issuer && (() => { try { return last.verify(a.publicKey); } catch { return false; } })());
-  if (!links) fail(`attestation#${c.id}: x5c links do not verify`);
+  const anchored = anchors.some((a) => parts(a).subject.equals(parts(last).issuer) && okVerify(last, a));
+  if (lf.length) fail(`attestation#${c.id}: x5c links do not verify (${lf.join("; ")})`);
   if (anchored === /^packed-unanchored/.test(c.id)) fail(`attestation#${c.id}: chain ${anchored ? "reaches" : "misses"} an anchor against the case id`);
   chainsChecked++;
   const key = x[0].publicKey;

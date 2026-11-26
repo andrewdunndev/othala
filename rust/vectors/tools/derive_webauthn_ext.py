@@ -312,7 +312,7 @@ def regid_cases():
 
 # ================================================================ origins.json (R8, R9, R10)
 def origin_cases():
-    apk = ("AZaz09-_" * 6)[:43]  # low entropy on purpose, every base64url symbol present: a real signer hash would read as a credential to the repository secret scan
+    apk = ("AZaz09-_" * 6)[:42] + "A"  # low entropy on purpose, every base64url symbol present, the last symbol one of A Q g w so 43 symbols are a canonical 32-byte value: a real signer hash would read as a credential to the repository secret scan
     assert len(apk) == 43
     o = lambda cid, s, spec, ok: {"id": cid, "op": "origin_parse", "input": s, "spec": spec, "expect": OK if ok else NO}
     r = lambda cid, s, spec, ok: {"id": cid, "op": "rp_id_parse", "input": s, "spec": spec, "expect": OK if ok else NO}
@@ -552,8 +552,9 @@ def chain_cases():
     add(chain("rsa-sha1-intermediate", Wk + "R117 (sha1 with RSA is outside R116)", [issue("Derived Leaf Under RSA Sha1", s := issue("Derived Int RSA Sha1", rsa_root, "p256", pathlen=0, hname="sha1"), "p256", ca=False), s], [rsa_root], un))
     add(chain("ecdsa-sha1-to-anchor", Wk + "R117 (the last certificate's signature under the anchor is ecdsa-with-SHA1)", [issue("Derived Leaf Under Sha1 Int", s1 := issue("Derived Int Sha1 To Root", ROOT, "p256", pathlen=0, hname="sha1"), "p256", ca=False), s1], [ROOT], un))
     r521 = issue("Derived Root P521", None, "p521")
-    i521 = issue("Derived Int P521", r521, "p521", pathlen=0)
-    add(chain("p521-anchor", "N3 and R117 (chain signatures on P-521 keys are Unanchored)", [issue("Derived Leaf Under P521", i521, "p256", ca=False), i521], [r521], un))
+    i521 = issue("Derived Int P521", ROOT, "p521", pathlen=0)
+    add(chain("p521-intermediate", "N3 and R117 (the leaf's signature is made by a P-521 intermediate key: Unanchored)", [issue("Derived Leaf Under P521", i521, "p256", ca=False), i521], [ROOT], un))
+    add(chain("p521-anchor", "N3 and R117 (the last certificate's signature under a P-521 anchor key: Unanchored)", [issue("Derived Leaf Under P521 Root", r521, "p256", ca=False)], [r521], un))
     # --- signature failures
     tampered = Ent(LEAF.key, LEAF.subject, flip_signature(LEAF.der))
     add(chain("leaf-signature-tampered", Wk + "R111 (a signature that does not verify under the next certificate's key is AttestationInvalid, never Unanchored; R117)", [tampered, INT], [ROOT], bad))
@@ -694,13 +695,9 @@ def limit_cases():
         cs.append({"id": f"allow-list-{sfx}", "op": "start_authentication", "bound": "webauthn_rp::MAX_LISTED_CREDENTIALS", "excess": ex, "spec": L + " and R1 (an Allow::User list over MAX_LISTED_CREDENTIALS)",
                    "allow_credentials": [sha(f"allow {i}".encode())[:16].hex() for i in range(n)], "expect": OK if ex == 0 else TOO})
         cs.append({"id": f"prf-salt-{sfx}", "op": "start_registration", "bound": "webauthn_rp::MAX_PRF_SALT", "excess": ex, "spec": L + " and R31 (a PRF salt over MAX_PRF_SALT)",
-                   "extensions": {"prf": {"eval": {"first": (bytes([7]) * (256 + ex)).hex()}}}, "expect": OK if ex == 0 else TOO})
+                   "extensions": {"prf": {"eval": {"first": b64(bytes([7]) * (256 + ex))}}}, "expect": OK if ex == 0 else TOO})
         cs.append({"id": f"prf-salt-auth-{sfx}", "op": "start_authentication", "bound": "webauthn_rp::MAX_PRF_SALT", "excess": ex, "spec": L + " and R61 (a PRF salt over MAX_PRF_SALT at start_authentication; the salt is base64url as in the other authentication extension requests)",
                    "allow": "discoverable", "extensions": {"prf": {"eval": {"first": b64(bytes([7]) * (256 + ex))}}}, "expect": OK if ex == 0 else TOO})
-        blob = bytes([3]) * (8192 - 91 + ex)
-        cs.append({"id": f"record-{sfx}", "op": "start_authentication", "bound": "webauthn_rp::MAX_RECORD", "excess": ex,
-                   "spec": L + " and R61 (a ceremony row that Record::encode refuses past MAX_RECORD; the row is the 91 fixed bytes of a discoverable ceremony with default options plus the largeBlob write, so the blob length sets the row length: bound+excess-91)",
-                   "allow": "discoverable", "extensions": {"largeBlob": {"write": b64(blob)}}, "expect": OK if ex == 0 else TOO})
         cs.append({"id": f"origins-{sfx}", "op": "relying_party_build", "bound": "webauthn_rp::MAX_ORIGINS", "excess": ex, "spec": L + " and R19 (more than MAX_ORIGINS origins and top origins together)",
                    "origins": [f"https://o{i}.example.org" for i in range(32 + ex)], "expect": OK if ex == 0 else TOO})
         cs.append({"id": f"timeout-{sfx}", "op": "start_registration", "bound": "webauthn_rp::MAX_TIMEOUT_SECS", "excess": ex, "spec": L + " (a timeout over MAX_TIMEOUT_SECS seconds)",
@@ -714,6 +711,12 @@ def limit_cases():
         cs.append({"id": f"large-blob-{sfx}", "op": "largeblob_result", "bound": "webauthn_rp::MAX_LARGE_BLOB", "excess": ex, "spec": L + " and R127 (a blob past MAX_LARGE_BLOB is TooLarge)",
                    "input_len": 65536 + ex, "input_sha256": sha(bytes([3]) * (65536 + ex)).hex(), "input_b64url": b64(bytes([3]) * (65536 + ex)), "recipe": "the byte 0x03 repeated bound+excess times, returned as the largeBlob `blob` after a Read request", "expect": OK if ex == 0 else TOO})
     cs += [
+        {"id": "record-large-blob-half-bound", "op": "start_authentication", "bound": "webauthn_rp::MAX_RECORD", "blob_len": 4096,
+         "spec": "contract R1 and R61 (a ceremony row well under MAX_RECORD: a largeBlob write of MAX_RECORD/2 bytes, under any row encoding)",
+         "allow": "discoverable", "extensions": {"largeBlob": {"write": b64(bytes([3]) * 4096)}}, "expect": OK},
+        {"id": "record-large-blob-max-record", "op": "start_authentication", "bound": "webauthn_rp::MAX_RECORD", "blob_len": 8192,
+         "spec": "contract R1 and R61 (a largeBlob write of exactly MAX_RECORD bytes is below MAX_LARGE_BLOB, 65536, yet the row holding it exceeds MAX_RECORD under any encoding, so TooLarge)",
+         "allow": "discoverable", "extensions": {"largeBlob": {"write": b64(bytes([3]) * 8192)}}, "expect": TOO},
         {"id": "trust-anchor-one-certificate", "op": "trust_anchor_from_der", "input": ROOT.der.hex(), "spec": "contract R18 (exactly one DER certificate; digest is the SHA-256 of that DER)", "expect": {"ok": True, "digest": sha(ROOT.der).hex()}},
         {"id": "trust-anchor-two-certificates", "op": "trust_anchor_from_der", "input": (ROOT.der + INT.der).hex(), "spec": "contract R18 (exactly one DER certificate, not a concatenation)", "expect": NO},
         {"id": "trust-anchor-trailing-byte", "op": "trust_anchor_from_der", "input": (ROOT.der + b"\x00").hex(), "spec": "contract R18 (exactly one DER certificate: nothing after it)", "expect": NO},
@@ -825,6 +828,7 @@ def tpm_attest(extra, name, magic=0xFF544347, typ=0x8017, tail=b""):
 
 TPM_AIK_P = Key("webauthn-rp-derived-ext tpm aik p256", "p256")
 TPM_AIK_R = Key("webauthn-rp-derived-ext tpm aik rsa", "rsa")
+TPM_AIK_P384 = Key("webauthn-rp-derived-ext tpm aik p384", "p384")
 TPM_OID_EKU = "2.23.133.8.3"
 TPM_SAN = lambda: ext("2.5.29.17", seq(ctx(4, seq(sset(seq(oid("2.23.133.2.1"), utf8("id:4E544300"))), sset(seq(oid("2.23.133.2.2"), utf8("DerivedTPM"))), sset(seq(oid("2.23.133.2.3"), utf8("id:00010002")))))), True)
 
@@ -885,7 +889,7 @@ def tpm_cases():
     add(tpm_case("tpm-signature-over-other-data", "(sig verifies over certInfo)", NO, data=b"not certInfo"))
     add(tpm_case("tpm-signature-other-key", "(sig verifies with the AIK certificate key)", NO, sig_key=CRED))
     add(tpm_case("tpm-alg-es256-rsa-aik", "(alg ES256 with an RSA AIK: the signature cannot verify under alg)", NO, aik=aik_cert(TPM_AIK_R, "Derived TPM AIK RSA Mismatch"), alg=-7))
-    add(tpm_case("tpm-alg-es384", "(alg is RS256, RS1 or ES256; ES384 is not accepted: the statement is otherwise valid under ES384 with SHA-384)", NO, alg=-35))
+    add(tpm_case("tpm-alg-es384", "(alg is RS256, RS1 or ES256; ES384 is not accepted: the statement is otherwise valid under ES384 with SHA-384)", NO, alg=-35, aik=aik_cert(TPM_AIK_P384, "Derived TPM AIK P384")))
     add(tpm_case("tpm-aik-subject-not-empty", "and 8.3.1 (the AIK certificate subject is empty)", NO, aik=aik_cert(TPM_AIK_P, "Derived TPM AIK Subject", subject=dn("Derived TPM AIK Subject"))))
     add(tpm_case("tpm-aik-no-san", "and 8.3.1 (a subject alternative name is required)", NO, aik=aik_cert(TPM_AIK_P, "Derived TPM AIK No SAN", san=False)))
     add(tpm_case("tpm-aik-no-eku", "and 8.3.1 (extended key usage 2.23.133.8.3 is required)", NO, aik=aik_cert(TPM_AIK_P, "Derived TPM AIK No EKU", eku=())))

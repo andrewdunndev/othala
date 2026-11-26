@@ -103,7 +103,7 @@
   {
    "id": "origin-android",
    "op": "origin_parse",
-   "input": "android:apk-key-hash:AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZa",
+   "input": "android:apk-key-hash:AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZA",
    "spec": "contract R8 (android:apk-key-hash: with 43 base64url symbols)",
    "expect": {
     "ok": true
@@ -481,7 +481,7 @@
   {
    "id": "origin-android-44-symbols",
    "op": "origin_parse",
-   "input": "android:apk-key-hash:AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZaA",
+   "input": "android:apk-key-hash:AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZAA",
    "spec": "contract R8 (exactly 43 base64url symbols)",
    "expect": {
     "ok": false
@@ -517,7 +517,7 @@
   {
    "id": "origin-android-trailing-slash",
    "op": "origin_parse",
-   "input": "android:apk-key-hash:AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZa/",
+   "input": "android:apk-key-hash:AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZA/",
    "spec": "contract R8 (nothing after the hash)",
    "expect": {
     "ok": false
@@ -526,7 +526,7 @@
   {
    "id": "origin-android-uppercase-scheme",
    "op": "origin_parse",
-   "input": "Android:apk-key-hash:AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZa",
+   "input": "Android:apk-key-hash:AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZA",
    "spec": "contract R8 (the scheme as written)",
    "expect": {
     "ok": false
@@ -809,7 +809,7 @@
   {
    "id": "app-id-android",
    "op": "app_id_parse",
-   "input": "android:apk-key-hash:AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZa",
+   "input": "android:apk-key-hash:AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZA",
    "spec": "contract R10 (an https URL)",
    "expect": {
     "ok": false
