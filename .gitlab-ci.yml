@@ -231,7 +231,7 @@ check-purity:
     - cd rust
     - rustup toolchain install
     - rustup toolchain install 1.89.0 nightly-2026-11-24 --profile minimal
-    - cargo install --locked cargo-deny@0.22.1
+    - cargo install --locked cargo-deny@$(just deny-pin)
 
 check-rust:
   extends: .rust
@@ -246,13 +246,15 @@ check-rust:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
   script:
-    - just lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api
+    - just tool-pins jq
+    - just floor-rule lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api
 
 # check-ownership: a branch item/<id> changes only the paths its primitives/queue.json item owns, and no oracle path.
 check-ownership:
   extends: .rust
   variables:
     GIT_DEPTH: "0"
+    GIT_LFS_SKIP_SMUDGE: "1"
   cache: []
   rules:
     - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^item\//'
@@ -272,8 +274,10 @@ check-rust-scheduled:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
   script:
-    - cargo install --locked cargo-mutants@27.1.0 cargo-fuzz@0.13.1
+    - cargo install --locked cargo-mutants@$(just mutants-pin) cargo-fuzz@0.13.1
+    - just tool-pins
     - just mutants rows
+    - just mutants-off
     - rustup toolchain install nightly --profile minimal
     - just fuzz
 
