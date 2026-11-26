@@ -1,5 +1,8 @@
 //! Issuing round trips (CONTRACT R42 to R45): sign then verify, `finish` of a signature equals `sign`, any one-byte
 //! change fails, and the header's `kid` comes back.
+mod common_figures;
+mod common_sections;
+
 use jose::{
     Alg, EdDsa, Es256, Es384, Header, Hs256, Jws, Kid, LocalAlg, SecretJwk, Signer, SigningKey,
     Unsigned, VerifyKey,
@@ -8,7 +11,7 @@ use proptest::prelude::*;
 use proptest::test_runner::{RngSeed, TestRunner};
 use serde::Deserialize;
 use testkit::vector;
-use testkit::vectors::{Json, Outcome, run, sections};
+use testkit::vectors::{Json, Outcome, run};
 
 #[derive(Deserialize)]
 struct Case {
@@ -19,7 +22,7 @@ struct Case {
 
 fn case_key(file: testkit::vectors::Vector, id: Option<&str>, private: bool) -> String {
     let mut found = String::new();
-    run::<Case>(file, 1, |case| {
+    let tally = run::<Case>(file, 1, |case| {
         let json = if private {
             case.private_jwk.as_ref()
         } else {
@@ -30,6 +33,7 @@ fn case_key(file: testkit::vectors::Vector, id: Option<&str>, private: bool) -> 
         }
         Outcome::Checked
     });
+    assert_eq!(tally.checked(), tally.total());
     found
 }
 
@@ -111,7 +115,7 @@ fn sign_round_trip() {
         serde_json::from_str(&derived).unwrap_or_default();
     members.remove("use");
     let p384 = pair::<Es384>(&serde_json::to_string(&members).unwrap_or_default());
-    let okp = sections(vector!("rfc8037/appendix-a.json"));
+    let okp = common_sections::all(vector!("rfc8037/appendix-a.json"));
     let ed = pair::<EdDsa>(
         okp.first()
             .and_then(|a| a.section.blocks.first())
@@ -150,7 +154,7 @@ fn sign_round_trip() {
 #[cfg(feature = "es512")]
 #[test]
 fn sign_round_trip_p521() {
-    let keys = testkit::vectors::figures(vector!("rfc7520/jwk.json"));
+    let keys = common_figures::all(vector!("rfc7520/jwk.json"));
     let private = keys
         .examples
         .iter()

@@ -1,10 +1,12 @@
 //! ES512 and the P-521 keys: Wycheproof, RFC 7515 A.4, RFC 7520 3.1, 3.2 and 4.3 (CONTRACT R2, R3, R6, R7, R23).
 #![cfg(feature = "es512")]
 mod common;
+mod common_figures;
+mod common_sections;
 
 use jose::{Es512, Jwk, Jws, Kty, SecretJwk};
 use testkit::vector;
-use testkit::vectors::{Appendix, Expected, Outcome, Vector, figures, sections, wycheproof};
+use testkit::vectors::{Appendix, Expected, Outcome, Vector, wycheproof};
 
 fn hex(text: &str) -> Vec<u8> {
     let parse = |pair: &[u8; 2]| u8::from_str_radix(std::str::from_utf8(pair).ok()?, 16).ok();
@@ -81,7 +83,7 @@ fn block(file: &[Appendix], section: &str, starts: &str) -> String {
 
 #[test]
 fn rfc7515_a4() {
-    let file = sections(vector!("rfc7515/appendix-a4-a7.json"));
+    let file = common_sections::all(vector!("rfc7515/appendix-a4-a7.json"));
     let private = block(&file, "A.4.1", "{\"kty\":\"EC\",\"crv\":\"P-521\"");
     let public = SecretJwk::decode(private.as_bytes())
         .ok()
@@ -106,7 +108,7 @@ fn example(file: &testkit::vectors::Figures, number: &str, figure: u32) -> Strin
 
 #[test]
 fn rfc7520_p521() {
-    let keys = figures(vector!("rfc7520/jwk.json"));
+    let keys = common_figures::all(vector!("rfc7520/jwk.json"));
     let (public, private) = (example(&keys, "3.1", 1), example(&keys, "3.2", 2));
     let (public, private) = (
         Jwk::decode(public.as_bytes()),
@@ -123,7 +125,7 @@ fn rfc7520_p521() {
     );
 
     // 4.3: the compact, general and flattened serializations verify under the 3.1 key
-    let signed = figures(vector!("rfc7520/jws.json"));
+    let signed = common_figures::all(vector!("rfc7520/jws.json"));
     let key = public.and_then(|k| k.verify_key::<Es512>().ok());
     let verified =
         |outcome: Result<jose::Payload, jose::Error>| outcome.ok().map(|p| p.bytes().len());

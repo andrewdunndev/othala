@@ -10,6 +10,7 @@ use core::fmt;
 use core::marker::PhantomData;
 
 use base::{Entropy, SecretBytes, b64url_decode, b64url_encode};
+use expose::Expose as _;
 use serde::Deserialize;
 use serde::de::IgnoredAny;
 use serde_json::value::RawValue;

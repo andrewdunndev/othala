@@ -1,8 +1,10 @@
 //! RFC 7515 A.4 to A.7: the JSON serializations verify, the unsecured JWS is refused (CONTRACT R2, R15).
+mod common_sections;
+
 use jose::{Es256, Jwk, Jws, Kid, Rs256};
 use serde::Deserialize;
 use testkit::vector;
-use testkit::vectors::{Json, Outcome, run, sections};
+use testkit::vectors::{Json, Outcome, run};
 
 #[derive(Deserialize)]
 struct Case {
@@ -13,12 +15,13 @@ struct Case {
 /// The key of the RFC 7515 A.2 (RSA) or A.3 (EC) example, as the vectors carry it.
 fn key(id: &str) -> Option<Jwk> {
     let mut text = String::new();
-    run::<Case>(vector!("rfc7515/jws.json"), 1, |case| {
+    let tally = run::<Case>(vector!("rfc7515/jws.json"), 1, |case| {
         if case.id == id {
             text = case.jwk.text().to_owned();
         }
         Outcome::Checked
     });
+    assert_eq!(tally.checked(), tally.total());
     Jwk::decode(text.as_bytes()).ok()
 }
 
@@ -38,7 +41,7 @@ fn block(file: &[testkit::vectors::Appendix], section: &str, starts: &str) -> St
 
 #[test]
 fn appendix_a4_to_a7() {
-    let file = sections(vector!("rfc7515/appendix-a4-a7.json"));
+    let file = common_sections::all(vector!("rfc7515/appendix-a4-a7.json"));
     let (rsa, ec) = (key("a2-rs256-valid"), key("a3-es256-valid"));
     assert!(rsa.is_some() && ec.is_some());
     let rs = rsa.and_then(|k| k.verify_key::<Rs256>().ok());

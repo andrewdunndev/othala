@@ -1,7 +1,9 @@
 //! RFC 7520 section 4 JWS in each serialization given (CONTRACT R3, R15); 4.3 is in `row_es512`.
+mod common_figures;
+
 use jose::{Alg, Hs256, Jwk, Jws, Ps384, Rs256, SecretJwk, VerifyKey};
 use testkit::vector;
-use testkit::vectors::{Figures, figures};
+use testkit::vectors::Figures;
 
 fn figure(file: &Figures, number: u32) -> String {
     let all = file
@@ -30,8 +32,8 @@ fn payload<A: Alg>(key: &Option<VerifyKey<A>>, text: &str, json: bool) -> Option
 #[test]
 fn section_4() {
     let (keys, signed) = (
-        figures(vector!("rfc7520/jwk.json")),
-        figures(vector!("rfc7520/jws.json")),
+        common_figures::all(vector!("rfc7520/jwk.json")),
+        common_figures::all(vector!("rfc7520/jws.json")),
     );
     let text = |number| figure(&keys, number);
     let rsa = Jwk::decode(text(3).as_bytes()).ok();

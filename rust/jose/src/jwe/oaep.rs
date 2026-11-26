@@ -90,6 +90,7 @@ oaep!(RsaOaep256, RsaOaep256, sha2::Sha256);
 mod tests {
     use alloc::string::String;
     use alloc::vec::Vec;
+    use expose::Expose as _;
 
     use serde::Deserialize;
     use testkit::vector;

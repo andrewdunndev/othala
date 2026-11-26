@@ -515,6 +515,7 @@ dependencies = [
  "cbc",
  "ecdsa",
  "ed25519-dalek",
+ "expose",
  "getrandom",
  "hmac",
  "one-step-kdf",

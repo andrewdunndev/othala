@@ -1,8 +1,10 @@
 //! RFC 8037 Appendix A: Ed25519 keys, thumbprint, signing byte for byte and validation; X25519 and X448 refused
 //! (CONTRACT R17, R24).
+mod common_sections;
+
 use jose::{EdDsa, ErrorKind, Header, Jwk, Jws, SecretJwk, Unsigned};
 use testkit::vector;
-use testkit::vectors::{Appendix, sections};
+use testkit::vectors::Appendix;
 
 fn blocks<'a>(file: &'a [Appendix], section: &str) -> Vec<&'a testkit::vectors::Block> {
     let all = file
@@ -22,7 +24,7 @@ fn first_json(file: &[Appendix], section: &str) -> String {
 
 #[test]
 fn appendix_a() {
-    let file = sections(vector!("rfc8037/appendix-a.json"));
+    let file = common_sections::all(vector!("rfc8037/appendix-a.json"));
     let private = SecretJwk::decode(first_json(&file, "A.1").as_bytes());
     let public = Jwk::decode(
         blocks(&file, "A.2")

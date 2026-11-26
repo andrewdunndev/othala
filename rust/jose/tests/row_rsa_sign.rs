@@ -2,6 +2,8 @@
 //! PS algorithm round trips, and the entropy is drawn from.
 #![cfg(feature = "rsa-sign")]
 
+mod common_figures;
+
 use base::Entropy;
 use jose::{
     BlindedAlg, Header, Jws, Kid, Ps256, Ps384, Ps512, Rs256, Rs384, Rs512, SecretJwk, Unsigned,
@@ -9,7 +11,7 @@ use jose::{
 use proptest::prelude::*;
 use proptest::test_runner::{RngSeed, TestRunner};
 use testkit::vector;
-use testkit::vectors::{Figures, figures};
+use testkit::vectors::Figures;
 
 /// Seeded entropy that counts its draws.
 struct Draws(testkit::Seeded, usize);
@@ -30,7 +32,7 @@ fn figure(file: &Figures, example: &str, number: u32) -> String {
 }
 
 fn key() -> Option<SecretJwk> {
-    let keys = figures(vector!("rfc7520/jwk.json"));
+    let keys = common_figures::all(vector!("rfc7520/jwk.json"));
     let found = keys.examples.iter().find(|e| e.example == "3.4");
     let json = found
         .and_then(|e| e.figures.last())
@@ -40,7 +42,7 @@ fn key() -> Option<SecretJwk> {
 
 #[test]
 fn rfc7520_4_1_byte_for_byte() {
-    let signed = figures(vector!("rfc7520/jws.json"));
+    let signed = common_figures::all(vector!("rfc7520/jws.json"));
     let token = figure(&signed, "4.1", 13);
     let payload = token
         .split('.')

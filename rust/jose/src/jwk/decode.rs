@@ -8,6 +8,7 @@ use core::fmt;
 use core::marker::PhantomData;
 
 use base::{SecretBytes, b64url_decode};
+use expose::Expose as _;
 use rsa::BoxedUint;
 use serde::de::{DeserializeSeed, IgnoredAny, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -866,10 +867,9 @@ mod tests {
     use alloc::string::{String, ToString as _};
     use alloc::vec;
     use alloc::vec::Vec;
-
     use serde::Deserialize;
     use testkit::vector;
-    use testkit::vectors::{Json, Outcome, figures, run, sections};
+    use testkit::vectors::{Appendix, Example, Json, Outcome, figures, run, sections};
 
     use super::{
         DECRYPT, DERIVE, ENCRYPT, Key, REGISTRY, SIGN, SIGNING, UNWRAP, VERIFY, WRAP, parse,
@@ -899,9 +899,16 @@ mod tests {
     }
 
     fn figure(example: &str) -> Members {
-        let file = figures(vector!("rfc7520/jwk.json"));
-        let found = file.examples.iter().find(|e| e.example == example);
+        let mut found: Option<Example> = None;
+        let tally = figures(vector!("rfc7520/jwk.json"), 1, |e, _| {
+            if e.example == example {
+                found = Some(e.clone());
+            }
+            Outcome::Checked
+        });
+        assert_eq!(tally.checked(), tally.total());
         let json = found
+            .as_ref()
             .and_then(|e| e.figures.last())
             .and_then(|f| f.json.as_ref());
         json.map(Json::parse).unwrap_or_default()
@@ -924,7 +931,12 @@ mod tests {
     }
 
     fn okp_private() -> Members {
-        let file = sections(vector!("rfc8037/appendix-a.json"));
+        let mut file: Vec<Appendix> = Vec::new();
+        let tally = sections(vector!("rfc8037/appendix-a.json"), 1, |a| {
+            file.push(a.clone());
+            Outcome::Checked
+        });
+        assert_eq!(tally.checked(), tally.total());
         let json = file
             .first()
             .and_then(|a| a.section.blocks.first())
@@ -938,12 +950,13 @@ mod tests {
             private_jwk: Option<Json>,
         }
         let mut found = Members::new();
-        run::<Case>(vector!("rfc7518/appendix-c.json"), 1, |c| {
+        let tally = run::<Case>(vector!("rfc7518/appendix-c.json"), 1, |c| {
             if found.is_empty() {
                 found = c.private_jwk.as_ref().map(Json::parse).unwrap_or_default();
             }
             Outcome::Checked
         });
+        assert_eq!(tally.checked(), tally.total());
         found
     }
 

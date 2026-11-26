@@ -136,7 +136,7 @@ fn round<K: LocalKeyAlg + PublicKeyAlg, E: Enc>(
 #[test]
 fn ecdh_round_trip() {
     let mut recipient = None;
-    run::<Keys>(vector!("rfc7518/appendix-c.json"), 1, |keys| {
+    let tally = run::<Keys>(vector!("rfc7518/appendix-c.json"), 1, |keys| {
         if keys.id == "c-recipient" {
             let public = Jwk::decode(keys.public_jwk.text().as_bytes());
             let private = SecretJwk::decode(keys.private_jwk.text().as_bytes());
@@ -146,6 +146,7 @@ fn ecdh_round_trip() {
         }
         Outcome::Checked
     });
+    assert_eq!(tally.checked(), tally.total());
     assert!(recipient.is_some());
     let config = ProptestConfig {
         cases: 24,

@@ -8,6 +8,7 @@ use aes_gcm::aead::AeadInOut as _;
 use aes_gcm::{AesGcm, KeyInit as _};
 use aes_kw::{KwAes128, KwAes192, KwAes256};
 use base::{Entropy, SecretBytes};
+use expose::Expose as _;
 
 use crate::jwe::envelope::{Params, sealed};
 use crate::key::{Private, Public};
@@ -272,6 +273,7 @@ impl sealed::Unwrap for Dir {
 mod tests {
     use alloc::string::String;
     use alloc::vec::Vec;
+    use expose::Expose as _;
 
     use base::{Entropy, SecretBytes};
     use serde::Deserialize;

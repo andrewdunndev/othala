@@ -2,10 +2,13 @@
 //! registry names still parse.
 #![cfg(not(any(feature = "es512", feature = "rsa-decrypt", feature = "rsa-sign")))]
 
+mod common_figures;
+mod common_sections;
+
 use jose::{ErrorKind, Jwe, JweAlg, Jwk, Jws, SecretJwk, SigningAlg};
 use serde::Deserialize;
 use testkit::vector;
-use testkit::vectors::{Appendix, Json, Outcome, figures, run, sections};
+use testkit::vectors::{Appendix, Json, Outcome, run};
 
 #[derive(Deserialize)]
 struct Case {
@@ -43,7 +46,7 @@ fn figure(file: &testkit::vectors::Figures, example: &str, number: u32) -> Strin
 
 #[test]
 fn es512_is_refused() {
-    let keys = figures(vector!("rfc7520/jwk.json"));
+    let keys = common_figures::all(vector!("rfc7520/jwk.json"));
     assert_eq!(
         kind(Jwk::decode(figure(&keys, "3.1", 1).as_bytes())),
         Some(ErrorKind::UnsupportedAlg)
@@ -52,7 +55,7 @@ fn es512_is_refused() {
         kind(SecretJwk::decode(figure(&keys, "3.2", 2).as_bytes())),
         Some(ErrorKind::UnsupportedAlg)
     );
-    let appendix = sections(vector!("rfc7515/appendix-a4-a7.json"));
+    let appendix = common_sections::all(vector!("rfc7515/appendix-a4-a7.json"));
     let key = joined(&appendix, "A.4.1", "{\"kty\":\"EC\",\"crv\":\"P-521\"");
     assert_eq!(
         kind(SecretJwk::decode(key.as_bytes())),
@@ -60,7 +63,7 @@ fn es512_is_refused() {
     );
     let token = joined(&appendix, "A.4.1", "eyJhbGciOiJFUzUxMiJ9.UGF5bG9hZA.");
     assert_eq!(kind(Jws::parse(&token)), Some(ErrorKind::UnsupportedAlg));
-    let signed = figures(vector!("rfc7520/jws.json"));
+    let signed = common_figures::all(vector!("rfc7520/jws.json"));
     assert_eq!(
         kind(Jws::parse(&figure(&signed, "4.3", 27))),
         Some(ErrorKind::UnsupportedAlg)

@@ -187,7 +187,7 @@ fn round<K: BlindedKeyAlg + PublicKeyAlg, E: Enc>(
 #[test]
 fn oaep_round_trip() {
     let mut keys = None;
-    run::<Case>(vector!("rfc7516/jwe.json"), 1, |case| {
+    let tally = run::<Case>(vector!("rfc7516/jwe.json"), 1, |case| {
         if case.id == "a1-rsa-oaep-a256gcm-valid" {
             let secret =
                 SecretJwk::decode(case.jwk.as_ref().map_or("{}", Json::text).as_bytes()).ok();
@@ -195,6 +195,7 @@ fn oaep_round_trip() {
         }
         Outcome::Checked
     });
+    assert_eq!(tally.checked(), tally.total());
     assert!(keys.is_some());
     let config = ProptestConfig {
         cases: 6,

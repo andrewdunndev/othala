@@ -1,4 +1,6 @@
 //! Key binding, JWK Sets and JWK serialization (CONTRACT R13, R16 to R21, R26, R27, R30).
+mod common_figures;
+
 use std::collections::BTreeMap;
 
 use jose::{
@@ -130,7 +132,7 @@ fn jwk_sets() {
 /// The public keys of keys.json by case id.
 fn public_keys() -> BTreeMap<String, String> {
     let mut found = BTreeMap::new();
-    run::<Case>(vector!("jose-derived/keys.json"), 1, |case| {
+    let tally = run::<Case>(vector!("jose-derived/keys.json"), 1, |case| {
         if [
             "es256-p256",
             "es256-p384-key",
@@ -149,6 +151,7 @@ fn public_keys() -> BTreeMap<String, String> {
         }
         Outcome::Checked
     });
+    assert_eq!(tally.checked(), tally.total());
     found
 }
 
@@ -257,7 +260,7 @@ fn sets_refuse_a_repeated_kid() {
 
 #[test]
 fn a_private_key_keeps_its_public_members() {
-    let file = testkit::vectors::figures(vector!("rfc7520/jwk.json"));
+    let file = common_figures::all(vector!("rfc7520/jwk.json"));
     let private = file
         .examples
         .iter()

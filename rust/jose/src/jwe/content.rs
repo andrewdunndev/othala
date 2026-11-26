@@ -8,6 +8,7 @@ use aes::{Aes128, Aes192, Aes256};
 use aes_gcm::aead::AeadInOut as _;
 use aes_gcm::{AesGcm, KeyInit as _};
 use base::SecretBytes;
+use expose::Expose as _;
 use hmac::{Hmac, Mac as _};
 use sha2::{Sha256, Sha384, Sha512};
 
@@ -189,6 +190,7 @@ impl JweEnc {
 mod tests {
     use alloc::string::String;
     use alloc::vec::Vec;
+    use expose::Expose as _;
 
     use base::SecretBytes;
     use serde::Deserialize;

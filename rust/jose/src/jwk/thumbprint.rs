@@ -6,6 +6,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use base::{Digest, b64url_encode};
+use expose::Expose as _;
 use p256::elliptic_curve::sec1::ToSec1Point as _;
 use rsa::traits::PublicKeyParts as _;
 use sha2::{Digest as _, Sha256};

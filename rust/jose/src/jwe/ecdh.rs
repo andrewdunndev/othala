@@ -5,6 +5,7 @@ use alloc::vec::Vec;
 use aes_gcm::KeyInit as _;
 use aes_kw::{KwAes128, KwAes192, KwAes256};
 use base::{Entropy, SecretBytes};
+use expose::Expose as _;
 use sha2::Sha256;
 
 use crate::jwe::envelope::{Params, sealed};
@@ -232,6 +233,7 @@ ecdh!(EcdhEsA256Kw, EcdhEsA256Kw, Mode::Wrap(32));
 mod tests {
     use alloc::string::String;
     use alloc::vec::Vec;
+    use expose::Expose as _;
 
     use base::{Entropy, SecretBytes};
     use serde::Deserialize;

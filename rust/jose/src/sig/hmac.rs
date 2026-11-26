@@ -1,4 +1,5 @@
 //! HS256, HS384 and HS512 (RFC 7518 section 3.2).
+use expose::Expose as _;
 use hmac::{Hmac, KeyInit, Mac, digest::block_api::EagerHash};
 
 use crate::alg::sealed;

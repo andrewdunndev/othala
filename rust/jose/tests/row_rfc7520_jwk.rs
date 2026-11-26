@@ -1,9 +1,10 @@
 //! RFC 7520 section 3 keys decode (CONTRACT R23); the P-521 keys of 3.1 and 3.2 are checked in `row_es512`.
+mod common_figures;
+
 use std::collections::BTreeMap;
 
 use jose::{ErrorKind, Jwk, Kty, SecretJwk};
 use testkit::vector;
-use testkit::vectors::figures;
 
 fn kind<T>(result: Result<T, jose::Error>) -> Option<ErrorKind> {
     result.err().map(|e| e.kind())
@@ -11,7 +12,7 @@ fn kind<T>(result: Result<T, jose::Error>) -> Option<ErrorKind> {
 
 #[test]
 fn rfc7520_section3() {
-    let file = figures(vector!("rfc7520/jwk.json"));
+    let file = common_figures::all(vector!("rfc7520/jwk.json"));
     let (mut checked, mut not_applicable) = (0, Vec::new());
     for example in &file.examples {
         let figure = example.figures.last().and_then(|f| f.json.as_ref());

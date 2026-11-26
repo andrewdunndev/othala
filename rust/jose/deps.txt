@@ -5,6 +5,7 @@ base
 cbc
 ecdsa
 ed25519-dalek
+expose
 hmac
 one-step-kdf
 p256
