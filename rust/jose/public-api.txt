@@ -405,6 +405,8 @@ method AnySigningKey::from_jwk fn(jwk: &SecretJwk) -> Result<Self, Error>
 method AnyVerifyKey::alg const fn(self: &Self) -> SigningAlg
 method AnyVerifyKey::from_jwk fn(jwk: &Jwk) -> Result<Self, Error>
 method AnyVerifyKey::from_jwk_for fn(jwk: &Jwk, alg: SigningAlg) -> Result<Self, Error>
+method Compact::flattened fn(self: &Self) -> String
+method Compact::general fn(tokens: &[Compact]) -> Result<String, Error>
 method Error::kind const fn(self: &Self) -> ErrorKind
 method JweAlg::name const fn(self: Self) -> &'static str
 method Jwk::decode fn(json: &[u8]) -> Result<Self, Error>
@@ -420,6 +422,7 @@ method JwkSet::find fn(self: &Self, kid: &Kid) -> Result<JwkEntry<'_>, Error>
 method JwkSet::new fn(keys: Vec<Jwk>) -> Result<Self, Error>
 method Jws::kids fn(self: &Self) -> &[Kid]
 method Jws::parse fn(compact: &'a str) -> Result<Self, Error>
+method Jws::parse_json fn(json: &'a [u8]) -> Result<Self, Error>
 method Jws::verify fn<A: Alg>(self: Self, key: &VerifyKey<A>) -> Result<Payload, Error>
 method Jws::verify_any fn(self: Self, key: &AnyVerifyKey) -> Result<Payload, Error>
 method Kid::as_str fn(self: &Self) -> &str
