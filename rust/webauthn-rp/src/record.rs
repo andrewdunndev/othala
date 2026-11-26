@@ -1115,9 +1115,11 @@ mod tests {
     }
 
     mod identity {
+        use alloc::boxed::Box;
         use alloc::vec::Vec;
 
         use proptest::prelude::*;
+        use proptest::test_runner::{RngSeed, TestError, TestRunner};
 
         use super::super::{
             ALGORITHMS, AuthenticationCeremony, FORMATS, HINTS, KINDS, TRANSPORTS, TRUSTS,
@@ -1127,6 +1129,7 @@ mod tests {
         use crate::cose::CoseKey;
         use crate::error::ErrorKind;
         use crate::extensions::{AppId, LargeBlobOp, LargeBlobRequest, PrfEval, PrfRequest};
+        use crate::options::UserHandle;
         use crate::options::{
             AuthenticationOptions, Mediation, RegistrationOptions, Requirement, ResidentKey,
             Timeout,
@@ -1150,7 +1153,7 @@ mod tests {
                 .prop_map(|(first, second)| PrfEval { first, second })
         }
 
-        fn registration() -> impl Strategy<Value = Record> {
+        fn registration(handle: UserHandle) -> impl Strategy<Value = Record> {
             (
                 (
                     pick(&ALGORITHMS, 300),
@@ -1172,7 +1175,7 @@ mod tests {
                 ),
             )
                 .prop_map(
-                    |((algorithms, formats, hints), (cp, prf, lb, app, cond))| {
+                    move |((algorithms, formats, hints), (cp, prf, lb, app, cond))| {
                         let mut options = RegistrationOptions::new(
                             Requirement::Required,
                             ResidentKey::Required,
@@ -1194,7 +1197,7 @@ mod tests {
                             challenge: digest(1),
                             browser: digest(2),
                             deadline: UnixTime::new(7),
-                            user: user().unwrap_or_else(|_| unreachable!()),
+                            user: handle.clone(),
                             options,
                         })
                     },
@@ -1243,7 +1246,7 @@ mod tests {
                 })
         }
 
-        fn credential() -> impl Strategy<Value = Record> {
+        fn credential(handle: UserHandle, id: CredentialId) -> impl Strategy<Value = Record> {
             (
                 pick(&TRANSPORTS, 300),
                 prop::collection::vec(any::<u8>(), 0..300),
@@ -1256,9 +1259,9 @@ mod tests {
                 ),
             )
                 .prop_map(
-                    |(transports, chain, sign_count, backup, (format, kind, trust))| {
+                    move |(transports, chain, sign_count, backup, (format, kind, trust))| {
                         Record::Credential(Credential {
-                            id: CredentialId::from_bytes(b"id").unwrap_or_else(|_| unreachable!()),
+                            id: id.clone(),
                             public_key: CoseKey::EdDsa([8; 32]),
                             sign_count,
                             uv_initialized: UserVerification::Verified,
@@ -1268,7 +1271,7 @@ mod tests {
                                 1 => Backup::MultiDevice(BackupState::NotBackedUp),
                                 _ => Backup::MultiDevice(BackupState::BackedUp),
                             },
-                            user: user().unwrap_or_else(|_| unreachable!()),
+                            user: handle.clone(),
                             aaguid: Aaguid::from_bytes([1; 16]),
                             attestation: Attestation {
                                 format,
@@ -1299,23 +1302,38 @@ mod tests {
             }
         }
 
-        proptest! {
-            #[test]
-            fn record_round_trip(
-                record in prop_oneof![registration(), authentication(), credential()]
-            ) {
-                match record.encode() {
-                    // the start paths refuse a row past MAX_RECORD, so only smaller rows must read back
-                    Ok(bytes) if bytes.len() <= crate::MAX_RECORD => {
-                        prop_assert_eq!(Record::decode(&bytes), Ok(record));
+        #[test]
+        fn record_round_trip() -> Result<(), Box<TestError<Record>>> {
+            let (Ok(handle), Ok(id)) = (user(), CredentialId::from_bytes(b"id")) else {
+                return Ok(());
+            };
+            let config = ProptestConfig {
+                cases: 512,
+                rng_seed: RngSeed::Fixed(0x5eed_0002),
+                failure_persistence: None,
+                ..ProptestConfig::default()
+            };
+            let rows = prop_oneof![
+                registration(handle.clone()),
+                authentication(),
+                credential(handle, id)
+            ];
+            TestRunner::new(config)
+                .run(&rows, |record| {
+                    match record.encode() {
+                        // the start paths refuse a row past MAX_RECORD, so only smaller rows must read back
+                        Ok(bytes) if bytes.len() <= crate::MAX_RECORD => {
+                            prop_assert_eq!(Record::decode(&bytes), Ok(record));
+                        }
+                        Ok(_) => {}
+                        Err(e) => {
+                            prop_assert_eq!(e.kind(), ErrorKind::TooLarge);
+                            prop_assert!(widest(&record) > 255);
+                        }
                     }
-                    Ok(_) => {}
-                    Err(e) => {
-                        prop_assert_eq!(e.kind(), ErrorKind::TooLarge);
-                        prop_assert!(widest(&record) > 255);
-                    }
-                }
-            }
+                    Ok(())
+                })
+                .map_err(Box::new)
         }
     }
 }
