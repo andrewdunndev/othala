@@ -11,6 +11,8 @@ publish.workspace = true
 std = []
 rand_core = ["dep:rand_core"]
 serde = ["dep:serde"]
+# the one secret read; a crate that enables it names its reading modules in gates.json (R-j)
+expose = []
 
 [dependencies]
 base64ct.workspace = true

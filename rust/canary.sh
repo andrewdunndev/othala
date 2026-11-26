@@ -18,6 +18,25 @@ errors() { # crate, then cargo args: code<TAB>file<TAB>line<TAB>message per erro
             | .message as $m | $m.spans[] | select(.is_primary)
             | "\($m.code.code // "")\t\(.file_name)\t\(.line_start)\t\($m.message)"' | sort -u
 }
+# R-j: the members that enable base/expose (a dependency feature or a feature of their own) must be the ones gates.json gives `expose` modules
+exposers() { # tree: one member name per line
+    (cd "$1" && cargo metadata --offline --no-deps --format-version 1) | jq -r '.packages[]
+        | select(any(.dependencies[]; .name == "base" and (.features | index("expose"))) or any(.features[][]; test("^base\\??/expose$")))
+        | .name' | sort -u
+}
+declared=$(./crates.sh | jq -r 'select(.expose) | .name' | sort -u)
+[ "$(exposers "$here")" = "$declared" ] || { echo "canary: base/expose is enabled by [$(exposers "$here" | xargs)] but declared by [$(echo $declared)]"; exit 1; }
+for c in $declared; do
+    for m in $(jq -r '.expose[]' "$c/gates.json"); do [ -f "$c/src/$m.rs" ] || [ -f "$c/src/$m/mod.rs" ] || { echo "canary $c: expose module $m has no source"; exit 1; }; done
+done
+# the check must catch an undeclared enable: one in a scratch copy is the only difference it may report
+probe=$(./crates.sh | jq -r 'select((.expose | not) and .name != "base") | .name' | head -n 1)
+cp "$probe/Cargo.toml" "$tmp/$probe/Cargo.toml"
+printf '\n[target.%s.dependencies]\nbase = { path = "../base", features = ["expose"] }\n' "'cfg(all())'" >> "$tmp/$probe/Cargo.toml"
+caught=$(comm -23 <(exposers "$tmp") <(echo "$declared"))
+cp "$probe/Cargo.toml" "$tmp/$probe/Cargo.toml"
+[ "$caught" = "$probe" ] || { echo "canary: an undeclared base/expose in $probe went unreported (got [$caught])"; exit 1; }
+echo "canary: base/expose only in [$(echo $declared)], and an undeclared enable in $probe is caught"
 want_paths=$(sed -nE 's/^[[:space:]]*\{ path = "([^"]+)".*/\1/p' clippy.toml | sort -u)
 for c in "$@"; do
     offset=$(wc -l < "$c/src/lib.rs")
