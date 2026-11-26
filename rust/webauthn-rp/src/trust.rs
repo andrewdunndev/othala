@@ -1,5 +1,9 @@
 //! Attestation results and trust: formats, types, anchors and the `TrustSource` a registration asks (R49, R50, R57); anchors with webauthn-09.
-use core::marker::PhantomData;
+use alloc::vec::Vec;
+
+use base::Digest;
+
+use crate::record::Aaguid;
 
 /// An attestation statement format (L3 section 8); each has its own cargo feature.
 #[non_exhaustive]
@@ -49,7 +53,13 @@ pub enum Trust {
 
 /// How a registration was attested; enough to sweep stored credentials after a CA compromise (L3 13.4.5).
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Attestation(());
+pub struct Attestation {
+    pub(crate) format: Format,
+    pub(crate) kind: AttestationType,
+    pub(crate) trust: Trust,
+    pub(crate) chain: Vec<Digest>,
+    pub(crate) anchor: Option<Digest>,
+}
 
 /// Where registrations find acceptable attestation roots and refusals (L3 7.1 step 23). Implemented by hosts and by `webauthn-mds`.
 pub trait TrustSource {
@@ -71,8 +81,17 @@ pub enum TrustDecision<'a> {
 
 /// What a `TrustSource` is asked.
 #[derive(Clone, Copy, Debug)]
-pub struct TrustQuery<'a>(PhantomData<&'a ()>);
+#[expect(dead_code, reason = "read by its accessors, webauthn-05")]
+pub struct TrustQuery<'a> {
+    pub(crate) format: Format,
+    pub(crate) aaguid: Aaguid,
+    pub(crate) chain: &'a [Digest],
+}
 
 /// A root certificate, parsed and bounded; its X.509 form stays inside the crate.
 #[derive(Clone, Debug)]
-pub struct TrustAnchor(());
+#[expect(dead_code, reason = "read by the chain walk, webauthn-09")]
+pub struct TrustAnchor {
+    pub(crate) der: Vec<u8>,
+    pub(crate) digest: Digest,
+}

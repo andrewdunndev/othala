@@ -128,7 +128,6 @@ impl Clone for Attestation
 impl Clone for AttestationType
 impl Clone for AuthenticationCeremony
 impl Clone for AuthenticationOptions
-impl Clone for AuthenticationResponse
 impl Clone for Backup
 impl Clone for BackupState
 impl Clone for Conveyance
@@ -159,7 +158,6 @@ impl Clone for PrfRequest
 impl Clone for Record
 impl Clone for RegistrationCeremony
 impl Clone for RegistrationOptions
-impl Clone for RegistrationResponse
 impl Clone for RelatedOrigins
 impl Clone for RelyingParty
 impl Clone for RelyingPartyBuilder
@@ -231,7 +229,6 @@ impl Debug for Conveyance
 impl Debug for CoseAlgorithm
 impl Debug for Counter
 impl Debug for CounterPolicy
-impl Debug for CreationOptions
 impl Debug for Credential
 impl Debug for CredentialDescriptor
 impl Debug for CredentialId
@@ -259,13 +256,10 @@ impl Debug for Registered
 impl Debug for RegistrationCeremony
 impl Debug for RegistrationOptions
 impl Debug for RelatedOrigins
-impl Debug for RelyingParty
-impl Debug for RelyingPartyBuilder
 impl Debug for RequestOptions
 impl Debug for Requirement
 impl Debug for ResidentKey
 impl Debug for RpId
-impl Debug for SignalOptions
 impl Debug for SpecStep
 impl Debug for Timeout
 impl Debug for Transport
@@ -285,6 +279,7 @@ impl Eq for Attachment
 impl Eq for Attestation
 impl Eq for AttestationType
 impl Eq for AuthenticationCeremony
+impl Eq for AuthenticationOptions
 impl Eq for Backup
 impl Eq for BackupState
 impl Eq for Conveyance
@@ -312,6 +307,7 @@ impl Eq for PrfEval
 impl Eq for PrfRequest
 impl Eq for Record
 impl Eq for RegistrationCeremony
+impl Eq for RegistrationOptions
 impl Eq for Requirement
 impl Eq for ResidentKey
 impl Eq for RpId
@@ -349,6 +345,7 @@ impl PartialEq for Attachment
 impl PartialEq for Attestation
 impl PartialEq for AttestationType
 impl PartialEq for AuthenticationCeremony
+impl PartialEq for AuthenticationOptions
 impl PartialEq for Backup
 impl PartialEq for BackupState
 impl PartialEq for Conveyance
@@ -376,6 +373,7 @@ impl PartialEq for PrfEval
 impl PartialEq for PrfRequest
 impl PartialEq for Record
 impl PartialEq for RegistrationCeremony
+impl PartialEq for RegistrationOptions
 impl PartialEq for Requirement
 impl PartialEq for ResidentKey
 impl PartialEq for RpId
@@ -402,6 +400,7 @@ impl StructuralPartialEq for Attachment
 impl StructuralPartialEq for Attestation
 impl StructuralPartialEq for AttestationType
 impl StructuralPartialEq for AuthenticationCeremony
+impl StructuralPartialEq for AuthenticationOptions
 impl StructuralPartialEq for Backup
 impl StructuralPartialEq for BackupState
 impl StructuralPartialEq for Conveyance
@@ -429,6 +428,7 @@ impl StructuralPartialEq for PrfEval
 impl StructuralPartialEq for PrfRequest
 impl StructuralPartialEq for Record
 impl StructuralPartialEq for RegistrationCeremony
+impl StructuralPartialEq for RegistrationOptions
 impl StructuralPartialEq for Requirement
 impl StructuralPartialEq for ResidentKey
 impl StructuralPartialEq for RpId

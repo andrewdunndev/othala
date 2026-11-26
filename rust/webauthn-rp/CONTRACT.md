@@ -11,7 +11,7 @@ Checks:
 - `w3c:f#s` is section `s` of `vectors/w3c-webauthn-3/f`. `oracle:f#c` is case `c` of `vectors/webauthn-rp-derived/f`, the oracle lane's family (ruling R-b), on `origin/primitives/oracle-jose` at 1de13bce with 78 cases in `client-data.json`, `authenticator-data.json`, `registration.json` and `cbor.json`; `oracle:f` alone is the whole file. `oracle-pending:f` names a family file the oracle lane has not pushed; its claim is pending until it lands, and no case is written here.
 - `prop:t` is a proptest in `tests/props.rs` (fixed seed); `fuzz:t` is target `t` under `fuzz/` with its committed corpus replayed on every pipeline; `mutants:m` is `cargo mutants` over `src/m.rs` (`src/attestation/x.rs` for `attestation::x`), every mutant caught or listed with a reason in `mutants.toml`; `unit:m::t` is a test in `src/m.rs`.
 
-Contract stage (ruling R-a): `src/` holds the types, traits, constants and module layout and no function body; every public function and trait impl is stated under Signatures, verbatim, and lands with the item that turns its row green. Derives are part of the declared surface; a placeholder `(())` field marks a type whose representation its item chooses. Now `ui`, `api`, `doc`, `lint`, `canary`, `msrv`, `deps`, `deny` and the `wasm` builds run; each other check lands with the body it tests, and until then its line is pending and outside the done count. Each `row:` file exists now with no test, so its row reads red (`running 0 tests`) until its item.
+Contract stage (ruling R-a): `src/` holds the types, traits, constants and module layout and no function body; every public function and trait impl is stated under Signatures, verbatim, and lands with the item that turns its row green. Derives are part of the declared surface. Every type a later item's module reads or builds has its representation now, as `pub(crate)` fields (and the crate-private types `cbor::Value`, `cose::CoseKey`, `client_data::ClientData`, `authdata::AuthData`, `attestation::{Statement, Verified}`, `attestation::chain::Walk` and the extension input and output records), so the fields are the crate-private constructors and accessors and need no body; each such item carries `#[expect(dead_code)]` naming the item that first reads it, which that item removes. Now `ui`, `api`, `doc`, `lint`, `canary`, `msrv`, `deps`, `deny` and the `wasm` builds run; each other check lands with the body it tests, and until then its line is pending and outside the done count. Each `row:` file exists now with no test, so its row reads red (`running 0 tests`) until its item.
 
 ## Signatures
 Functions and trait impls, by the file and item that land them. `BrowserBinding` is `base::BrowserBinding` (ruling R-d), a newtype built from `&Secret<32>` that lands as a base item; every signature naming it waits on that item.
@@ -61,6 +61,8 @@ impl RelyingPartyBuilder {
     /// Finish; a repeated origin is `Malformed`, more than `MAX_ORIGINS` is `TooLarge`.
     pub fn build(self) -> Result<RelyingParty, Error>;
 }
+impl fmt::Debug for RelyingParty { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
+impl fmt::Debug for RelyingPartyBuilder { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
 ```
 ### `src/options.rs` (webauthn-04 and webauthn-05)
 ```rust
@@ -93,6 +95,7 @@ impl UserEntity {
 impl fmt::Debug for UserName { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
 impl fmt::Debug for DisplayName { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
 impl fmt::Debug for UserEntity { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
+impl fmt::Debug for CreationOptions { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
 impl Transport {
     /// The L3 5.8.4 name.
     pub fn as_str(&self) -> &'static str;
@@ -250,7 +253,7 @@ impl Assertion {
     pub fn counter(&self) -> Counter;
 }
 ```
-### `src/trust.rs` (`Attestation` and `TrustQuery` with webauthn-05, `TrustAnchor` with webauthn-09)
+### `src/trust.rs` (webauthn-05; `impl TrustAnchor` with webauthn-09)
 ```rust
 impl Attestation {
     /// The statement format.
@@ -346,6 +349,7 @@ impl RelyingParty {
     pub fn signal(&self, signal: Signal) -> SignalOptions;
 }
 impl fmt::Debug for Signal { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
+impl fmt::Debug for SignalOptions { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
 impl Serialize for CreationOptions { fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error>; }
 impl Serialize for RequestOptions { fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error>; }
 impl Serialize for SignalOptions { fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error>; }
@@ -354,6 +358,21 @@ impl<'de> Deserialize<'de> for RegistrationResponse { fn deserialize<D: Deserial
 impl<'de> Deserialize<'de> for AuthenticationResponse { fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error>; }
 ```
 Private modules with no public function: `cbor`, `cose` (webauthn-02; `cose` gains ES384, EdDSA and RS256 with webauthn-08), `client_data` (webauthn-03), `authdata` (webauthn-04), `attestation` (dispatch and `none` with webauthn-05), `attestation::packed` (self with webauthn-08, full with webauthn-09), `attestation::chain` (webauthn-09), `attestation::tpm` (webauthn-10), `attestation::android_key` (webauthn-11), `attestation::apple` (webauthn-12), `attestation::fido_u2f` (webauthn-13).
+
+## Files per item
+Each later item edits its own files and row file; where it must touch another item's file, the line says where and why.
+- webauthn-02: `cbor.rs`, `cose.rs` (ES256), `error.rs`; row:derived (cbor).
+- webauthn-03: `client_data.rs`, `policy.rs`; row:derived (client data).
+- webauthn-04: `authdata.rs`, `record.rs`, `response.rs`, `verify.rs`, `options.rs`; row:exam_spike, row:derived (authenticator data).
+- webauthn-05: `attestation/mod.rs`, `trust.rs`, and the registration halves of `response.rs`, `verify.rs` and `options.rs`, which webauthn-04 opened (the brief pairs 04 and 05 on these files, so they run in sequence); row:w3c_none, row:derived (registration).
+- webauthn-06: row:roundtrip only (the virtual authenticator lives in the test, on the signing dev-dependencies).
+- webauthn-07: row:race only.
+- webauthn-08: `attestation/packed.rs` (self); it also adds ES384, EdDSA and RS256 to `cose.rs` (webauthn-02's) and one dispatch arm to `attestation/mod.rs` (webauthn-05's), because a format is reachable only through the dispatch and stub arms are forbidden (R-a); row:w3c_packed.
+- webauthn-09: `attestation/chain.rs`, `attestation/packed.rs` (full); it also adds `impl TrustAnchor` to `trust.rs` (webauthn-05's), because `chain.rs` compiles only under a certificate format and `TrustAnchor::from_der` stays in the API under every feature set (N20); row:w3c_attestation_root, row:w3c_packed.
+- webauthn-10 to webauthn-13: each its format file plus one dispatch arm in `attestation/mod.rs`, as webauthn-08; rows w3c_tpm; w3c_android_key and android_key_attestation; w3c_apple; w3c_fido_u2f. With the arms in one `match`, these four can run in parallel only if each arm is its own line and a conflict is rebased, never hand-merged.
+- webauthn-14: `extensions.rs` (the setters, accessors and output processing are inherent impls there); it also adds the calls at L3 7.1 step 28 and 7.2 step 23 and the PRF and large-blob bounds of R31 and R61 in `verify.rs` (webauthn-04's and webauthn-05's), since those steps sit inside the finishes; row:w3c_prf.
+- webauthn-15: `json.rs` (the deserializers build responses through the byte constructors, then fill `extensions::ClientOutputs`).
+- row:derived is shared by 02 to 05, one test function per oracle file, so those four items add disjoint functions to one file.
 
 ## Amendments (ruling R-h)
 - W-S1: `Allow::User` names the identified user and its list; finishes return `Verdict`; both `start_*` return `Result`; registration and authentication ceremonies are split records (`RegistrationCeremony`, `AuthenticationCeremony`), so one cannot finish the other (T10).

@@ -36,6 +36,13 @@ serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 testkit.workspace = true
+# the row tests read JSON vectors into derived case shapes
+serde = { workspace = true, features = ["derive"] }
+# the virtual authenticator signs; signing stays out of the library (B5)
+p256 = { version = "0.14", default-features = false, features = ["ecdsa"] }
+p384 = { version = "0.14", default-features = false, features = ["ecdsa"] }
+ed25519-dalek = { version = "3", default-features = false }
+sha2.workspace = true
 store.workspace = true
 proptest.workspace = true
 serde_json.workspace = true

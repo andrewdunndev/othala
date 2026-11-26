@@ -2,6 +2,7 @@
 use alloc::vec::Vec;
 
 use crate::options::{UserEntity, UserHandle};
+use crate::policy::{Origin, RpId};
 use crate::record::CredentialId;
 
 /// What a client signal method reports (L3 5.1.10).
@@ -17,9 +18,14 @@ pub enum Signal {
 }
 
 /// The options object for a signal method, with the RP ID filled in; serialized under `serde`.
-#[derive(Clone, Debug)]
-pub struct SignalOptions(());
+#[derive(Clone)]
+#[expect(dead_code, reason = "read by the serializer of webauthn-15")]
+pub struct SignalOptions {
+    pub(crate) rp_id: RpId,
+    pub(crate) signal: Signal,
+}
 
 /// The `/.well-known/webauthn` document: `{"origins": [...]}`; serialized under `serde`.
 #[derive(Clone, Debug)]
-pub struct RelatedOrigins(());
+#[expect(dead_code, reason = "read by the serializer of webauthn-15")]
+pub struct RelatedOrigins(pub(crate) Vec<Origin>);

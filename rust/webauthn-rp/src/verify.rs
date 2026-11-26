@@ -1,12 +1,29 @@
 //! The ceremonies: start, finish and their verdicts (L3 7.1, 7.2); authentication with webauthn-04, registration with webauthn-05.
 
+use crate::extensions::{AuthenticationOutputs, RegistrationOutputs};
+use crate::options::UserHandle;
+use crate::record::{Credential, CredentialId};
+
 /// A verified registration; made only by `finish_registration`.
 #[derive(Debug)]
-pub struct Registered(());
+#[expect(dead_code, reason = "read by its accessors, webauthn-05")]
+pub struct Registered {
+    pub(crate) credential: Credential,
+    pub(crate) user_verification: UserVerification,
+    pub(crate) extensions: RegistrationOutputs,
+}
 
 /// A verified assertion; made only by `finish_authentication`.
 #[derive(Debug)]
-pub struct Assertion(());
+#[expect(dead_code, reason = "read by its accessors, webauthn-04")]
+pub struct Assertion {
+    pub(crate) credential_id: CredentialId,
+    pub(crate) user: UserHandle,
+    pub(crate) user_verification: AssertionVerification,
+    pub(crate) backup: Backup,
+    pub(crate) counter: Counter,
+    pub(crate) extensions: AuthenticationOutputs,
+}
 
 /// The UV flag of a registration, and a credential's `uvInitialized`.
 #[non_exhaustive]

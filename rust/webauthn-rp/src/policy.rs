@@ -1,13 +1,16 @@
 //! Relying-party identity and fixed policy: RP ID, origins, cross-origin, counter and trust policies (R8, R9, R19); bodies with webauthn-03.
+use alloc::string::String;
 use alloc::vec::Vec;
+
+use crate::options::DisplayName;
 
 /// A relying party identifier: a lowercase ASCII domain of at most `MAX_RP_ID` bytes, validated.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct RpId(());
+pub struct RpId(pub(crate) String);
 
 /// A serialized web origin (`https://host[:port]`, or `http://localhost[:port]`) or an `android:apk-key-hash:` origin, compared exactly.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Origin(());
+pub struct Origin(pub(crate) String);
 
 /// What a signature counter that did not advance means.
 #[non_exhaustive]
@@ -62,10 +65,24 @@ pub enum KeyEnforcement {
 }
 
 /// One relying party's fixed policy: RP ID, origins and every ceremony option that is not per call.
-#[derive(Clone, Debug)]
-pub struct RelyingParty(());
+#[derive(Clone)]
+#[expect(
+    dead_code,
+    reason = "read by the ceremonies of webauthn-03 to webauthn-05"
+)]
+pub struct RelyingParty {
+    pub(crate) id: RpId,
+    pub(crate) name: DisplayName,
+    pub(crate) origins: Vec<Origin>,
+    pub(crate) counter: CounterPolicy,
+    pub(crate) cross_origin: CrossOrigin,
+    pub(crate) unsolicited: UnsolicitedExtensions,
+    pub(crate) trust: TrustPolicy,
+    pub(crate) android_key: KeyEnforcement,
+}
 
 /// Builds a [`RelyingParty`]; cross-origin, unsolicited extensions and untrusted Android lists are off unless set, and unanchored attestation registers unless `TrustPolicy::RequireTrusted` is set.
 #[must_use]
-#[derive(Clone, Debug)]
-pub struct RelyingPartyBuilder(());
+#[derive(Clone)]
+#[expect(dead_code, reason = "read by build, webauthn-03")]
+pub struct RelyingPartyBuilder(pub(crate) RelyingParty);
