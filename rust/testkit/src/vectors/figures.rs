@@ -1,7 +1,7 @@
 //! RFC 7520 figure files (`{"figures":[...]}`): one case per numbered example, the shared preamble figures apart.
 use serde::Deserialize;
 
-use super::{Json, SOURCES, Vector, verified};
+use super::{Json, Outcome, SOURCES, Tally, Vector, floored, verified};
 
 /// A numbered figure of RFC 7520.
 #[derive(Clone, Debug)]
@@ -56,13 +56,23 @@ struct File {
     figures: Vec<RawFigure>,
 }
 
-/// The examples of an RFC 7520 figure file. Panics unless the file has the SHA-256 and the case count `SOURCES.toml`
-/// lists.
-pub fn figures(vector: Vector) -> Figures {
-    figures_against(SOURCES, vector)
+/// Runs `check` over every example of an RFC 7520 figure file, with the figures shared by all of them; each call
+/// reports one [`Outcome`]. Panics unless the file has the SHA-256 and the case count `SOURCES.toml` lists, every
+/// figure lands in an example or the shared set, and at least `floor` (nonzero) examples were checked.
+pub fn figures(
+    vector: Vector,
+    floor: usize,
+    check: impl FnMut(&Example, &[Figure]) -> Outcome,
+) -> Tally {
+    figures_against(SOURCES, vector, floor, check)
 }
 
-fn figures_against(sources: &str, vector: Vector) -> Figures {
+fn figures_against(
+    sources: &str,
+    vector: Vector,
+    floor: usize,
+    mut check: impl FnMut(&Example, &[Figure]) -> Outcome,
+) -> Tally {
     let path = vector.path;
     let declared = verified(sources, vector);
     let file: File = serde_json::from_str(vector.json).expect("vector file decodes");
@@ -106,49 +116,66 @@ fn figures_against(sources: &str, vector: Vector) -> Figures {
     );
     let held: usize = shared.len() + examples.iter().map(|e| e.figures.len()).sum::<usize>();
     assert_eq!(held, total, "{path}: every figure lands in an example");
-    Figures { shared, examples }
+    let checked = examples
+        .iter()
+        .filter(|e| check(e, &shared) == Outcome::Checked)
+        .count();
+    floored(path, examples.len(), checked, floor)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Figures, figures_against};
+    use super::{Example, Figure, figures_against};
     use crate::vector;
+    use crate::vectors::{Outcome, Tally};
 
-    fn read(f: &Figures) -> (usize, usize, usize) {
-        let all = f.examples.iter().flat_map(|e| &e.figures).chain(&f.shared);
-        let (mut n, mut json, mut joined) = (0, 0, 0);
-        for fig in all {
-            n += 1;
-            json += usize::from(fig.json.is_some());
-            joined += usize::from(fig.from_joined);
-        }
-        (n, json, joined)
+    #[derive(Default)]
+    struct Seen {
+        examples: usize,
+        shared: usize,
+        figures: usize,
+        json: usize,
+        joined: Vec<u32>,
     }
 
-    fn numbers(f: &Figures) -> Vec<u32> {
-        f.examples
-            .iter()
-            .flat_map(|e| &e.figures)
-            .filter(|g| g.from_joined)
-            .map(|g| g.figure)
-            .collect()
+    fn read(file: super::Vector, floor: usize) -> (Seen, Tally) {
+        let mut seen = Seen::default();
+        let t = figures_against(
+            super::SOURCES,
+            file,
+            floor,
+            |e: &Example, shared: &[Figure]| {
+                seen.examples += 1;
+                seen.shared = shared.len();
+                for f in &e.figures {
+                    seen.figures += 1;
+                    seen.json += usize::from(f.json.is_some());
+                    if f.from_joined {
+                        seen.joined.push(f.figure);
+                    }
+                }
+                Outcome::Checked
+            },
+        );
+        (seen, t)
     }
 
     #[test]
     fn jwk_has_six_examples_and_the_rsa_private_key_from_joined() {
-        let f = figures_against(super::SOURCES, vector!("rfc7520/jwk.json"));
-        assert_eq!(f.examples.len(), 6);
-        assert!(f.shared.is_empty());
-        assert_eq!(read(&f), (6, 6, 1));
-        assert_eq!(numbers(&f), [4]);
-        let key = f
-            .examples
-            .iter()
-            .flat_map(|e| &e.figures)
-            .find(|g| g.figure == 4)
-            .and_then(|g| g.json.as_ref());
-        let key: std::collections::BTreeMap<String, String> =
-            key.map(|j| j.parse()).unwrap_or_default();
+        let (seen, t) = read(vector!("rfc7520/jwk.json"), 6);
+        assert_eq!((seen.examples, seen.shared), (6, 0));
+        assert_eq!((seen.figures, seen.json), (6, 6));
+        assert_eq!(seen.joined, [4]);
+        assert_eq!((t.total(), t.not_applicable()), (6, 0));
+        let mut key = None;
+        figures_against(super::SOURCES, vector!("rfc7520/jwk.json"), 6, |e, _| {
+            if let Some(g) = e.figures.iter().find(|g| g.figure == 4) {
+                key = g.json.as_ref().map(|j| j.parse());
+            }
+            Outcome::Checked
+        })
+        .total();
+        let key: std::collections::BTreeMap<String, String> = key.unwrap_or_default();
         let names: Vec<&str> = key.keys().map(String::as_str).collect();
         assert_eq!(
             names,
@@ -161,18 +188,34 @@ mod tests {
 
     #[test]
     fn jws_has_eight_examples() {
-        let f = figures_against(super::SOURCES, vector!("rfc7520/jws.json"));
-        assert_eq!(f.examples.len(), 8);
-        assert_eq!(f.shared.len(), 2);
-        assert_eq!(read(&f), (65, 30, 0));
+        let (seen, t) = read(vector!("rfc7520/jws.json"), 8);
+        assert_eq!((seen.examples, seen.shared), (8, 2));
+        assert_eq!((seen.figures + seen.shared, seen.json), (65, 30));
+        assert!(seen.joined.is_empty());
+        assert_eq!((t.total(), t.not_applicable()), (8, 0));
     }
 
     #[test]
     fn jwe_has_thirteen_examples() {
-        let f = figures_against(super::SOURCES, vector!("rfc7520/jwe.json"));
-        assert_eq!(f.examples.len(), 13);
-        assert_eq!(f.shared.len(), 1);
-        assert_eq!(read(&f), (150, 55, 5));
-        assert_eq!(numbers(&f), [111, 138, 151, 155, 216]);
+        let (seen, t) = read(vector!("rfc7520/jwe.json"), 13);
+        assert_eq!((seen.examples, seen.shared), (13, 1));
+        assert_eq!(seen.figures + seen.shared, 150);
+        assert_eq!(seen.joined, [111, 138, 151, 155, 216]);
+        assert_eq!((t.total(), t.not_applicable()), (13, 0));
+    }
+
+    #[test]
+    #[should_panic(expected = "rfc7520/jwk.json: 0 cases checked, floor 1")]
+    fn all_not_applicable_fails() {
+        figures_against(super::SOURCES, vector!("rfc7520/jwk.json"), 1, |_, _| {
+            Outcome::NotApplicable
+        })
+        .total();
+    }
+
+    #[test]
+    #[should_panic(expected = "rfc7520/jwk.json: 6 cases checked, floor 7")]
+    fn floor_above_the_file_fails() {
+        read(vector!("rfc7520/jwk.json"), 7).1.total();
     }
 }

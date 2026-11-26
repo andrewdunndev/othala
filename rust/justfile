@@ -45,7 +45,7 @@ twins:
 # the mutants each package yields after .cargo/mutants.toml's skips; raise them as code grows
 base_floor := "137"
 store_floor := "28"
-testkit_floor := "83"
+testkit_floor := "115"
 
 # skips and test args live in .cargo/mutants.toml; store's and testkit's mutants are caught by the workspace's tests;
 # each run must reach its floor of mutants with none missed or timed out, so a filter that empties it fails
