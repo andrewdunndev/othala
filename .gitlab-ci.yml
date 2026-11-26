@@ -39,7 +39,7 @@ include:
   - component: gitlab.com/dunn.dev/pipeline/secret-verdict@4.16.0
     inputs:
       # Fake SMTP credentials on example.com, parser fixtures.
-      excluded_paths: "portal/src/lib/contact.test.ts,portal/scripts/config.test.mjs,portal/scripts/admin-port.test.mjs"
+      excluded_paths: "portal/src/lib/contact.test.ts,portal/scripts/config.test.mjs,portal/scripts/admin-port.test.mjs,portal/scripts/contact.test.mjs"
   - component: gitlab.com/dunn.dev/pipeline/pin-audit@4.16.0
   - component: gitlab.com/dunn.dev/pipeline/automerge-gate@4.16.0
     inputs:
@@ -240,11 +240,30 @@ check-rust:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - rust/**/*
+        - primitives/**/*
         - .gitlab-ci.yml
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
   script:
-    - just lock fmt lint canary twins test doc wasm thumb msrv deny deps api
+    - just lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api
+
+# check-ownership: a branch item/<id> changes only the paths its primitives/queue.json item owns, and no oracle path.
+check-ownership:
+  extends: .rust
+  variables:
+    GIT_DEPTH: "0"
+  cache: []
+  rules:
+    - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^item\//'
+    - if: '$CI_COMMIT_BRANCH =~ /^item\//'
+  before_script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - git fetch origin +refs/heads/main:refs/remotes/origin/main
+  script:
+    - branch=${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_BRANCH}
+    # the base's own.sh and queue judge the branch, so a branch edit to either has no effect
+    - base=$(git merge-base origin/main HEAD)
+    - git show "$base:primitives/own.sh" | bash -s -- "${branch#item/}"
 
 check-rust-scheduled:
   extends: .rust
