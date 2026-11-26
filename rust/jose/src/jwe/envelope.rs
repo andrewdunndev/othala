@@ -302,8 +302,13 @@ fn merge(
             tag: params.tag.or(given.tag),
         };
     }
+    let alg = alg.ok_or_else(malformed)?;
+    #[cfg(not(feature = "rsa-decrypt"))]
+    if alg.starts_with("RSA-OAEP") {
+        return Err(ErrorKind::UnsupportedAlg.into());
+    }
     let recipient = Recipient {
-        alg: alg.ok_or_else(malformed)?,
+        alg,
         params,
         encrypted_key: Vec::new(),
     };
@@ -445,6 +450,39 @@ impl<'a> Jwe<'a> {
     /// Decrypts through the first recipient whose `alg` is `K`'s and whose key opens it; the header `enc` must be
     /// `E`'s. `AlgMismatch` when no `alg` or the `enc` differs, otherwise every failure is `Decrypt`.
     pub fn decrypt<K: LocalKeyAlg, E: Enc>(self, key: &DecryptKey<K>) -> Result<Plaintext, Error> {
+        self.open::<E>(K::ALG.name(), |recipient| {
+            <K as sealed::Unwrap>::unwrap(
+                &key.material,
+                &recipient.encrypted_key,
+                E::ENC,
+                &recipient.params,
+            )
+        })
+    }
+
+    /// As [`Self::decrypt`] for RSA-OAEP: the private-key operation is blinded from `e`, and an OAEP failure yields a
+    /// random key of the right length, so the content step fails as `Decrypt` (RFC 7516 11.5).
+    #[cfg(feature = "rsa-decrypt")]
+    pub fn decrypt_blinded<K: crate::BlindedKeyAlg, E: Enc>(
+        self,
+        key: &DecryptKey<K>,
+        e: &mut impl Entropy,
+    ) -> Result<Plaintext, Error> {
+        self.open::<E>(K::ALG.name(), |recipient| {
+            Ok(<K as sealed::BlindedUnwrap>::unwrap(
+                &key.material,
+                &recipient.encrypted_key,
+                E::ENC,
+                &mut *e,
+            ))
+        })
+    }
+
+    fn open<E: Enc>(
+        self,
+        alg: &str,
+        mut unwrap: impl FnMut(&Recipient) -> Result<SecretBytes, Error>,
+    ) -> Result<Plaintext, Error> {
         if self.enc != E::ENC.name() {
             return Err(ErrorKind::AlgMismatch.into());
         }
@@ -454,17 +492,11 @@ impl<'a> Jwe<'a> {
         };
         let mut named = false;
         for recipient in &self.recipients {
-            if recipient.alg != K::ALG.name() {
+            if recipient.alg != alg {
                 continue;
             }
             named = true;
-            let opened = <K as sealed::Unwrap>::unwrap(
-                &key.material,
-                &recipient.encrypted_key,
-                E::ENC,
-                &recipient.params,
-            )
-            .and_then(|cek| {
+            let opened = unwrap(recipient).and_then(|cek| {
                 <E as sealed::Enc>::open(
                     &cek,
                     &self.iv,

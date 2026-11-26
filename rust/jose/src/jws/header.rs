@@ -76,8 +76,13 @@ impl Parsed {
             .into());
         }
         let kid = first.kid.or(second.kid);
+        let alg = first.alg.or(second.alg).ok_or(ErrorKind::Malformed)?;
+        #[cfg(not(feature = "es512"))]
+        if matches!(alg.as_str(), "ES512") {
+            return Err(ErrorKind::UnsupportedAlg.into());
+        }
         Ok(Self {
-            alg: Some(first.alg.or(second.alg).ok_or(ErrorKind::Malformed)?),
+            alg: Some(alg),
             kid: kid.and_then(|kid| Kid::new(&kid).ok()),
             typ: first.typ,
             cty: first.cty,

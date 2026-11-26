@@ -41,6 +41,8 @@ impl Alg for Ps512
 impl Alg for Rs256
 impl Alg for Rs384
 impl Alg for Rs512
+impl BlindedKeyAlg for RsaOaep
+impl BlindedKeyAlg for RsaOaep256
 impl Clone for A128CbcHs256
 impl Clone for A128Gcm
 impl Clone for A128GcmKw
@@ -309,6 +311,8 @@ impl KeyAlg for EcdhEs
 impl KeyAlg for EcdhEsA128Kw
 impl KeyAlg for EcdhEsA192Kw
 impl KeyAlg for EcdhEsA256Kw
+impl KeyAlg for RsaOaep
+impl KeyAlg for RsaOaep256
 impl LocalAlg for EdDsa
 impl LocalAlg for Es256
 impl LocalAlg for Es384
@@ -399,6 +403,8 @@ impl PublicKeyAlg for EcdhEs
 impl PublicKeyAlg for EcdhEsA128Kw
 impl PublicKeyAlg for EcdhEsA192Kw
 impl PublicKeyAlg for EcdhEsA256Kw
+impl PublicKeyAlg for RsaOaep
+impl PublicKeyAlg for RsaOaep256
 impl Serialize for Audience
 impl Serialize for Issuer
 impl Serialize for JweAlg
@@ -481,6 +487,7 @@ method Header::with_kid fn(self: Self, kid: Kid) -> Self
 method Issuer::as_str fn(self: &Self) -> &str
 method Issuer::new fn(text: &str) -> Result<Self, Error>
 method Jwe::decrypt fn<K: LocalKeyAlg, E: Enc>(self: Self, key: &DecryptKey<K>) -> Result<Plaintext, Error>
+method Jwe::decrypt_blinded fn<K: crate::BlindedKeyAlg, E: Enc>(self: Self, key: &DecryptKey<K>, e: &mut impl Entropy) -> Result<Plaintext, Error>
 method Jwe::kids fn(self: &Self) -> &[Kid]
 method Jwe::parse fn(compact: &'a str) -> Result<Self, Error>
 method Jwe::parse_json fn(json: &'a [u8]) -> Result<Self, Error>

@@ -18,6 +18,8 @@ mod claims;
 mod error;
 mod jwt;
 mod key;
+#[cfg(any(feature = "rsa-decrypt", feature = "rsa-sign"))]
+mod rng;
 mod sign;
 #[cfg(test)]
 mod testing;
