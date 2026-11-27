@@ -1138,6 +1138,17 @@ mod tests {
     }
 
     #[test]
+    fn tag_numbers_must_run_from_zero_in_order() {
+        use super::in_order;
+        assert!(in_order(&[], 0));
+        assert!(in_order(&[0, 1, 2], 0));
+        assert!(!in_order(&[1, 2], 0));
+        assert!(!in_order(&[0, 2], 0));
+        assert!(!in_order(&[0, 0, 2], 0));
+        assert!(!in_order(&[0, 1, 3], 0));
+    }
+
+    #[test]
     fn every_table_matches_the_committed_listing() {
         use super::{
             ALGORITHMS, ATTACHMENTS, BACKUPS, CONVEYANCES, FORMATS, HINTS, KINDS, LARGE_BLOBS,
