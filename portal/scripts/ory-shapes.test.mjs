@@ -74,5 +74,5 @@ test('a Hydra consent request is read and accepted with the scopes it asked for'
   assert.equal(res.status, 302);
   assert.equal(res.headers.get('Location'), 'https://sso.othala.test/oauth2/auth?consent_verifier=v');
   assert.deepEqual(accepted.grant_scope, consentRequest.requested_scope);
-  assert.equal(accepted.remember, false);
+  assert.equal(accepted.remember, true);
 });
