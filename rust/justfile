@@ -10,10 +10,37 @@ default:
 gate: gate-rust claims vectors
 
 # the gates that run on CI's ci-rust image, which has no node or python3; claims and vectors run on theirs
-gate-rust: (tool-pins "jq") lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api
+gate-rust: (tool-pins "jq") lock queue slow-units-ci fmt lint canary twins test doc wasm thumb msrv deny deps api
 
-# the slow gates, run on a schedule and on main: the per-crate mutation floors, the scoreboard they feed, the features-off jose run and the fuzz targets
-gate-slow: (tool-pins) mutants rows mutants-off fuzz
+# the slow gates, run on a schedule and on main: the per-crate mutation floors, the scoreboard they feed, the features-off jose run and the fuzz targets; `just gate-slow <crate>` runs one crate's share of each (CI runs one job per crate of `slow-units`), and with no crate runs them all
+gate-slow crate="": (tool-pins)
+    #!/usr/bin/env bash
+    set -euo pipefail
+    c="{{crate}}"
+    if [ -n "$c" ]; then
+        just slow-units | grep -qx "$c" || { echo "gate-slow: '$c' is not one of: $(just slow-units | tr '\n' ' ')"; exit 1; }
+    fi
+    if [ -z "$c" ] || ./crates.sh | jq -e --arg c "$c" 'select(.name == $c and .mutants)' > /dev/null; then just mutants "$c"; fi
+    just rows
+    if [ -z "$c" ] || [ "$c" = jose ]; then just mutants-off; fi
+    just fuzz 600 "$c"
+
+# the crates the slow gates run per job, derived: each with a mutants floor or a fuzz target; CI's check-rust-scheduled matrix names these and slow-units-ci fails when they differ
+slow-units:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ./crates.sh | jq -r '.name' | while read -r c; do
+        if ./crates.sh | jq -e --arg c "$c" 'select(.name == $c and .mutants)' > /dev/null || [ -d "$c/fuzz" ]; then echo "$c"; fi
+    done
+
+# the matrix of CI's check-rust-scheduled names exactly the slow-units
+slow-units-ci:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ci=$(sed -n '/^check-rust-scheduled:/,/^[a-z#]/ s/^ *- CRATE: \[\(.*\)\]$/\1/p' ../.gitlab-ci.yml | tr -d ' ' | tr ',' '\n' | sort)
+    [ -n "$ci" ] || { echo "slow-units-ci: no CRATE matrix in check-rust-scheduled"; exit 1; }
+    want=$(just slow-units | sort)
+    [ "$ci" = "$want" ] || { echo "slow-units-ci: .gitlab-ci.yml names [$(tr '\n' ' ' <<< "$ci")], slow-units is [$(tr '\n' ' ' <<< "$want")]"; exit 1; }
 
 # a manifest change without its lock change fails here, before anything builds
 lock:
@@ -261,10 +288,11 @@ api nightly="nightly-2026-11-24":
         git diff --exit-code -- "$c/public-api.txt"
     done
 
-fuzz seconds="600":
+fuzz seconds="600" crate="":
     #!/usr/bin/env bash
     set -euo pipefail
-    for t in */fuzz/fuzz_targets/*.rs; do
+    for t in {{ if crate == "" { "*" } else { crate } }}/fuzz/fuzz_targets/*.rs; do
+        [ -e "$t" ] || continue
         n=$(basename "$t" .rs)
         (cd "${t%/fuzz_targets/*}" && cargo +nightly fuzz run "$n" "corpus/$n" -- -max_total_time={{seconds}})
     done

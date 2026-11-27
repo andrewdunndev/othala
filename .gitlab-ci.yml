@@ -317,13 +317,17 @@ check-rust-scheduled:
   timeout: 3h
   # the mutation proof must finish at every merged sha, so a later push does not cancel it
   interruptible: false
+  # one job per crate: the matrix is `just slow-units`, and `just slow-units-ci` (in gate-rust) fails when they differ
+  parallel:
+    matrix:
+      - CRATE: [base, factor, jose, store, testkit, webauthn-rp]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
   script:
     - cargo install --locked cargo-mutants@$(just mutants-pin) cargo-fuzz@0.13.1
     - rustup toolchain install nightly --profile minimal
-    - just gate-slow
+    - just gate-slow "$CRATE"
 
 # check-portal: `just setup` (npm ci without install scripts in portal, e2e and
 # site), then `just check`: astro check, tsc over e2e and site, vitest (src and
