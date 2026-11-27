@@ -326,7 +326,7 @@ These are the types `oidc-provider` takes from jose rather than defining its own
 - NC4 `finish` checks only the signature's length: a signature by the wrong key yields a token that fails verification downstream.
 - NC5 A JWS `Payload` is authenticated bytes, not validated content.
 - NC6 The timing of RFC 7516 11.4 is not measured (NC2); AES key-wrap failures return `Decrypt` without a substituted CEK, since a symmetric unwrap is no padding oracle.
-- NC7 `Error` has no source chain by design: a cause would be an oracle (R63), so `Error::source` is `None` and the kind is all a caller gets.
+- NC7 `Error` has no source chain by design: a cause would be an oracle (R53, R54), so `Error::source` is `None` and the kind is all a caller gets.
 
 ## RFC 8725 section 3
 - P3.1 Algorithm verification, the key's type picking the algorithm and the header only compared: T8, T9, T11, R4, R16, R21, R52.
