@@ -2,28 +2,33 @@
 // `just claims`: every rust/*/CONTRACT.md test ref resolves, and every mutants floor a contract quotes is its crate's gates.json floor.
 // usage: claims.mjs [--root RUST_DIR]
 //
+// A CONTRACT is a strict Markdown subset that this tool owns; what falls outside it fails rather than being guessed at.
 // A ref is `prefix:value` outside the legend. The legend is the first `Checks:` line and the bullet or indented lines directly under it,
-// up to the first blank line; nothing else is exempt. Fenced code is skipped, with CommonMark fences: an opener is 0-3 spaces then three or more
-// backticks or tildes, and a backtick opener's info string holds no backtick (so ```x``` is inline code); the closer is 0-3 spaces then the
-// same character at least as many times and nothing but spaces; an unterminated fence fails. Every resolver prefix (and its `-pending` form) found in
-// a body must be named in the legend, and a legend prefix with no resolver fails the run. A pending ref is `<prefix>-pending:value (reason)`:
-// the reason is inline and has three or more words of two or more letters each, the target must not exist yet, and the run counts them.
-// `<crate> unit:...` names the crate a ref lives in.
+// up to the first blank line; nothing else is exempt. Every resolver prefix (and its `-pending` form) found in a body must be named in the
+// legend, and a legend prefix with no resolver fails the run. A pending ref is `<prefix>-pending:value (reason)`: the reason is inline and has
+// three or more words of two or more letters each, the target must not exist yet, and the run counts them. `<crate> unit:...` names the
+// crate a ref lives in.
+// Fences: an opener is 0-3 spaces then three or more backticks or tildes, except a backtick run followed by text holding a backtick
+// (```x``` is not an opener); the closer is 0-3 spaces, the opener's character at least as many times, then only spaces or tabs. Lines
+// inside are skipped, but one with an R, T or B id in its first five words fails (a fence never holds a claim), and an unterminated fence fails.
+// Outside fences a line whose first non-whitespace character is `<` (an HTML block or comment) fails.
 // Rust sources are read with comments and string literals blanked, so a commented-out test or a `proptest!` in a comment counts for nothing.
 // unit/lib/it/store resolve in the exact module path given: a file for the longest `src/a/b.rs` prefix (lib.rs for none), then inline `mod`s.
 // fuzz:t is a non-empty fuzz/fuzz_targets/t.rs with a committed file (not a dotfile) in fuzz/corpus/t and a test under tests/ whose string literal names fuzz/corpus/t.
 // vec/oracle `#id` is an `id` field value in the JSON file, w3c `#s` a `section` field value.
 // api:Item and api-absent:Item read the crate's committed public-api.txt (and need a `just api` recipe). Its items are the path each line
-// declares, generics dropped (`method Jws::parse fn(..)` declares Jws::parse); impl and attr lines declare none. A value with `::` must equal
-// a declared path, one without must equal a path's last segment. api:Item resolves when the item is declared, api-absent:Item when it is not.
+// declares, generics dropped (`method Jws::parse fn(..)` declares Jws::parse); impl and attr lines declare none. api:Item resolves when
+// Item equals a declared path, so a bare name must be a top-level item. api-absent:A::b resolves when A is declared and A::b is not;
+// a bare api-absent:b resolves when no declared path ends in the segment b.
 // A quoted floor is a line naming both `mutants` and `floor`: `crate N`, `crate: N`, `floor N`, `floor: N`, `floor = N`, `floor for crate is N`.
-// A claim is a line `- <id> <text>` with an R, T or B id (`- R26b ...`). A line that is not a claim fails as a claim form when, after
-// nothing but non-letter, non-digit characters (and optionally one `1.` or `1)` list number or `[x]` task box), its first letter or digit
-// starts such an id not followed by a letter or digit: `- [ ] R1`, `- ~~R1~~`, R1 in backticks, `1. R1`, `| R1 |`, `- **R1**`, `- R1:`;
-// so does such a line inside the legend. N, NC and P lines claim
-// nothing, and an O line is proven by the owner it names, outside the crate. Each claim carries at least one proof token: a ref or pending
-// ref as above, or a backticked `just <recipe>` naming a justfile recipe. A bare `api` is no proof, and naming another claim is no proof.
-// Known limits: a claim or a floor split across two lines is not seen; the legend is the first `Checks:` block only.
+// A claim is a line that starts exactly `- <id> ` with an R, T or B id (`- R26b ...`). Any other line with an R, T or B id token (the letter
+// not preceded by a letter, digit or `_`, then digits) in its first five whitespace-separated words fails as a claim form, unless it starts
+// `- ` and an N, NC, P, O or W-S id (`- P3.7 `, `- W-S7:`); a table row (`|` first) is read only up to its second `|`. A legend line with
+// such a token fails too. N, NC and P lines claim nothing, and an O line is proven by the owner it names, outside the crate. Each claim
+// carries at least one proof token: a ref or pending ref as above, or a backticked `just <recipe>` naming a justfile recipe. A bare `api`
+// is no proof, and naming another claim is no proof.
+// Known limits: a claim or a floor split across two lines is not seen; the legend is the first `Checks:` block only; a pending reason is
+// checked for shape, not sense.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -216,7 +221,7 @@ function apiItems(c) {
     }
     return cache.get(k);
 }
-const apiHas = (paths, v) => (v.includes('::') ? paths.includes(v) : paths.some((x) => x.split('::').at(-1) === v));
+const parentOf = (v) => v.slice(0, v.lastIndexOf('::'));
 
 // each resolver returns 'ok' or the reason the ref is dangling
 const resolvers = {
@@ -263,18 +268,32 @@ const resolvers = {
     wipe: (c, v) => (anyTest([...walk(join(c.rust, 'wipe/src'), '.rs'), ...walk(join(c.rust, 'wipe/tests'), '.rs')], v.split('::').at(-1)) === 'ok' ? 'ok' : `no test fn ${v} in wipe`),
     api: (c, v) => {
         const items = apiItems(c);
-        return typeof items === 'string' ? items : apiHas(items, v) ? 'ok' : `no item ${v} in ${c.dir.slice(c.rust.length + 1)}/public-api.txt`;
+        return typeof items === 'string' ? items : items.includes(v) ? 'ok' : `no ${v.includes('::') ? 'item' : 'top-level item'} ${v} in ${c.dir.slice(c.rust.length + 1)}/public-api.txt`;
     },
     'api-absent': (c, v) => {
         const items = apiItems(c);
-        return typeof items === 'string' ? items : apiHas(items, v) ? `${c.dir.slice(c.rust.length + 1)}/public-api.txt declares ${v}` : 'ok';
+        if (typeof items === 'string') return items;
+        const snap = `${c.dir.slice(c.rust.length + 1)}/public-api.txt`;
+        if (v.includes('::') && !items.includes(parentOf(v))) return `no parent ${parentOf(v)} in ${snap}`;
+        const hit = v.includes('::') ? items.includes(v) : items.some((x) => x.split('::').at(-1) === v);
+        return hit ? `${snap} declares ${v}` : 'ok';
     },
     gate: (c, v) => (isFile(join(c.rust, 'justfile')) && new RegExp(`^${esc(v)}(\\s[^:=\\n]*)?:(?!=)`, 'm').test(read(join(c.rust, 'justfile'))) ? 'ok' : `no just recipe ${v}`),
 };
 const PREFIXES = Object.keys(resolvers).sort((a, b) => b.length - a.length);
 const CLAIM = /^- ([RTB]\d+[a-z]?) /;
 // an R, T or B id opening a line behind any list, table, emphasis or bracket mark
-const CLAIMISH = /^[^\p{L}\p{N}]*(?:(?:\d+[.)]|\[[xX]\])[^\p{L}\p{N}]*)?([RTB]\d+[a-z]?)(?![\p{L}\p{N}])/u;
+// a non-claim ledger entry, whose own id stands where a claim's would
+const LEDGER = /^- (?:NC|N|P|O|W-S)\d+(?:\.\d+)*[a-z]?[ :]/;
+// the first R, T or B id token among a line's first five whitespace-separated words; a table row (`|` first) is read up to its second `|`
+const ID = /(?<![\p{L}\p{N}_])[RTB]\d+[\p{L}\p{N}_]*/u;
+const idNear = (l) =>
+    (/^\s*\|/.test(l) ? l.replace(/^(\s*\|[^|]*).*$/, '$1') : l)
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 5)
+        .map((w) => ID.exec(w)?.[0])
+        .find(Boolean);
 const JUST = /`just ([a-z_][a-z0-9_-]*)\b/g;
 const recipes = (rust) => (isFile(join(rust, 'justfile')) ? new Set([...read(join(rust, 'justfile')).matchAll(/^@?([a-z_][a-z0-9_-]*)(?:\s+[*+$]?[a-z_][a-z0-9_-]*(?:=(?:"[^"\n]*"|'[^'\n]*'|[^\s:]+))?)*\s*:(?!=)/gm)].map((m) => m[1])) : new Set());
 const NAME = '(?:[A-Za-z0-9_./*#:-]|\\{[^}\\s]*\\})+';
@@ -304,7 +323,7 @@ function check(rust) {
             legend.add(start);
             for (let i = start + 1; i < lines.length && /^(- |\s+\S)/.test(lines[i]); i++) legend.add(i);
         }
-        for (const i of legend) if (CLAIMISH.test(lines[i])) fail(i, CLAIMISH.exec(lines[i])[1], 'a claim inside the `Checks:` legend is never checked; end the legend with a blank line first');
+        for (const i of legend) if (idNear(lines[i])) fail(i, idNear(lines[i]), 'a claim inside the `Checks:` legend is never checked; end the legend with a blank line first');
         const defined = new Set();
         for (const i of legend) for (const m of lines[i].matchAll(/`([a-z][a-z0-9]*(?:-[a-z][a-z0-9]*)*):(?!:)/g)) defined.add(m[1]);
         for (const p of defined) if (!resolvers[p.replace(/-pending$/, '')]) fail(start, `legend prefix ${p}:`, 'the claims tool has no resolver for it');
@@ -314,8 +333,13 @@ function check(rust) {
         const seen = new Set();
         lines.forEach((line, i) => {
             if (fence) {
-                const close = /^ {0,3}(`{3,}|~{3,}) *$/.exec(line);
+                const close = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
                 if (close && close[1][0] === fence.ch && close[1].length >= fence.len) fence = null;
+                else if (idNear(line)) fail(i, idNear(line), 'claim inside a fence: a fence never holds a claim');
+                return;
+            }
+            if (/^\s*</.test(line)) {
+                fail(i, 'html', 'html is outside the ledger subset');
                 return;
             }
             const open = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
@@ -325,8 +349,8 @@ function check(rust) {
             }
             if (legend.has(i)) return;
             const claim = CLAIM.exec(line)?.[1];
-            const claimish = CLAIMISH.exec(line)?.[1];
-            if (claimish && !claim) fail(i, claimish, 'claim form: a claim is a line `- <id> <text>` with the id undecorated');
+            const near = claim || LEDGER.test(line) ? null : idNear(line);
+            if (near) fail(i, near, 'claim form: a claim is exactly `- <id> <text>`, and no other line has an R, T or B id in its first five words');
             let proofs = 0;
             for (const m of line.matchAll(JUST)) {
                 proofs++;

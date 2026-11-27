@@ -4,7 +4,7 @@ Every public signature is listed below verbatim, with the item that lands its bo
 
 Checks:
 - `ui:x (Ennnn)` is `tests/ui/fail/x.rs` with its committed `.stderr` opening with that rustc code, and its compiling twin `tests/ui/pass/x.rs` one line and one token away (`just twins`). `tests/ledger.rs` fails unless the cases on disk are exactly the names below; `ui:x (Ennnn, jose-NN)` lands with that item, since its case calls a function that item writes. `off_*` cases run with every feature off, the rest with every feature on.
-- `api:I` is an item `I` that the committed `public-api.txt` declares (a path such as `Type::method`, or a bare name matching a path's last segment; impl and attr lines declare none) and `api-absent:I` one it does not declare; the snapshot is under `just api`. An absent accessor or constructor is an `api-absent:` ref; an absent impl is held by the snapshot (`just api`) and its `ui:` case.
+- `api:<Item>` is an item path the committed `public-api.txt` declares (`Type::method`, or a bare top-level name; impl and attr lines declare none) and `api-absent:<Item>` one it does not declare (a bare name matches no path's last segment; `Type::b` needs `Type` declared); the snapshot is under `just api`. An absent accessor or constructor is an `api-absent:` ref; an absent impl is held by the snapshot (`just api`) and its `ui:` case.
 - `vec:f#id` is a case of `rust/vectors/f`; `vec:f` is the whole file. A refusal's error kind is compared only where the oracle file names one (`kind named`); elsewhere the check is refusal alone. Rows read files through testkit's typed readers (`testkit::vectors::{wycheproof, sections, figures}`), which check each file's SHA-256 and count against `SOURCES.toml`.
 - `row:x` is `tests/row_x.rs`, one file per family (Layout below). `lib:m::x` is a row run as a `--lib` filter over a `#[cfg(test)]` module of `src/m.rs`, where the inputs are raw primitive values no public item takes (ruling R-l). `prop:t` is a fixed-seed proptest in a row file; `unit:m::t` a test in `src/m.rs`.
 - `gate:x` is `just x` with jose's `gates.json`.
@@ -181,9 +181,9 @@ Each bound is a named `pub const` at the crate root; each is checked before anyt
 - `MAX_JSON_LEN`, `MAX_ENTRIES`, `MAX_NAME_LEN`, `MAX_LEEWAY`, `MAX_RSA_BITS`, `MAX_RSA_EXPONENT`: oracle gap, no oversize case yet in jose-derived/limits.json; requested of the oracle lane.
 
 ## Type
-- T1 A parsed `Jws` has no payload accessor; the payload exists only as the `Payload` that a verify returns: api:Jws api:Payload.
-- T2 A parsed `Jwt` has no claims or payload accessor, and a `VerifiedJwt` none either, so `claims` with a `Policy` is the only way out (RFC 8725 3.8, 3.9, 3.11): api:Jwt api:VerifiedJwt api:Policy.
-- T3 `Payload`, `VerifiedJwt` and `Plaintext` have no public constructor or field: api:Payload api:VerifiedJwt api:Plaintext.
+- T1 A parsed `Jws` has no payload accessor; the payload exists only as the `Payload` that a verify returns: api-absent:Jws::payload api:Jws::verify.
+- T2 A parsed `Jwt` has no claims or payload accessor, and a `VerifiedJwt` none either, so `claims` with a `Policy` is the only way out (RFC 8725 3.8, 3.9, 3.11): api-absent:Jwt::claims api-absent:Jwt::payload api-absent:VerifiedJwt::payload api:VerifiedJwt::claims.
+- T3 `Payload`, `VerifiedJwt` and `Plaintext` have no public constructor or field: api-absent:Payload::new api-absent:Payload::0 api-absent:VerifiedJwt::new api-absent:VerifiedJwt::0 api-absent:Plaintext::new api-absent:Plaintext::0.
 - T4 `Policy` has no `Default`: ui:policy_default (E0277).
 - T5 Issuer and audience are distinct types, so they cannot be swapped into a policy (8725 3.8, 3.9): ui:policy_swap (E0308).
 - T6 A policy is typed by its kind, so an ID-token policy is not an access-token policy (8725 3.11, 3.12): ui:kind_policy (E0308).
