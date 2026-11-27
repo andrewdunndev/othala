@@ -5,7 +5,7 @@ Every public signature is listed below verbatim, with the item that lands its bo
 Checks:
 - `ui:x (Ennnn)` is `tests/ui/fail/x.rs` with its committed `.stderr` opening with that rustc code, and its compiling twin `tests/ui/pass/x.rs` one line and one token away (`just twins`). `tests/ledger.rs` fails unless the cases on disk are exactly the names below; `ui:x (Ennnn, jose-NN)` lands with that item, since its case calls a function that item writes. `off_*` cases run with every feature off, the rest with every feature on.
 - `api` is the committed `public-api.txt` (`just api`): an absence (no accessor, no constructor, no impl) is held there.
-- `vec:f#id` is a case of `rust/vectors/f`; `vec:f` is the whole file. A refusal's error kind is compared only where the oracle file names one (`kind named`); elsewhere the check is refusal alone. Rows read files through testkit's typed readers (`testkit::vectors::{wycheproof, sections, figures}`, testkit `b0aba876`), which check each file's SHA-256 and count against `SOURCES.toml`.
+- `vec:f#id` is a case of `rust/vectors/f`; `vec:f` is the whole file. A refusal's error kind is compared only where the oracle file names one (`kind named`); elsewhere the check is refusal alone. Rows read files through testkit's typed readers (`testkit::vectors::{wycheproof, sections, figures}`), which check each file's SHA-256 and count against `SOURCES.toml`.
 - `row:x` is `tests/row_x.rs`, one file per family (Layout below). `lib:m::x` is a row run as a `--lib` filter over a `#[cfg(test)]` module of `src/m.rs`, where the inputs are raw primitive values no public item takes (ruling R-l). `prop:t` is a fixed-seed proptest in a row file; `unit:m::t` a test in `src/m.rs`.
 - `gate:x` is `just x` with jose's `gates.json`.
 

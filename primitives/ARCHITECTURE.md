@@ -22,33 +22,7 @@ DAG: othala-native and othala-worker -> othala-core -> {oidc-provider -> jose, w
 Rules for all: every public struct has private fields, a named constructor and accessors; every public enum is #[non_exhaustive]; no all-pub structs. Traits are sealed unless extension is their purpose. Errors are Error { kind: ErrorKind, .. } with a fieldless Copy kind; Display never carries secret-derived detail. Every parser takes input bounded by rule 5.7.
 Claims ledger: each claim is tagged by what carries it, and section 4 gives the proof each tag requires. Type: the program does not compile. Runtime: a check returns an error. Obligation: the caller must do something the crate cannot see; it is named in CONTRACT.md and tested against every store. Nothing is called unrepresentable unless it is Type.
 ### base
-pub struct UnixTime(u64);  // seconds; From<SystemTime> only behind std
-pub trait Entropy { fn fill(&mut self, out: &mut [u8]); }  // the only way randomness enters (D11)
-pub struct Secret<const N: usize>; pub struct SecretBytes;  // SecretBytes: imported TOTP and HS keys
-impl Secret<N> { generate(e: &mut impl Entropy) -> Self; ct_eq(&self, &Self) -> bool; digest(&self) -> Digest /*SHA-256*/ }  // R-j: the read is expose::Expose, in its own crate; base implements it and never re-exports it; a crate may read secret bytes only if it depends directly on `expose` and its gates.json declares `expose`; no workspace member has a build script.
-pub struct Digest([u8; 32]);  // Eq, Ord, Hash, Serialize: safe to store and index
-pub fn b64url_encode(&[u8]) -> String; pub fn b64url_decode(&str) -> Result<Vec<u8>, Error>;  // Malformed on padding or a non-canonical tail
-pub enum ErrorKind { Malformed, Overlap, TooLarge, Empty, ScopeChanged, SpansDomains, WrongReceipt }
-pub trait StoreKey: Ord + Clone { fn scope(&self) -> Scope; }  // Scope::{Global, Subject}: a consumer qualifies Subject keys with the subject, never Global ones
-pub struct Version(u64);  // never repeats for a key, across deletes too
-pub struct Row<R>;  // Row::new(record, version)
-pub struct Rows<K, R>;  // insert(K, Option<Row<R>>), corrupt(K), get(&K)
-pub enum Guard<K> { Consume(K), Unchanged(K, Version), Absent(K) }  // Consume: the row must exist and is deleted
-pub struct Effect<K, R>;  // id(), guards(), puts() -> (K, R, Option<UnixTime> expiry), deletes()
-impl Effect { builder(e: &mut impl Entropy) -> Builder  // the only constructor; the id is 16 bytes of Entropy
-  lift<K2,R2>(self, key: impl Fn(K)->K2, record: impl Fn(R)->R2) -> Result<Effect<K2,R2>, Error>  // same id; a non-injective map is Overlap, a scope change is ScopeChanged
-  merge(self, other) -> Result<Self, Error>  // Overlap if a key is in both, TooLarge past the bound; the merged id is the digest of both ids
-  domain<D: Eq>(&self, of: impl Fn(&K)->D) -> Result<D, Error>  // SpansDomains unless every key maps to one domain
-  host_applied(&self) -> Receipt }  // the one Receipt mint; confined to the stores of testkit and the two shells (the phase-0 store crate is where this goes)
-impl Builder { create(k, r, expiry) /*Absent+put*/; update(k, seen: &Row, r, expiry) /*Unchanged+put*/; consume(k); delete(k, seen); expect(k, seen); expect_absent(k); build() -> Result<Effect, Error> /*Overlap, TooLarge, Empty*/ }  // every write is paired with a guard on its own key. dc441b29 also adds Effect::created/updated/consumed/deleted shorthands.
-pub struct Receipt;  // a store committed this one Effect; not Clone
-pub struct Conflict<K>;  // failures() -> &[(K, Failure)], Failure::{Missing, Changed, Present}; nothing was applied
-#[must_use] pub struct Pending<T, K, R>;  // a verdict void until settled with its effect's Receipt
-impl Pending { effect(&self) -> &Effect; settle(self, Receipt) -> Result<T, Error> /*WrongReceipt, and the verdict is gone*/; lift(..); join<U>(self, Pending<U,K,R>) -> Result<Pending<(T,U),K,R>, Error> }  // Pending::map was REMOVED: it let a verdict escape without a receipt
-pub trait Store<K, R> { type Error;  // Error means outcome unknown; a store's own constraint failure is Conflict, never Error
-  fn load(&mut self, keys: &[K], now: UnixTime) -> Result<Rows<K,R>, Self::Error>;
-  fn apply(&mut self, effect: &Effect<K,R>, now: UnixTime) -> Result<Result<Receipt, Conflict<K>>, Self::Error>; }
-pub struct Retry; pub const REDECIDE: u8 = 3;  // re-applies of one Effect after Error; re-decisions after Conflict
+Public signatures: `rust/base/public-api.txt`, generated and gated by `just api`.
 - Type: a secret printed, cloned, serialized or compared with == (no Display, Clone, Serialize or PartialEq; Debug redacts); a bearer value as a store key or record field without expose (store-facing types take Digest, never Secret; expose is confined to the modules each CONTRACT.md names); a verdict out of Pending without a Receipt; a put or delete with no guard on its key.
 - Runtime: a key named twice in one effect, merge or lift (Overlap); a lift that changes a key's scope (ScopeChanged); an effect with no guard (Empty); an effect past the bound (TooLarge); an effect spanning transaction domains (SpansDomains, before anything is written); a receipt for another effect (WrongReceipt).
 - Obligation (the only one the three protocol crates place on a host; proof: testkit::store_conformance against every Store, on the exact apply path each shell uses):
@@ -59,44 +33,15 @@ pub struct Retry; pub const REDECIDE: u8 = 3;  // re-applies of one Effect after
   - A row at or after its expiry is absent to load and to every guard; every decision also checks the deadline in its record.
   - A version never repeats for a key.
 - Retry rule: Conflict is not a verdict. The decider re-loads and re-decides, at most REDECIDE times, then answers ServerError (except a crate's named reuse rule, oidc-provider below). Error from apply means the outcome is unknown: the host re-applies the same Effect with the decision's now, within Retry, and never re-decides; when Retry is spent the verdict is void. Error from load is retried freely.
-- Not claimed: zeroize on drop (best effort). dc441b29 does test the owned-buffer wipe.
+- Not claimed: zeroize on drop (best effort).
 ### jose
-pub trait Alg: sealed { const NAME; type Signature: AsRef<[u8]>; }  pub struct Es256; Es384; EdDsa; Rs256; Ps256; Hs256;  // one feature each
-pub struct VerifyKey<A>;  // rejects RSA under 2048 bits and HMAC keys shorter than the hash
-pub struct AnyVerifyKey;  // from_jwk(&Jwk): the JWK's alg is required and binding
-pub trait Signer<A> { fn sign(&self, input: &[u8]) -> A::Signature; }
-pub struct Jws<'a>;  // parsed, not verified: no payload accessor
-impl Jws { parse(&str) -> Result<Self>; kid() -> Option<&str> /*a lookup hint only*/; verify<A>(self, &VerifyKey<A>) -> Result<Payload>; verify_any(self, &AnyVerifyKey) -> Result<Payload> /*header alg compared, never used to choose*/ }
-impl Payload { bytes() -> &[u8] }  // signature verified, content unvalidated
-pub struct Jwt<'a>;  // same parse/verify; verification yields VerifiedJwt
-impl VerifiedJwt { claims<K: TokenKind>(self, &Policy<K>, now) -> Result<K::Claims> }  // no payload accessor: the only way out
-pub struct Unsigned<A>;  new(Header<A>, payload) ; signing_input() ; finish(signature) -> Compact  // WebCrypto, KMS or HSM signs; the Worker's RS256 path
-pub trait TokenKind { const TYP; type Claims: DeserializeOwned; }
-impl Policy<K> { new(Issuer, Audience, Leeway) }  // private fields, no Default
-pub enum Jwk { Ec, Rsa, Okp, Oct }  // JwkSet::decode bounded; find(kid); Jwk::thumbprint(); Jwk::verify_key<A>()
-pub enum ErrorKind { Malformed, TooLarge, DuplicateMember, UnsupportedAlg, AlgMismatch, KeyAlgMissing, CriticalHeader, WeakKey, KeyUse, BadSignature, Expired, NotYetValid, Issuer, Audience, Type, MissingClaim, ClaimType }
+Public signatures: `rust/jose/public-api.txt`, generated and gated by `just api`.
 - Type: a payload or claims read before verification; JWT claims read without a Policy carrying issuer, audience and typ; an ID token accepted as an access token (TokenKind::TYP, 8725 3.11); fetching jku/x5u/jwk (no fetch exists); an Ed25519 key in ECDH, or an X25519 key signing.
 - Runtime: none and the RS-to-HS swap (AlgMismatch; header alg compared, never selecting code; 8725 3.1); claims mismatched or absent (Issuer, Audience, Type, MissingClaim); a non-numeric exp treated as absent (ClaimType; GHSA-h395-gr6q-cpjc); a JWK without alg used dynamically (KeyAlgMissing); weak keys (WeakKey).
-Note: D3 (JWE now) and the rsa-sign/rsa-decrypt features postdate this text. The jose draft at 10a23867 carries them.
+Note: D3 (JWE now) and the rsa-sign/rsa-decrypt features postdate this text.
 
 ### webauthn-rp
-pub struct RelyingParty(/* private */);  // new(RpId, NonEmpty<Origin>, CounterPolicy); cross-origin, topOrigin and unsolicited extensions are deny-by-default builder options
-pub enum CounterPolicy { Reject, Tolerate }  // Reject: a regressed counter is Err(CounterRegressed)
-pub struct UserHandle;  // 32 random bytes; UserHandle::generate(&mut impl Entropy) | from_stored(&[u8])
-pub enum Key { Ceremony(Digest), Credential(CredentialId) }  // ceremony key = digest of the challenge; both Scope::Global
-pub enum Record { Ceremony(Ceremony), Credential(Credential) }  // encode()/decode(): opaque versioned bytes, no serde derive
-pub type Pending<T> = base::Pending<T, Key, Record>; pub type Effect = base::Effect<Key, Record>;
-impl RelyingParty {
-  start_registration(&self, user: &UserEntity, exclude: &[CredentialId], opts: &RegistrationOptions, now, e) -> (CreationOptions, Effect);  // effect: Absent(Ceremony) + put, with the deadline as expiry
-  start_authentication(&self, allow: Allow, opts: &AuthenticationOptions, now, e) -> (RequestOptions, Effect);
-  locate(&self, response: &Response) -> Result<Lookup, Error>;  // Lookup: ceremony Key, credential Key, Option<UserHandle>
-  finish_registration(&self, state: Row<Ceremony>, response: &RegistrationResponse, trust: &dyn TrustSource, now, e) -> Pending<Result<Registered, Error>>;  // effect: Consume(Ceremony) always; on Ok also Absent(Credential) + put
-  finish_authentication(&self, state: Row<Ceremony>, stored: Row<Credential>, response: &AuthenticationResponse, now, e) -> Pending<Result<Assertion, Error>>; }  // effect: Consume(Ceremony) always; on Ok also Unchanged(Credential) + put
-pub enum Allow<'a> { Credentials(&'a [CredentialId]), Discoverable }
-impl Assertion { user() -> UserVerification; backup() -> BackupState; counter() -> Counter }  // private constructor
-pub enum UserVerification { Verified, PresenceOnly } pub enum Counter { Unsupported, Advanced(u32), Regressed { stored, seen } }
-pub struct Error; impl Error { kind() -> ErrorKind; spec_step() -> SpecStep }  // L3 7.1/7.2 step number
-Wire JSON types sit behind a serde feature, separate from verification.
+Public signatures: `rust/webauthn-rp/public-api.txt`, generated and gated by `just api`.
 - Type: a PII string as the user handle; ceremony state returned to the caller (start_* returns no state value, only an Effect that stores it under its digest key; this closes the webauthn-rs "danger" case); a second finish variant for discoverable credentials (one finish; locate comes first); state that breaks under a generic serializer; an Assertion or Registered value made outside a finished ceremony.
 - Runtime: an expired challenge (state carries its deadline, and finish takes now); counter regression under CounterPolicy::Reject. Under Tolerate it is reported in Assertion::counter, never dropped.
 - Obligation (the base one, plus):
@@ -142,17 +87,7 @@ pub fn drive<S: Store<Key,Record>>(step, store: &mut S, signer: &impl Sign, retr
   - No decision reads a range: end_session finds families through the Sid index row.
 
 ### factor
-pub enum Key { Attempts, TotpStep, Recovery(Digest) }  // all Scope::Subject: the host qualifies them with the subject
-pub enum Record { Attempts(Attempts), TotpStep(TotpStep), Recovery(RecoveryHash) }
-pub struct Throttle;  // Throttle::new(policy) | Throttle::unlimited(), the greppable opt-out
-impl Throttle { check(&self, attempts: Option<&Row<Attempts>>, now) -> Result<Permit, ClosedUntil>; reset(&self, attempts: &Row<Attempts>, e) -> base::Effect<Key,Record> }  // reset is the only reset; the consumer merges it into its login-complete effect
-pub struct Permit;  // private: the attempts version it was issued against; not Clone; consumed by exactly one verify
-pub struct Totp;  // key: SecretBytes, alg, Digits::{Six,Eight}, Period, Skew::{None,One}
-Totp::verify(&self, permit, code: &OtpCode, now, last: Option<&Row<TotpStep>>, e) -> Pending<Result<OtpMatch, Rejected>>
-recovery_generate(n, e) -> Vec<(RecoveryCode, RecoveryHash)>; password_hash(pw, cost, e) -> Phc
-recovery_verify(permit, code, stored: &[RecoveryHash], e) -> Pending<Result<RecoveryMatch, Rejected>>
-password_verify(permit, pw, phc, e) -> Pending<Result<PasswordMatch, Rejected>>  // PasswordMatch::rehash() -> Rehash::{Needed, Current}
-Every verdict's effect, a match included, guards Unchanged(Attempts) (or Absent) and puts the incremented count, never a reset. A reset on a correct password would reopen the throttle for the OTP guess that follows it. A TOTP match also guards the step row and puts the new step; a recovery match adds Consume(Recovery). Two factors therefore never merge (both guard Attempts); a consumer applies them in sequence.
+Public signatures: `rust/factor/public-api.txt`, generated and gated by `just api`.
 - Type: a verifier called without a Permit (private field, made only by Throttle::check); a Permit used twice; an OtpMatch, RecoveryMatch or PasswordMatch made outside a verify.
 - Runtime: OTP replay (a step at or below last is Rejected::Replayed, an RFC 6238 MUST); a Cost below the OWASP Argon2id floor, or a Password outside the NIST length bounds (validated constructors).
 - Obligation (the base one):
@@ -268,7 +203,6 @@ Also binding:
 ## Open items from the contract rounds (what to pick up first)
 - oidc-provider must be re-cut on jose's types. These move: Issuer, Audience, Kid, SigningAlg, and the signing types.
 - oidc-provider asks base for Rows::lift / Conflict::lift, and either Effect: Clone or Effect::lift(&self), so othala-core can drive one unified store. Until then its CONTRACT says shells lower rows and conflicts per crate key type.
-- The round-2 owner fixes on primitives/jose 10a23867, webauthn-rp c5eb4e7c, oidc-provider 60d71813 and factor 799b1e29 were never re-reviewed. Integration failed on the shared justfile, which phase 0 step 2 removes.
 - base nits still open (low): the reference store's reused-id check compares key sets only, so the same keys with different ops answer Ok. Fingerprint guards and writes per id, or narrow O15.
 - Exam (the containers run in a separate session; the decisions are made here):
   - E2 at spike/exam f303e7b. Acceptance is green: 115/115 e2e and the trace checks pass. Gaps:
@@ -343,7 +277,7 @@ Each function lands with the item whose row it turns green.
 
 The rulings R-j to R-o were added on 2026-11-26. Where a ruling differs from sections 2 to 5, the ruling supersedes the section (R-f, R-g and R-m are known cases).
 
-**R-j** Secret exposure is confined per crate, by the compiler: the read is expose::Expose, in its own crate; base implements it and never re-exports it; a crate may read secret bytes only if it depends directly on `expose` and its gates.json declares `expose`; no workspace member has a build script. A crate declares `"expose": ["<module>", ...]` in its gates.json. The canary fails when the members other than base with a direct dependency on `expose` (any kind, renamed or under a target table) differ from those whose gates.json declares it; when a declared module has no source; when a member has a build script; when a tracked `.cargo/config` other than mutants.toml or a tracked file under `.cargo-home` exists, when CARGO_HOME points inside the repository but not at its `.cargo-home`, when a tracked CI file, script, justfile or mise file sets CARGO_HOME to anything but CI's `.cargo-home`, or sets a rustc wrapper or flag; when a member's source tests `doc` in cfg or cfg_attr; when any member's public API (rustdoc JSON with hidden items, or public-api.txt) names an item of `expose`, apart from base's impls of the read for Secret and SecretBytes; or when wipe is a non-dev dependency. It also proves by plant, on every run, that the compiler refuses an undeclared member that compiles `unsafe`, reads a secret, or names the trait directly, through `include!` or through base, and that each check above catches its own plant. Laundering by a declared crate is a review duty (base CONTRACT O13). Within the crate, the named modules are an Obligation that review checks, named in its CONTRACT. Crates never keep their own secret buffers: imported OTP and HS keys are `SecretBytes`. User-supplied inputs (a password, an OTP code, a recovery code) are crate types that wrap `SecretBytes`.
+**R-j** Secret exposure is confined per crate, by the compiler: the read is expose::Expose, in its own crate; base implements it and never re-exports it; a crate may read secret bytes only if it depends directly on `expose` and its gates.json declares `expose`; no workspace member has a build script. A crate declares `"expose": ["<module>", ...]` in its gates.json. `rust/canary.sh` is the check and states what it refuses; `just canary` runs it. Laundering by a declared crate is a review duty (base CONTRACT O13). Within the crate, the named modules are an Obligation that review checks, named in its CONTRACT. Crates never keep their own secret buffers: imported OTP and HS keys are `SecretBytes`. User-supplied inputs (a password, an OTP code, a recovery code) are crate types that wrap `SecretBytes`.
 
 **R-k** HOTP verification with a stored counter (look-ahead, resync) is a non-goal. HOTP is the primitive under TOTP. Row tests count the oracle's hotp_verify and hotp_resync cases as not applicable, under the total assertion.
 
