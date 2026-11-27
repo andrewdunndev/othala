@@ -12,22 +12,22 @@ gate: gate-rust claims vectors
 # the gates that run on CI's ci-rust image, which has no node or python3; claims and vectors run on theirs
 gate-rust: (tool-pins "jq") lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api
 
-# the slow gates, run on a schedule and on main: the per-crate mutation floors, the scoreboard they feed, the features-off jose run and the fuzz targets; `just gate-slow <crate> <k>/<n>` runs shard k of n of one crate's mutants and, in shard 1, the rest of its share (CI runs the jobs `slow-plan` lists), and with no argument runs everything unsharded
+# the slow gates, run on a schedule and on main: the per-crate mutation floors, the scoreboard they feed, the features-off jose run and the fuzz targets; `just gate-slow <crate> <k>/<n>` runs shard k of n (cargo-mutants' own, k from 0) of one crate's mutants and, in shard 0, the rest of its share (CI runs the jobs `slow-plan` lists), and with no argument runs everything unsharded
 gate-slow crate="" shard="": (tool-pins)
     #!/usr/bin/env bash
     set -euo pipefail
-    c="{{crate}}"; shard="{{shard}}"; k=1
+    c="{{crate}}"; shard="{{shard}}"; k=0
     if [ -n "$c" ]; then
         units=$(just slow-units)
         grep -qx "$c" <<< "$units" || { echo "gate-slow: '$c' is not one of: $(tr '\n' ' ' <<< "$units")"; exit 1; }
     fi
     if [ -n "$shard" ]; then
         [ -n "$c" ] || { echo "gate-slow: a shard needs a crate"; exit 1; }
-        [[ "$shard" =~ ^([1-9][0-9]*)/([1-9][0-9]*)$ ]] && [ "${BASH_REMATCH[1]}" -le "${BASH_REMATCH[2]}" ] || { echo "gate-slow: shard '$shard' is not k/n with 1 <= k <= n"; exit 1; }
+        [[ "$shard" =~ ^(0|[1-9][0-9]*)/([1-9][0-9]*)$ ]] && [ "${BASH_REMATCH[1]}" -lt "${BASH_REMATCH[2]}" ] || { echo "gate-slow: shard '$shard' is not k/n with 0 <= k < n"; exit 1; }
         k=${BASH_REMATCH[1]}
     fi
     if [ -z "$c" ] || ./crates.sh | jq -e --arg c "$c" 'select(.name == $c and .mutants)' > /dev/null; then just mutants "$c" "$shard"; fi
-    [ "$k" = 1 ] || exit 0
+    [ "$k" = 0 ] || exit 0
     just rows
     if [ -z "$c" ] || [ "$c" = jose ]; then just mutants-off; fi
     just fuzz 600 "$c"
@@ -48,7 +48,7 @@ slow-plan:
     echo "stages: [verify]"
     just slow-units | while read -r c; do
         n=${shards[$c]:-1}
-        for ((k = 1; k <= n; k++)); do
+        for ((k = 0; k < n; k++)); do
             printf '\nslow-%s-%sof%s:\n  extends: .slow\n  variables:\n    CRATE: %s\n    SHARD: %s/%s\n' "$c" "$k" "$n" "$c" "$k" "$n"
         done
     done
@@ -155,7 +155,7 @@ mutants crate="" shard="": (tool-pins "cargo-mutants" "jq")
     n=1; sharding=()
     if [ -n "{{shard}}" ]; then
         [ -n "{{crate}}" ] || { echo "mutants: a shard needs a crate"; exit 1; }
-        [[ "{{shard}}" =~ ^([1-9][0-9]*)/([1-9][0-9]*)$ ]] && [ "${BASH_REMATCH[1]}" -le "${BASH_REMATCH[2]}" ] || { echo "mutants: shard '{{shard}}' is not k/n with 1 <= k <= n"; exit 1; }
+        [[ "{{shard}}" =~ ^(0|[1-9][0-9]*)/([1-9][0-9]*)$ ]] && [ "${BASH_REMATCH[1]}" -lt "${BASH_REMATCH[2]}" ] || { echo "mutants: shard '{{shard}}' is not k/n with 0 <= k < n"; exit 1; }
         n=${BASH_REMATCH[2]}; sharding=(--shard "{{shard}}")
     fi
     runs=$(./crates.sh | jq -r --arg c "{{crate}}" 'select(.mutants and ($c == "" or .name == $c)) | "\(.name) \(.mutants.floor) \(.mutants.tests // [] | join(","))"')
