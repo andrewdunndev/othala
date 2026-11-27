@@ -1807,6 +1807,9 @@ test('promptIsNone: none, absent, other prompts, malformed and device urls', () 
   assert.equal(promptIsNone(`${AUTHZ}&prompt=login`), false);
   assert.equal(promptIsNone('not a url'), false);
   assert.equal(promptIsNone(`${DEVICE_URL}&prompt=none`), false);
+  assert.equal(promptIsNone(undefined), false);
+  assert.equal(promptIsNone(`${AUTHZ}&prompt=`), false);
+  assert.equal(promptIsNone(`${AUTHZ}&prompt=nonexistent`), false);
 });
 
 test('prompt=none login: aal1 session that needs step-up is rejected login_required, no UI, no slide', async () => {

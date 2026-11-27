@@ -118,8 +118,8 @@ export function freshnessVerdict(
 }
 
 /** OIDC prompt=none forbids any UI: the browser must get an error at the redirect_uri. Device grants never carry it. */
-export function promptIsNone(requestUrl: string): boolean {
-  if (isDeviceRequest(requestUrl)) return false;
+export function promptIsNone(requestUrl: string | undefined): boolean {
+  if (!requestUrl || isDeviceRequest(requestUrl)) return false;
   try {
     return (new URL(requestUrl).searchParams.get('prompt') ?? '').split(' ').includes('none');
   } catch {
@@ -346,7 +346,8 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
       return upstreamError();
     }
     const silent = promptIsNone(consent.request_url);
-    const [err, status] = silent ? ['login_required', 400] : [undefined, undefined];
+    const err = silent ? 'login_required' : 'access_denied';
+    const status = silent ? 400 : 403;
     if (!session?.active || !session.identity) {
       return rejectConsent(d, challenge, 'no active session', upstreamError, undefined, err, status);
     }
