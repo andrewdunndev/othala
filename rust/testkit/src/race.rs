@@ -35,8 +35,8 @@ where
                         serial
                             .apply(&effect, now)
                             .expect("reference store")
-                            .map(drop),
-                        Ok(()),
+                            .map(|receipt| receipt.effect_id()),
+                        Ok(effect.id()),
                         "serial {order:?}: op {i}"
                     );
                 }
@@ -84,12 +84,12 @@ where
         let first = twice
             .apply(&effect, now)
             .expect("reference store")
-            .map(drop);
+            .map(|receipt| receipt.effect_id());
         assert_eq!(
             twice
                 .apply(&effect, now)
                 .expect("reference store")
-                .map(drop),
+                .map(|receipt| receipt.effect_id()),
             first,
             "op {i} applied twice"
         );

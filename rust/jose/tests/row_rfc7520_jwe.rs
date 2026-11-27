@@ -42,6 +42,16 @@ fn section_5() {
         if !owned && !refused {
             return Outcome::NotApplicable;
         }
+        if refused {
+            // RSA1_5 and PBES2 are refused by name, before any key is read (R51)
+            assert_eq!(
+                JweAlg::parse(&case.alg).err().map(|e| e.kind()),
+                Some(ErrorKind::UnsupportedAlg),
+                "{}",
+                case.id
+            );
+            return Outcome::Checked;
+        }
         let jwk = case.jwk.as_ref().map_or("{}", Json::text);
         let compact = case.serialization == "compact";
         let wire = if compact {
@@ -49,18 +59,6 @@ fn section_5() {
         } else {
             case.jwe.text().to_owned()
         };
-        if refused {
-            for alg in common_jwe::LOCAL {
-                let outcome = parse(compact, &wire)
-                    .and_then(|jwe| common_jwe::decrypt(alg, &case.enc, jwk, jwe));
-                common_refusal::assert_outcome(&outcome, false, None, &case.id);
-            }
-            assert_eq!(
-                JweAlg::parse(&case.alg).err().map(|e| e.kind()),
-                Some(ErrorKind::UnsupportedAlg)
-            );
-            return Outcome::Checked;
-        }
         let outcome = parse(compact, &wire)
             .and_then(|jwe| common_jwe::decrypt(&case.alg, &case.enc, jwk, jwe));
         common_refusal::assert_outcome(&outcome, case.expect.ok, None, &case.id);

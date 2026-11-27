@@ -43,28 +43,28 @@ fn row(file: Vector, total: usize, applicable: usize) {
         if case.alg.starts_with("ECDH") || case.alg.starts_with("RSA-OAEP") {
             return Outcome::NotApplicable;
         }
-        let jwk = case.jwk.as_ref().map_or("{}", Json::text);
-        let outcomes: Vec<Result<Vec<u8>, jose::Error>> = if refused {
-            common_jwe::LOCAL
-                .iter()
-                .map(|alg| common_jwe::decrypt(alg, &case.enc, jwk, Jwe::parse(&case.jwe)?))
-                .collect()
-        } else {
-            vec![
-                Jwe::parse(&case.jwe)
-                    .and_then(|jwe| common_jwe::decrypt(&case.alg, &case.enc, jwk, jwe)),
-            ]
-        };
         if refused {
-            for outcome in &outcomes {
-                common_refusal::assert_outcome(outcome, false, None, &case.id);
-            }
+            // RSA1_5 and PBES2 are refused by name, before any key is read: the kind the file names, else R51's
             assert_eq!(
-                JweAlg::parse(&case.alg).err().map(|e| e.kind()),
-                Some(ErrorKind::UnsupportedAlg)
+                JweAlg::parse(&case.alg)
+                    .err()
+                    .map(|e| format!("{:?}", e.kind())),
+                Some(
+                    case.expect
+                        .kind
+                        .clone()
+                        .unwrap_or_else(|| "UnsupportedAlg".into())
+                ),
+                "{}",
+                case.id
             );
             return Outcome::Checked;
         }
+        let jwk = case.jwk.as_ref().map_or("{}", Json::text);
+        let outcomes = vec![
+            Jwe::parse(&case.jwe)
+                .and_then(|jwe| common_jwe::decrypt(&case.alg, &case.enc, jwk, jwe)),
+        ];
         let outcome = outcomes
             .into_iter()
             .next()

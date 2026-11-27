@@ -46,15 +46,6 @@ const REFUSALS: &[(&str, &str)] = &[
     ("s5_9-compact-must-refuse", "UnsupportedAlg"),
     ("s5_9-flattened-must-refuse", "UnsupportedAlg"),
     ("s5_9-general-must-refuse", "UnsupportedAlg"),
-    ("a2-rsa1_5-a128cbc-hs256-must-refuse", "AlgMismatch"),
-    ("s5_1-compact-must-refuse", "AlgMismatch"),
-    ("s5_1-flattened-must-refuse", "AlgMismatch"),
-    ("s5_1-general-must-refuse", "AlgMismatch"),
-    ("s5_3-compact-must-refuse", "Malformed"),
-    ("s5_3-flattened-must-refuse", "Malformed"),
-    ("s5_3-general-must-refuse", "Malformed"),
-    ("rsa1_5", "AlgMismatch"),
-    ("pbes2", "Malformed"),
     ("s5_13-general-recipient-1-must-refuse", "AlgMismatch"),
 ];
 

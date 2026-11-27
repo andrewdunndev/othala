@@ -84,10 +84,12 @@ fn start() -> S {
     let b = Effect::builder(&mut testkit::seeded(99))
         .create(K(1), 5, None)
         .create(K(4), 1, None);
-    assert!(
-        b.build()
-            .is_ok_and(|e| matches!(s.apply(&e, NOW), Ok(Ok(_))))
-    );
+    let built = b.build().ok();
+    let receipt = built.as_ref().and_then(|e| match s.apply(e, NOW) {
+        Ok(Ok(receipt)) => Some(receipt.effect_id()),
+        _ => None,
+    });
+    assert_eq!(receipt, built.map(|e| e.id()));
     s
 }
 
