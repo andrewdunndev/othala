@@ -1,6 +1,7 @@
 //! Golden v1 stored records (CONTRACT R147): the committed bytes of each record shape, decoded to their stated values and re-encoded byte for byte.
 //!
 //! Origin: each `golden/*.hex` is `Record::encode` of the record the `record.rs` unit tests build with the same name, written from the encoder on origin/main at 669c6adb, before the tag tables were generated from one list.
+//! The `*_variants_*` rows set the variants the first nine do not reach (resident key, conveyance, transport, format, attestation type, trust, backup state); `golden/tags.txt` lists every tag table entry by index, from the same encoder, and `record.rs` asserts its tables against it.
 //! `golden/debug.txt` holds the `Debug` text of each decoded record, one line per fixture, from the same run.
 //! A deliberate format change adds a new version and new fixtures; these files stay as the proof that v1 rows still read.
 use webauthn_rp::{
@@ -8,7 +9,7 @@ use webauthn_rp::{
     UserVerification,
 };
 
-const NAMES: [&str; 9] = [
+const NAMES: [&str; 17] = [
     "registration",
     "registration_conditional",
     "authentication",
@@ -18,6 +19,14 @@ const NAMES: [&str; 9] = [
     "credential_eddsa",
     "credential_rs256",
     "credential_single_device",
+    "registration_variants_1",
+    "registration_variants_2",
+    "registration_variants_3",
+    "credential_variants_1",
+    "credential_variants_2",
+    "credential_variants_3",
+    "credential_variants_4",
+    "credential_variants_5",
 ];
 
 fn dir() -> std::path::PathBuf {
