@@ -18,7 +18,8 @@ gate-slow crate="" shard="": (tool-pins)
     set -euo pipefail
     c="{{crate}}"; shard="{{shard}}"; k=1
     if [ -n "$c" ]; then
-        just slow-units | grep -qx "$c" || { echo "gate-slow: '$c' is not one of: $(just slow-units | tr '\n' ' ')"; exit 1; }
+        units=$(just slow-units)
+        grep -qx "$c" <<< "$units" || { echo "gate-slow: '$c' is not one of: $(tr '\n' ' ' <<< "$units")"; exit 1; }
     fi
     if [ -n "$shard" ]; then
         [ -n "$c" ] || { echo "gate-slow: a shard needs a crate"; exit 1; }
