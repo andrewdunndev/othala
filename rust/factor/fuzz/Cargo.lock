@@ -26,6 +26,7 @@ name = "base"
 version = "0.0.0"
 dependencies = [
  "base64ct",
+ "expose",
  "sha2",
  "subtle",
  "zeroize",
@@ -120,15 +121,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "expose"
+version = "0.0.0"
+
+[[package]]
 name = "factor"
 version = "0.0.0"
 dependencies = [
  "argon2",
  "base",
+ "expose",
  "hmac",
  "sha1",
  "sha2",
  "subtle",
+ "zeroize",
 ]
 
 [[package]]

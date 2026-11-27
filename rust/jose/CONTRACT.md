@@ -8,6 +8,7 @@ Checks:
 - `vec:f#id` is a case of `rust/vectors/f`; `vec:f` is the whole file. A refusal's error kind is compared only where the oracle file names one (`kind named`); elsewhere the check is refusal alone. Rows read files through testkit's typed readers (`testkit::vectors::{wycheproof, sections, figures}`, testkit `b0aba876`), which check each file's SHA-256 and count against `SOURCES.toml`.
 - `row:x` is `tests/row_x.rs`, one file per family (Layout below). `lib:m::x` is a row run as a `--lib` filter over a `#[cfg(test)]` module of `src/m.rs`, where the inputs are raw primitive values no public item takes (ruling R-l). `prop:t` is a fixed-seed proptest in a row file; `unit:m::t` a test in `src/m.rs`.
 - `gate:x` is `just x` with jose's `gates.json`.
+- `fuzz:t` is the cargo-fuzz target `fuzz/fuzz_targets/t.rs` (`just fuzz`) with its committed `fuzz/corpus/t` replayed by `tests/fuzz_corpus.rs`, each seed's outcome named in its file name.
 
 ## Signatures
 
@@ -282,9 +283,9 @@ Each bound is a named `pub const` at the crate root; each is checked before anyt
 
 ## Runtime: errors, names, limits
 - R61 Each bound in Bounds holds with `TooLarge` before parsing, for input that is also malformed: vec:jose-derived/limits.json, row:limits.
-- R62 No parser, decoder, verifier or decrypter panics on any input: the fuzz targets `jws_parse`, `jwt_claims`, `jwe_parse` and `jwk_decode` with committed corpora replayed in a row file.
+- R62 No parser, decoder, verifier or decrypter panics on any input: fuzz:jws_parse, fuzz:jwt_claims, fuzz:jwe_parse and fuzz:jwk_decode, their corpora replayed by `tests/fuzz_corpus.rs`.
 - R63 `Error` displays its kind only, never input, key or claim bytes: unit:error::display_names_kind_only.
-- R64 `Debug` of every key type, `SecretJwk`, `Plaintext`, `Payload`, `Compact` and `Unsigned` prints no key, plaintext, payload or token byte (`alg`, `kid` and lengths only), and of `Jws`, `Jwt`, `Jwe` and `VerifiedJwt` only their `kid`s: unit:<module>::debug_redacted in each type's own module, the hex, base64url and decimal of the secret absent.
+- R64 `Debug` of every key type, `SecretJwk`, `Plaintext`, `Payload`, `Compact` and `Unsigned` prints no key, plaintext, payload or token byte (`alg`, `kid` and lengths only), and of `Jws`, `Jwt`, `Jwe` and `VerifiedJwt` only their `kid`s: unit:key::debug_redacted, unit:sign::debug_redacted, unit:jwk::decode::debug_redacted and unit:jwe::envelope::debug_redacted, the hex, base64url and decimal of the secret absent.
 - R65 `SigningAlg`, `JweAlg` and `JweEnc` parse exactly their registry names, case-sensitively, and `name` round-trips through `Serialize` and `Deserialize`; `none`, `RSA1_5`, `PBES2-HS256+A128KW`, `ES256K`, `Ed25519` and `DEF` are `UnsupportedAlg`: unit:jws::header::names, unit:jwe::envelope::names.
 
 ## Obligation

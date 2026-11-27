@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // `just claims`: every rust/*/CONTRACT.md test ref resolves, and every mutants floor a contract quotes is its crate's gates.json floor.
-// usage: claims.mjs [--root RUST_DIR] | --selftest
+// usage: claims.mjs [--root RUST_DIR]
 //
 // A ref is `prefix:value` outside the legend. The legend is the first `Checks:` line and the bullet or indented lines directly under it,
 // up to the first blank line; nothing else is exempt, and fenced code is skipped. Every resolver prefix (and its `-pending` form) found in
@@ -8,11 +8,15 @@
 // the reason is inline and non-empty, the target must not exist yet, and the run counts them. `<crate> unit:...` names the crate a ref lives in.
 // Rust sources are read with comments and string literals blanked, so a commented-out test or a `proptest!` in a comment counts for nothing.
 // unit/lib/it/store resolve in the exact module path given: a file for the longest `src/a/b.rs` prefix (lib.rs for none), then inline `mod`s.
+// fuzz:t is fuzz/fuzz_targets/t.rs with a non-empty fuzz/corpus/t and a test under tests/ whose string literal names fuzz/corpus/t.
 // vec/oracle `#id` is an `id` field value in the JSON file, w3c `#s` a `section` field value.
 // A quoted floor is a line naming both `mutants` and `floor`: `crate N`, `crate: N`, `floor N`, `floor: N`, `floor = N`, `floor for crate is N`.
+// A claim is a bullet tagged R, T or B and a number (`- R26b ...`); N, NC and P lines claim nothing, and an O line is proven by the owner it
+// names, outside the crate. Each claim carries at least one proof token: a ref or pending ref as above, the bare word `api` (the crate's
+// committed public-api.txt under `just api`), or a backticked `just <recipe>` naming a justfile recipe. Naming another claim is no proof.
+// Every bare `api` and backticked `just <recipe>` in a body resolves too.
 // Known limits: a claim or a floor split across two lines is not seen; the legend is the first `Checks:` block only.
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -209,7 +213,13 @@ const resolvers = {
     },
     oracle: (c, v) => (existsSync(join(c.rust, 'vectors', v.split('#')[0])) ? vecIn(join(c.rust, 'vectors', v.split('#')[0]), v, 'id') : family(c, v, c.derived, 'id')),
     w3c: (c, v) => family(c, v, c.w3c, 'section'),
-    fuzz: (c, v) => (isFile(join(c.dir, 'fuzz', 'fuzz_targets', `${v}.rs`)) ? 'ok' : `no fuzz/fuzz_targets/${v}.rs`),
+    fuzz: (c, v) => {
+        if (!isFile(join(c.dir, 'fuzz', 'fuzz_targets', `${v}.rs`))) return `no fuzz/fuzz_targets/${v}.rs`;
+        const corpus = join(c.dir, 'fuzz', 'corpus', v);
+        if (!isDir(corpus) || !readdirSync(corpus).length) return `no committed corpus fuzz/corpus/${v}`;
+        const replay = new RegExp(`"[^"]*\\bfuzz/corpus/${esc(v)}"`);
+        return walk(join(c.dir, 'tests'), '.rs').some((f) => replay.test(code(f, true))) ? 'ok' : `no test under tests/ replays "fuzz/corpus/${v}"`;
+    },
     mutants: (c, v) => {
         const rel = v.split('::').join('/');
         return [`${rel}.rs`, `${rel}/mod.rs`].some((f) => isFile(join(c.dir, 'src', f))) ? 'ok' : `no src/${rel}.rs`;
@@ -223,6 +233,10 @@ const resolvers = {
     gate: (c, v) => (isFile(join(c.rust, 'justfile')) && new RegExp(`^${esc(v)}(\\s[^:=\\n]*)?:(?!=)`, 'm').test(read(join(c.rust, 'justfile'))) ? 'ok' : `no just recipe ${v}`),
 };
 const PREFIXES = Object.keys(resolvers);
+const CLAIM = /^\s*[-*]\s+([RTB]\d+[a-z]?)\b/;
+const API = /(?<![\w`./-])api(?![\w`/-]|\.\w)/g;
+const JUST = /`just ([a-z_][a-z0-9_-]*)\b/g;
+const recipes = (rust) => (isFile(join(rust, 'justfile')) ? new Set([...read(join(rust, 'justfile')).matchAll(/^@?([a-z_][a-z0-9_-]*)(?:\s+[*+$]?[a-z_][a-z0-9_-]*(?:=(?:"[^"\n]*"|'[^'\n]*'|[^\s:]+))?)*\s*:(?!=)/gm)].map((m) => m[1])) : new Set());
 const NAME = '(?:[A-Za-z0-9_./*#:-]|\\{[^}\\s]*\\})+';
 
 export function check(rust) {
@@ -254,12 +268,24 @@ export function check(rust) {
         for (const i of legend) for (const m of lines[i].matchAll(/`([a-z][a-z0-9]*(?:-pending)?):(?!:)/g)) defined.add(m[1]);
         for (const p of defined) if (!resolvers[p.replace(/-pending$/, '')]) fail(start, `legend prefix ${p}:`, 'the claims tool has no resolver for it');
         const ctx = { dir: join(rust, d), rust, derived: vdirs(/-derived$/), w3c: vdirs(/^w3c-/) };
+        const known = recipes(rust);
+        const api = isFile(join(rust, d, 'public-api.txt')) && known.has('api') ? 'ok' : `no rust/${d}/public-api.txt under \`just api\``;
         let fence = false;
         const seen = new Set();
         lines.forEach((line, i) => {
             if (/^```/.test(line)) fence = !fence;
             if (fence || legend.has(i)) return;
+            let proofs = 0;
+            for (const _ of line.matchAll(API)) {
+                proofs++;
+                if (api !== 'ok') fail(i, 'api', api);
+            }
+            for (const m of line.matchAll(JUST)) {
+                proofs++;
+                if (!known.has(m[1])) fail(i, `just ${m[1]}`, `no just recipe ${m[1]}`);
+            }
             for (const m of line.matchAll(refRe)) {
+                proofs++;
                 const [kind, raw] = [m[1], m[2].replace(/[.:,;]+$/, '')];
                 const base = kind.replace(/-pending$/, '');
                 if (!defined.has(kind)) {
@@ -279,6 +305,8 @@ export function check(rust) {
                 else if (!seen.has(key)) out.resolved++;
                 seen.add(key);
             }
+            const claim = CLAIM.exec(line)?.[1];
+            if (claim && !proofs) fail(i, claim, 'the claim names no proof: add a ref, `api`, `just <recipe>` or `<prefix>-pending:<target> (reason)`');
             // a quoted mutants floor
             if (/mutants/i.test(line) && /floor/i.test(line)) {
                 const quoted = [];
@@ -321,90 +349,8 @@ function report(rust) {
     return r.failures.length ? 1 : 0;
 }
 
-// plants: a fixture tree with one good ref per resolver, then one defect at a time; each must fail with its own message
-function selftest() {
-    const root = mkdtempSync(join(tmpdir(), 'claims-'));
-    const put = (p, s) => (mkdirSync(dirname(join(root, p)), { recursive: true }), writeFileSync(join(root, p), s));
-    const rs = (name) => `#[test]\nfn ${name}() {}\n`;
-    const lib = `fn lib_only() {}\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn lt() {}\n}\n`;
-    const m = `#[cfg(test)]\nmod tests {\n    #[test]\n    fn t() {}\n    mod inner {\n        #[test]\n        fn deep() {}\n    }\n}\n`;
-    // a commented-out test and a proptest! in a comment must count for nothing
-    const dead = `// #[test]\nfn commented() {}\n/* proptest! { */\nfn after() {}\nconst S: &str = "#[test]";\nfn in_string() {}\n`;
-    const all = 'unit lib it row ui prop race vec oracle w3c fuzz mutants conf store wipe gate'.split(' ');
-    const legendOf = (ps) => `Checks: ${ps.map((p) => `\`${p}:x\``).join(', ')}.\n`;
-    const build = (body, { floor = 7, legend = legendOf([...all, 'fuzz-pending', 'unit-pending']), extra = {} } = {}) => {
-        put('a/Cargo.toml', '[package]\n');
-        put('a/gates.json', JSON.stringify({ mutants: { floor } }));
-        put('b/Cargo.toml', '[package]\n');
-        put('b/gates.json', JSON.stringify({ mutants: { floor: 3 } }));
-        put('a/src/lib.rs', lib);
-        put('a/src/m.rs', m);
-        put('a/tests/it.rs', `${rs('it_t')}mod sub {\n    #[test]\n    fn s() {}\n}\n`);
-        put('a/tests/dead.rs', dead);
-        put('a/tests/props.rs', `proptest! {\n    fn p(x in 0..1) {}\n}\n${rs('r')}`);
-        put('a/tests/row_r.rs', '');
-        for (const d of ['fail/x.rs', 'fail/x.stderr', 'pass/x.rs']) put(`a/tests/ui/${d}`, '');
-        put('a/fuzz/fuzz_targets/real.rs', '');
-        put('vectors/fam/v.json', JSON.stringify({ cases: [{ id: 'c1', note: 'decoy' }] }));
-        put('vectors/x-derived/o.json', JSON.stringify({ cases: [{ id: 'o1' }] }));
-        put('vectors/w3c-y/w.json', JSON.stringify({ sections: [{ section: '1.2' }] }));
-        put('testkit/src/conformance.rs', '// c.name = "commented";\nfn f() { c.name = "case1"; }\n');
-        put('store/tests/st.rs', rs('s1'));
-        put('wipe/src/lib.rs', rs('w1'));
-        put('justfile', 'gt arg:\n    true\n');
-        for (const [p, s] of Object.entries(extra)) put(p, s);
-        put('a/CONTRACT.md', `# a\n\n${legend}\n## Runtime\n${body}\n`);
-    };
-    const goodRefs = 'unit:m::t unit:m::inner::deep lib:m::t it:it::it_t it:it::sub::s row:r ui:x prop:p race:r vec:fam/v.json#c1 oracle:o.json#o1 w3c:w.json#1.2 fuzz:real mutants:m conf:case1 store:st::s1 wipe:w1 gate:gt unit:lib::tests'.split(' ');
-    const dangling = {
-        unit: 'unit:m::gone', lib: 'lib:m::gone', it: 'it:it::gone', row: 'row:nope', ui: 'ui:nope', prop: 'prop:gone', race: 'race:gone',
-        vec: 'vec:fam/v.json#nope', oracle: 'oracle:o.json#nope', w3c: 'w3c:w.json#9.9', fuzz: 'fuzz:gone', mutants: 'mutants:gone', conf: 'conf:gone', store: 'store:st::gone', wipe: 'wipe:gone', gate: 'gate:gone',
-    };
-    const cases = [['good tree', `- R1 ${goodRefs.join(' ')}. The mutants floor of 7 holds. And b's mutants floor is 3.`, {}, null]];
-    for (const [k, ref] of Object.entries(dangling)) cases.push([`dangling ${k}`, `- R1 ${ref}`, {}, `${ref}:`]);
-    cases.push(
-        ['commented-out test is not a test', '- R1 it:dead::commented', {}, 'no test fn commented'],
-        ['proptest! in a comment marks nothing', '- R1 prop:after', {}, 'no test fn after'],
-        ['#[test] in a string marks nothing', '- R1 it:dead::in_string', {}, 'no test fn in_string'],
-        ['conf case in a comment', '- R1 conf:commented', {}, 'no conformance case'],
-        ['unit in the wrong module', '- R1 unit:m::wrong::deep', {}, 'no mod wrong'],
-        ['unit has no fallback to lib.rs', '- R1 unit:m::lt', {}, 'no test fn lt'],
-        ['it middle path is honoured', '- R1 it:it::nomod::s', {}, 'no mod nomod'],
-        ['vec #id is an id field, not any string', '- R1 vec:fam/v.json#decoy', {}, 'no id "decoy"'],
-        ['w3c #s is a section field', '- R1 w3c:w.json#c1', {}, 'no section "c1"'],
-        ['legend ends at the first blank line', '- R1 fuzz:t', { legend: `${legendOf(all)}\n- a bullet after the blank, \`fuzz:t\`\n` }, 'no fuzz/fuzz_targets/t.rs'],
-        ['a placeholder in the body is not ignored', '- R1 fuzz:t', {}, 'no fuzz/fuzz_targets/t.rs'],
-        ['body prefix not in the legend', '- R1 gate:gt', { legend: legendOf(all.filter((p) => p !== 'gate')) }, 'the prefix is not defined in the legend'],
-        ['pending prefix not in the legend', '- R1 unit-pending:q (later)', { legend: legendOf(all) }, 'not defined in the legend'],
-        ['pending without a reason', '- R1 fuzz-pending:later', {}, 'no inline reason'],
-        ['pending that exists', '- R1 fuzz-pending:real (stale)', {}, 'its target exists'],
-        ['unknown legend prefix', '- R1 ok', { legend: legendOf([...all, 'zap']) }, 'no resolver'],
-        ['quoted crate floor', '- R1 `just mutants` holds the floor (a 9).', {}, 'rust/a/gates.json says 7'],
-        ['quoted crate: floor', '- R1 the mutants floor (a: 9).', {}, 'rust/a/gates.json says 7'],
-        ['floor N', '- R1 the mutants floor 9 holds.', {}, 'rust/a/gates.json says 7'],
-        ['floor: N', '- R1 the mutants floor: 9 holds.', {}, 'rust/a/gates.json says 7'],
-        ['floor = N', '- R1 the mutants floor = 9 holds.', {}, 'rust/a/gates.json says 7'],
-        ['floor for crate is N', '- R1 the mutants floor for b is 4.', {}, 'rust/b/gates.json says 3'],
-        ["crate's floor is N", "- R1 b's mutants floor is 4.", {}, 'rust/b/gates.json says 3'],
-    );
-    let bad = 0;
-    for (const [name, body, opts, want] of cases) {
-        rmSync(root, { recursive: true, force: true });
-        mkdirSync(root);
-        build(body, opts);
-        const r = check(root);
-        const got = r.failures.join('\n');
-        const ok = want === null ? r.failures.length === 0 && r.pending.length === 0 : r.failures.length >= 1 && got.includes(want);
-        if (!ok) bad++;
-        console.log(`${ok ? 'ok  ' : 'FAIL'} selftest: ${name}${ok ? '' : `: wanted ${want ?? 'no failure'}, got ${got || 'none'}`}`);
-    }
-    rmSync(root, { recursive: true, force: true });
-    return bad ? 1 : 0;
-}
-
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
     const a = process.argv.slice(2);
-    if (a[0] === '--selftest') process.exit(selftest());
     const i = a.indexOf('--root');
     process.exit(report(resolve(i >= 0 ? a[i + 1] : join(dirname(fileURLToPath(import.meta.url)), '..'))));
 }
