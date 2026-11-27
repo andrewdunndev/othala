@@ -1,6 +1,6 @@
 # jose contract
 
-The public surface is the generated `public-api.txt`. Each claim carries one tag from the claims ledger: *Type* (the program does not compile), *Runtime* (a check returns an error or a value), *Obligation* (the consumer's or host's, which the crate cannot see). Non-goals and non-claims follow; each non-goal names the claim that holds it.
+The public surface is the generated `public-api.txt`. Item tags (`jose-NN`) name the queue item that landed a claim; `git log --grep` finds it. Each claim carries one tag from the claims ledger: *Type* (the program does not compile), *Runtime* (a check returns an error or a value), *Obligation* (the consumer's or host's, which the crate cannot see). Non-goals and non-claims follow; each non-goal names the claim that holds it.
 
 Checks:
 - `ui:x (Ennnn)` is `tests/ui/fail/x.rs` with its committed `.stderr` opening with that rustc code, and its compiling twin `tests/ui/pass/x.rs` one line and one token away (`just twins`). `tests/ledger.rs` fails unless the cases on disk are exactly the names below; `ui:x (Ennnn, jose-NN)` lands with that item, since its case calls a function that item writes. `off_*` cases run with every feature off, the rest with every feature on.
@@ -112,7 +112,7 @@ Checks:
 - R60 `encrypt_jwt` sets `cty: JWT` (RFC 7519 5.2), and the receiver verifies the inner token on its own (R38): unit:jwe::envelope::issued_headers, unit:jwt::nested.
 
 ## Runtime: errors, names, limits
-- R61 Each bound (the `MAX_*` and `MIN_RSA_BITS` constants in `public-api.txt`) holds with `TooLarge` before parsing, for input that is also malformed: vec:jose-derived/limits.json, row:limits.
+- R61 Each `MAX_*` bound (constants in `public-api.txt`) is checked before anything is allocated, for input that is also malformed, and exceeding it is `TooLarge`; a modulus below `MIN_RSA_BITS` is `WeakKey` (R19); neither panics: vec:jose-derived/limits.json (`MAX_COMPACT_LEN`, `MAX_JSON_DEPTH`, `MAX_JWKS_KEYS`), vec:jose-derived/keys.json#rs256-2047, #rs256-1024 (kind named), row:limits; oracle gap: `MAX_JSON_LEN`, `MAX_ENTRIES`, `MAX_NAME_LEN`, `MAX_LEEWAY`, `MAX_RSA_BITS` and `MAX_RSA_EXPONENT` have no oversize vector yet in jose-derived/limits.json, requested of the oracle lane.
 - R62 No parser, decoder, verifier or decrypter panics on any input: fuzz:jws_parse, fuzz:jwt_claims, fuzz:jwe_parse and fuzz:jwk_decode, their corpora replayed by `tests/fuzz_corpus.rs`.
 - R63 `Error` displays one fixed sentence per `ErrorKind`, naming the caller's next action and holding no input, key or claim bytes; the sentences are pairwise distinct: unit:error::each_kind_reads_distinctly.
 - R64 `Debug` of every key type, `SecretJwk`, `Plaintext`, `Payload`, `Compact` and `Unsigned` prints no key, plaintext, payload or token byte (`alg`, `kid` and lengths only), and of `Jws`, `Jwt`, `Jwe` and `VerifiedJwt` only their `kid`s: unit:key::debug_redacted, unit:sign::debug_redacted, unit:jwk::decode::debug_redacted and unit:jwe::envelope::debug_redacted, the hex, base64url and decimal of the secret absent.
