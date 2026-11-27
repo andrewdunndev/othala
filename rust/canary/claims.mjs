@@ -17,7 +17,8 @@
 // fuzz:t is a non-empty fuzz/fuzz_targets/t.rs with a committed file (not a dotfile) in fuzz/corpus/t and a test under tests/ whose string literal names fuzz/corpus/t.
 // vec/oracle `#id` is an `id` field value in the JSON file, w3c `#s` a `section` field value; an oracle or w3c file also needs a string literal
 // under the crate's tests/ that names it, so a vector no test reads proves nothing. oracle reads only the crate's own `<crate>-derived` family.
-// row:f is tests/row_f.rs holding a test; mutants:m is src/m.rs (or src/m/mod.rs) holding a fn.
+// row:f is tests/row_f.rs holding a test that no `#[ignore]` and no cfg that cannot hold (one naming no feature of the crate) drops; mutants:m is src/m.rs (or src/m/mod.rs) holding a fn with a body; oracle:f is a
+// bare file name, never a path.
 // api:Item and api-absent:Item read the crate's committed public-api.txt (and need a `just api` recipe). Its items are the path each line
 // declares, generics dropped (`method Jws::parse fn(..)` declares Jws::parse); impl and attr lines declare none. api:Item resolves when
 // Item equals a declared path, so a bare name must be a top-level item. api-absent:A::b resolves when A is declared and A::b is not;
@@ -112,6 +113,30 @@ const matchBrace = (s, open) => {
 };
 const ATTR = /#\[\s*(?:\w+::)*test(?:_case)?\b/;
 const hasTestIn = (s, a = 0, b = s.length) => ATTR.test(s.slice(a, b)) || /\bproptest!/.test(s.slice(a, b));
+// a cfg can hold only when it names at least one of the crate's own features (or `test`) and nothing else but any/all/not
+const cfgCan = (text, features) => {
+    const preds = [...text.matchAll(/\bfeature\s*=\s*"([^"]*)"|\btest\b/g)];
+    const rest = text.replace(/\bfeature\s*=\s*"[^"]*"|\btest\b|\b(?:cfg|any|all|not)\b|[\s(),#![\]]/g, '');
+    return preds.length > 0 && rest === '' && preds.every((m) => m[1] === undefined || features.has(m[1]));
+};
+// a test no cfg or ignore drops: a `#[test]` fn or `proptest!` whose file, enclosing mods and own attributes hold no cfg that cannot hold
+function liveTest(p, features) {
+    const s = code(p);
+    const raw = code(p, true);
+    const can = (a, b) => [...raw.slice(a, b).matchAll(/#!?\[\s*cfg\s*\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)\s*\]/g)].every((m) => cfgCan(m[0], features));
+    if (!can(0, (/^(?:\s*(?:#!\[[^\]]*\]|\/\/.*))*/.exec(s) ?? [''])[0].length)) return false;
+    const gated = [...s.matchAll(/((?:#\[[^\]]*\]\s*)+)(?:pub(?:\([^)]*\))?\s+)?mod\s+\w+\s*\{/g)]
+        .filter((m) => !can(m.index, m.index + m[1].length))
+        .map((m) => [m.index, matchBrace(s, m.index + m[0].length - 1)]);
+    const outside = (i) => !gated.some(([a, b]) => i > a && i < b);
+    for (const m of s.matchAll(/((?:#\[[^\]]*\]\s*)+)(?:pub\s+)?(?:async\s+)?fn\s+\w+/g)) if (ATTR.test(m[1]) && !/#\[\s*ignore\b/.test(m[1]) && can(m.index, m.index + m[1].length) && outside(m.index)) return true;
+    return [...s.matchAll(/\bproptest!\s*\{/g)].some((m) => outside(m.index));
+}
+const featuresOf = (dir) => {
+    const t = isFile(join(dir, 'Cargo.toml')) ? read(join(dir, 'Cargo.toml')) : '';
+    const sec = /^\[features\]\n([\s\S]*?)(?=^\[|(?![\s\S]))/m.exec(t)?.[1] ?? '';
+    return new Set([...sec.matchAll(/^([A-Za-z0-9_-]+)\s*=/gm)].map((m) => m[1]));
+};
 
 // the [start, end) of `mod a { mod b { .. } }` nested in order inside range, or null
 function locate(s, mods, range = [0, s.length]) {
@@ -242,7 +267,7 @@ const resolvers = {
     row: (c, v) => {
         const p = join(c.dir, 'tests', `row_${v}.rs`);
         if (!isFile(p)) return `no tests/row_${v}.rs`;
-        return hasTestIn(code(p)) ? 'ok' : `tests/row_${v}.rs holds no test`;
+        return liveTest(p, featuresOf(c.dir)) ? 'ok' : `tests/row_${v}.rs holds no test that a cfg or ignore cannot drop`;
     },
     ui: (c, v) => {
         const need = [`fail/${v}.rs`, `fail/${v}.stderr`, `pass/${v}.rs`].filter((f) => !isFile(join(c.dir, 'tests/ui', f)));
@@ -260,7 +285,7 @@ const resolvers = {
             .filter((r) => r !== 'ok');
         return bad[0] ?? 'ok';
     },
-    oracle: (c, v) => (existsSync(join(c.rust, 'vectors', v.split('#')[0])) ? readVec(c, v, 'id') : family(c, v, [`${c.dir.slice(c.rust.length + 1)}-derived`], 'id')),
+    oracle: (c, v) => (v.split('#')[0].includes('/') ? `oracle:${v} leaves the crate's own family; name a file of ${c.dir.slice(c.rust.length + 1)}-derived` : family(c, v, [`${c.dir.slice(c.rust.length + 1)}-derived`], 'id')),
     w3c: (c, v) => family(c, v, c.w3c, 'section'),
     fuzz: (c, v) => {
         const target = join(c.dir, 'fuzz', 'fuzz_targets', `${v}.rs`);
@@ -274,7 +299,7 @@ const resolvers = {
     mutants: (c, v) => {
         const f = modFile(c.dir, v.split('::'));
         if (!f) return `no src/${v.split('::').join('/')}.rs`;
-        return /\bfn\s+[A-Za-z_]\w*/.test(code(f)) ? 'ok' : `${f.slice(c.dir.length + 1)} holds no fn`;
+        return /\bfn\s+[A-Za-z_]\w*[^;{]*\{/.test(code(f)) ? 'ok' : `${f.slice(c.dir.length + 1)} holds no fn with a body`;
     },
     conf: (c, v) => {
         const p = join(c.rust, 'testkit/src/conformance.rs');

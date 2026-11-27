@@ -117,12 +117,8 @@ const fn refuse_registration(kind: ErrorKind, step: u8) -> Error {
     Error::at(kind, SpecStep::Registration(step))
 }
 
-const DEFAULT_ALGORITHMS: [CoseAlgorithm; 4] = [
-    CoseAlgorithm::Es256,
-    CoseAlgorithm::EdDsa,
-    CoseAlgorithm::Es384,
-    CoseAlgorithm::Rs256,
-];
+// only what `CoseKey::parse` accepts; the others join with webauthn-08
+const DEFAULT_ALGORITHMS: [CoseAlgorithm; 1] = [CoseAlgorithm::Es256];
 
 // the same bytes, with no early exit
 fn same(a: &[u8], b: &[u8]) -> bool {
@@ -1754,6 +1750,14 @@ mod tests {
             at(24),
         )?;
         Ok(())
+    }
+
+    #[test]
+    fn the_default_algorithms_are_es256_only() {
+        assert_eq!(
+            super::DEFAULT_ALGORITHMS,
+            [crate::cose::CoseAlgorithm::Es256]
+        );
     }
 
     #[test]
