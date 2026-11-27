@@ -601,7 +601,7 @@ mod tests {
         assert_eq!(MAX_EFFECT_SIZE, 128);
         let e = &mut Fill(0);
         let creates = |e: &mut Fill| (0..64).fold(builder(e), |b, n| b.create(K::G(n), n, None));
-        assert_eq!(kind(creates(e).build()), None);
+        assert_eq!(creates(e).build()?.puts().count(), 64);
         let b = creates(e).expect_absent(K::S(0));
         assert_eq!(kind(b.build()), Some(ErrorKind::TooLarge));
         let b =
@@ -610,8 +610,16 @@ mod tests {
                 .consume(K::G(1))
                 .update(K::G(2), &row(1), 0, None);
         let b = (3..125).fold(b, |b, n| b.expect(K::G(n), &row(1)));
-        assert_eq!(kind(b.build()), None);
-        assert_eq!(kind(absent(e, 0..64)?.merge(absent(e, 64..128)?)), None);
+        let built = b.build()?;
+        assert_eq!((built.puts().count(), built.deletes().count()), (1, 2));
+        assert_eq!(built.guards().count(), 125);
+        assert_eq!(
+            absent(e, 0..64)?
+                .merge(absent(e, 64..128)?)?
+                .guards()
+                .count(),
+            128
+        );
         assert_eq!(
             kind(absent(e, 0..64)?.merge(absent(e, 64..=128)?)),
             Some(ErrorKind::TooLarge)

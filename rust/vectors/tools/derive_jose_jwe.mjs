@@ -55,18 +55,18 @@ const c = (id, spec, expect, f) => ({ id, op: "jwe_decrypt", serialization: "com
 const kwk = (hdr, pt = PT) => compact(hdr, kw(ub(KEY.k), CEK), pt);
 const cases = [
   c("control-a128kw-a128gcm", "RFC 7516 5.2 (the generator's own positive control)", OK, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM"}') }),
-  c("zip-def", "RFC 7516 4.1.3 (zip DEF; a non-goal, must-refuse)", NO, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM","zip":"DEF"}', stored(PT)), note: "must-refuse: JWE zip is a non-goal" }),
-  c("zip-unknown", "RFC 7516 4.1.3", NO, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM","zip":"XYZ"}') }),
+  c("zip-def", "RFC 7516 4.1.3 (zip DEF; a non-goal, must-refuse)", { ok: false, kind: "UnsupportedAlg" }, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM","zip":"DEF"}', stored(PT)), note: "must-refuse: JWE zip is a non-goal" }),
+  c("zip-unknown", "RFC 7516 4.1.3", { ok: false, kind: "UnsupportedAlg" }, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM","zip":"XYZ"}') }),
   c("crit-unknown", "RFC 7516 4.1.13 with RFC 7515 4.1.11", { ok: false, kind: "CriticalHeader" }, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM","crit":["exp-x"],"exp-x":1}') }),
   c("dup-enc", "RFC 7516 4 (names MUST be unique; this oracle rejects)", { ok: false, kind: "DuplicateMember" }, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM","enc":"A256GCM"}') }),
-  c("enc-missing", "RFC 7516 4.1.2 (enc is REQUIRED)", NO, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW"}') }),
-  c("alg-none", "RFC 7516 4.1.1 with RFC 7518 4.1 (none is not a key management alg)", NO, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"none","enc":"A128GCM"}') }),
-  c("alg-mismatch", "RFC 8725 3.1 (expected A128KW, header says dir)", NO, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: compact('{"alg":"dir","enc":"A128GCM"}', Buffer.alloc(0), PT, ub(KEY.k)) }),
+  c("enc-missing", "RFC 7516 4.1.2 (enc is REQUIRED)", { ok: false, kind: "Malformed" }, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW"}') }),
+  c("alg-none", "RFC 7516 4.1.1 with RFC 7518 4.1 (none is not a key management alg)", { ok: false, kind: "AlgMismatch" }, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"none","enc":"A128GCM"}') }),
+  c("alg-mismatch", "RFC 8725 3.1 (expected A128KW, header says dir)", { ok: false, kind: "AlgMismatch" }, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: compact('{"alg":"dir","enc":"A128GCM"}', Buffer.alloc(0), PT, ub(KEY.k)) }),
 ];
 const a2 = load("rfc7516/jwe.json").cases.find((x) => x.id.startsWith("a2-"));
-cases.push(c("rsa1_5", "RFC 7516 A.2 (RSA1_5; a non-goal, must-refuse)", NO, { alg: "RSA1_5", enc: a2.enc, jwk: a2.jwk, jwe: a2.jwe, note: "must-refuse: RSA1_5 is a non-goal" }));
+cases.push(c("rsa1_5", "RFC 7516 A.2 (RSA1_5; a non-goal, must-refuse)", { ok: false, kind: "UnsupportedAlg" }, { alg: "RSA1_5", enc: a2.enc, jwk: a2.jwk, jwe: a2.jwe, note: "must-refuse: RSA1_5 is a non-goal" }));
 const s53 = load("rfc7520/jwe-cases.json").cases.find((x) => x.id === "s5_3-compact-must-refuse");
-cases.push(c("pbes2", "RFC 7520 5.3 (PBES2; a non-goal, must-refuse)", NO, { alg: s53.alg, enc: s53.enc, password: s53.password, jwe: s53.jwe, note: "must-refuse: PBES2 is a non-goal" }));
+cases.push(c("pbes2", "RFC 7520 5.3 (PBES2; a non-goal, must-refuse)", { ok: false, kind: "UnsupportedAlg" }, { alg: s53.alg, enc: s53.enc, password: s53.password, jwe: s53.jwe, note: "must-refuse: PBES2 is a non-goal" }));
 
 // RFC 8037 A.6: Z = X25519(ephemeral secret, Bob's public); reversing the roles makes the A.6 ephemeral key the
 // recipient, Bob's public the epk, and the same published Z

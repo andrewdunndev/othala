@@ -1056,7 +1056,16 @@ mod tests {
     fn the_deadline_is_exclusive() -> Result<(), Error> {
         let mut fx = Fx::new()?;
         fx.now = DEADLINE - 1;
-        assert_eq!(fx.run()?.result.map(drop), Ok(()));
+        assert_eq!(
+            fx.run()?.result.map(reported),
+            Ok((
+                ID.to_vec(),
+                USER.to_vec(),
+                AssertionVerification::PresenceOnly,
+                Backup::SingleDevice,
+                Counter::Advanced(6)
+            ))
+        );
         Ok(())
     }
 
@@ -1074,8 +1083,14 @@ mod tests {
         let mut fx = Fx::new()?;
         fx.handle = None;
         assert_eq!(
-            fx.run()?.result.map(drop),
-            Ok(()),
+            fx.run()?.result.map(reported),
+            Ok((
+                ID.to_vec(),
+                USER.to_vec(),
+                AssertionVerification::PresenceOnly,
+                Backup::SingleDevice,
+                Counter::Advanced(6)
+            )),
             "a user handle is optional when the user is named"
         );
         fx.ceremony.user = None;
@@ -1085,7 +1100,16 @@ mod tests {
             "discoverable needs the handle"
         );
         fx.handle = Some(USER.to_vec());
-        assert_eq!(fx.run()?.result.map(drop), Ok(()));
+        assert_eq!(
+            fx.run()?.result.map(reported),
+            Ok((
+                ID.to_vec(),
+                USER.to_vec(),
+                AssertionVerification::PresenceOnly,
+                Backup::SingleDevice,
+                Counter::Advanced(6)
+            ))
+        );
         fx.handle = Some(b"other".to_vec());
         assert_eq!(fx.refused()?.0, ErrorKind::UserHandleMismatch);
         fx.handle = Some(USER.to_vec());
@@ -1098,7 +1122,16 @@ mod tests {
     fn an_allow_list_admits_its_members() -> Result<(), Error> {
         let mut fx = Fx::new()?;
         fx.ceremony.allowed = vec![sha256(b"other"), sha256(ID)];
-        assert_eq!(fx.run()?.result.map(drop), Ok(()));
+        assert_eq!(
+            fx.run()?.result.map(reported),
+            Ok((
+                ID.to_vec(),
+                USER.to_vec(),
+                AssertionVerification::PresenceOnly,
+                Backup::SingleDevice,
+                Counter::Advanced(6)
+            ))
+        );
         Ok(())
     }
 
@@ -1148,8 +1181,14 @@ mod tests {
         fx.rp.origins.push(Origin::parse("https://second.example")?);
         fx.origin = "https://second.example".into();
         assert_eq!(
-            fx.run()?.result.map(drop),
-            Ok(()),
+            fx.run()?.result.map(reported),
+            Ok((
+                ID.to_vec(),
+                USER.to_vec(),
+                AssertionVerification::PresenceOnly,
+                Backup::SingleDevice,
+                Counter::Advanced(6)
+            )),
             "any configured origin matches"
         );
         Ok(())
@@ -1222,10 +1261,28 @@ mod tests {
             Backup::MultiDevice(BackupState::NotBackedUp)
         );
         fx.ceremony.options.user_verification = Requirement::Required;
-        assert_eq!(fx.run()?.result.map(drop), Ok(()));
+        assert_eq!(
+            fx.run()?.result.map(reported),
+            Ok((
+                ID.to_vec(),
+                USER.to_vec(),
+                AssertionVerification::FirstUse,
+                Backup::MultiDevice(BackupState::NotBackedUp),
+                Counter::Advanced(6)
+            ))
+        );
         fx.rp.unsolicited = UnsolicitedExtensions::Ignore;
         fx.extensions = true;
-        assert_eq!(fx.run()?.result.map(drop), Ok(()));
+        assert_eq!(
+            fx.run()?.result.map(reported),
+            Ok((
+                ID.to_vec(),
+                USER.to_vec(),
+                AssertionVerification::FirstUse,
+                Backup::MultiDevice(BackupState::NotBackedUp),
+                Counter::Advanced(6)
+            ))
+        );
         Ok(())
     }
 
@@ -1426,6 +1483,26 @@ mod tests {
         fn decide(&self, _: &crate::trust::TrustQuery<'_>) -> crate::trust::TrustDecision<'_> {
             crate::trust::TrustDecision::Unknown
         }
+    }
+
+    /// What an assertion reports: credential id, user handle, UV, backup and counter.
+    fn reported(a: Assertion) -> (Vec<u8>, Vec<u8>, AssertionVerification, Backup, Counter) {
+        (
+            a.credential_id().as_bytes().to_vec(),
+            a.user().as_bytes().to_vec(),
+            a.user_verification(),
+            a.backup(),
+            a.counter(),
+        )
+    }
+
+    /// What a registration reports: credential id, UV and backup.
+    fn registered(r: Registered) -> (Vec<u8>, UserVerification, Backup) {
+        (
+            r.credential().id().as_bytes().to_vec(),
+            r.user_verification(),
+            r.credential().backup(),
+        )
     }
 
     impl Reg {
@@ -1771,8 +1848,12 @@ mod tests {
             .clone()
             .mediation(Mediation::Conditional);
         assert_eq!(
-            fx.run()?.result.map(drop),
-            Ok(()),
+            fx.run()?.result.map(registered),
+            Ok((
+                ID.to_vec(),
+                UserVerification::PresenceOnly,
+                Backup::SingleDevice
+            )),
             "a conditional registration needs no UP"
         );
         let mut fx = Reg::new()?;
@@ -1799,11 +1880,25 @@ mod tests {
             .clone()
             .algorithm(crate::cose::CoseAlgorithm::Rs256)
             .algorithm(crate::cose::CoseAlgorithm::Es256);
-        assert_eq!(fx.run()?.result.map(drop), Ok(()));
+        assert_eq!(
+            fx.run()?.result.map(registered),
+            Ok((
+                ID.to_vec(),
+                UserVerification::PresenceOnly,
+                Backup::SingleDevice
+            ))
+        );
         let mut fx = Reg::new()?;
         fx.cross = r#","crossOrigin":true"#.into();
         fx.rp.cross_origin = CrossOrigin::AnyTop;
-        assert_eq!(fx.run()?.result.map(drop), Ok(()));
+        assert_eq!(
+            fx.run()?.result.map(registered),
+            Ok((
+                ID.to_vec(),
+                UserVerification::PresenceOnly,
+                Backup::SingleDevice
+            ))
+        );
         Ok(())
     }
 
@@ -1813,7 +1908,14 @@ mod tests {
         fx.extensions = true;
         assert_eq!(fx.refused()?, (ErrorKind::Extension, at(28)));
         fx.rp.unsolicited = UnsolicitedExtensions::Ignore;
-        assert_eq!(fx.run()?.result.map(drop), Ok(()));
+        assert_eq!(
+            fx.run()?.result.map(registered),
+            Ok((
+                ID.to_vec(),
+                UserVerification::PresenceOnly,
+                Backup::SingleDevice
+            ))
+        );
         Ok(())
     }
 
@@ -1897,7 +1999,10 @@ mod tests {
                 .map(|(_, e)| e)
         };
         let options = fx.ceremony.options.clone();
-        assert_eq!(start(MAX_LISTED_CREDENTIALS, &options).map(drop), Ok(()));
+        assert_eq!(
+            start(MAX_LISTED_CREDENTIALS, &options).map(|e| e.puts().count()),
+            Ok(1)
+        );
         assert_eq!(
             start(MAX_LISTED_CREDENTIALS + 1, &options)
                 .err()
@@ -1915,8 +2020,11 @@ mod tests {
         };
         let room = MAX_RECORD - record.encode()?.len();
         assert_eq!(
-            start(0, &sized(room)).map(drop),
-            Ok(()),
+            start(0, &sized(room)).map(|e| e
+                .puts()
+                .map(|(_, r, _)| r.encode().map(|b| b.len()))
+                .collect::<Vec<_>>()),
+            Ok(vec![Ok(MAX_RECORD)]),
             "a row of exactly MAX_RECORD"
         );
         assert_eq!(
@@ -1942,7 +2050,16 @@ mod tests {
     fn every_effect_is_one_transaction_of_at_most_two_guards_and_two_writes() -> Result<(), Error> {
         let fx = Fx::new()?;
         let ok = fx.run()?;
-        assert_eq!(ok.result.map(drop), Ok(()));
+        assert_eq!(
+            ok.result.map(reported),
+            Ok((
+                ID.to_vec(),
+                USER.to_vec(),
+                AssertionVerification::PresenceOnly,
+                Backup::SingleDevice,
+                Counter::Advanced(6)
+            ))
+        );
         assert_eq!(
             ok.shape,
             (2, 2),
@@ -1962,7 +2079,14 @@ mod tests {
         );
         let reg = Reg::new()?;
         let ok = reg.run()?;
-        assert_eq!(ok.result.map(drop), Ok(()));
+        assert_eq!(
+            ok.result.map(registered),
+            Ok((
+                ID.to_vec(),
+                UserVerification::PresenceOnly,
+                Backup::SingleDevice
+            ))
+        );
         assert_eq!(
             ok.shape,
             (2, 2),

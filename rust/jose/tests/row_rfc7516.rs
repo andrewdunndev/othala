@@ -1,5 +1,6 @@
 //! RFC 7516 Appendix A.3, the header refusals and issuing round trips (CONTRACT R48, R51 to R53, R59).
 mod common_jwe;
+mod common_refusal;
 
 use base::{Entropy, SecretBytes, b64url_decode, b64url_encode};
 use jose::{
@@ -55,13 +56,9 @@ fn row(file: Vector, total: usize, applicable: usize) {
             ]
         };
         if refused {
-            assert!(
-                outcomes
-                    .iter()
-                    .all(|o| matches!(o, Err(e) if matches!(e.kind(), ErrorKind::UnsupportedAlg | ErrorKind::AlgMismatch | ErrorKind::Malformed))),
-                "{}",
-                case.id
-            );
+            for outcome in &outcomes {
+                common_refusal::assert_outcome(outcome, false, None, &case.id);
+            }
             assert_eq!(
                 JweAlg::parse(&case.alg).err().map(|e| e.kind()),
                 Some(ErrorKind::UnsupportedAlg)
@@ -72,11 +69,10 @@ fn row(file: Vector, total: usize, applicable: usize) {
             .into_iter()
             .next()
             .unwrap_or(Err(ErrorKind::Malformed.into()));
-        testkit::vectors::assert_verdict(
+        common_refusal::assert_outcome(
             &outcome,
             case.expect.ok,
             case.expect.kind.as_deref(),
-            |e| e.kind(),
             &case.id,
         );
         if let Some(want) = &case.expect.plaintext {

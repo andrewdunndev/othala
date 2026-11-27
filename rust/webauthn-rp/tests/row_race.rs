@@ -380,8 +380,8 @@ fn an_assertion_replays_once() -> Setup<()> {
             .ok_or("loser")?;
         assert!(failed(loser).contains(&(key_of(2), Failure::Missing)));
         assert_eq!(
-            finish_login(&run.store, 2, 1, 90, NOW + 1).map(drop),
-            Err("row"),
+            finish_login(&run.store, 2, 1, 90, NOW + 1).err(),
+            Some("row"),
             "the consumed ceremony row cannot be loaded again"
         );
     }

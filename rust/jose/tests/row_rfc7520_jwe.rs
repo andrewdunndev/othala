@@ -1,6 +1,7 @@
 //! RFC 7520 section 5 JWEs in each serialization given (CONTRACT R49, R52); ECDH-ES and RSA-OAEP are counted not
 //! applicable here and checked in `row_rfc7520_jwe_ecdh` and `row_oaep`.
 mod common_jwe;
+mod common_refusal;
 
 use base::b64url_encode;
 use jose::{ErrorKind, Jwe, JweAlg};
@@ -52,14 +53,7 @@ fn section_5() {
             for alg in common_jwe::LOCAL {
                 let outcome = parse(compact, &wire)
                     .and_then(|jwe| common_jwe::decrypt(alg, &case.enc, jwk, jwe));
-                assert!(
-                    matches!(
-                        outcome.err().map(|e| e.kind()),
-                        Some(ErrorKind::AlgMismatch | ErrorKind::Malformed)
-                    ),
-                    "{}",
-                    case.id
-                );
+                common_refusal::assert_outcome(&outcome, false, None, &case.id);
             }
             assert_eq!(
                 JweAlg::parse(&case.alg).err().map(|e| e.kind()),
@@ -69,19 +63,7 @@ fn section_5() {
         }
         let outcome = parse(compact, &wire)
             .and_then(|jwe| common_jwe::decrypt(&case.alg, &case.enc, jwk, jwe));
-        // a token the parser refuses is Malformed; one the decryption refuses is Decrypt
-        assert_eq!(
-            outcome.as_ref().err().map(|e| matches!(
-                e.kind(),
-                ErrorKind::Decrypt
-                    | ErrorKind::Malformed
-                    | ErrorKind::AlgMismatch
-                    | ErrorKind::UnsupportedAlg
-            )),
-            (!case.expect.ok).then_some(true),
-            "{}",
-            case.id
-        );
+        common_refusal::assert_outcome(&outcome, case.expect.ok, None, &case.id);
         if let Some(want) = &case.expect.plaintext {
             let got = outcome.ok().map(|plaintext| b64url_encode(&plaintext));
             assert_eq!(got.as_ref(), Some(want), "{}", case.id);

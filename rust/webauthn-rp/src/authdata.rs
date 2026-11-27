@@ -255,7 +255,11 @@ mod tests {
                 .concat(),
             )
         };
-        assert_eq!(AuthData::parse(&long(MAX_CREDENTIAL_ID)).map(drop), Ok(()));
+        assert_eq!(
+            AuthData::parse(&long(MAX_CREDENTIAL_ID))
+                .map(|a| a.attested.map(|c| c.id.as_bytes().to_vec())),
+            Ok(Some(vec![1; MAX_CREDENTIAL_ID]))
+        );
         assert_eq!(
             refused(&long(MAX_CREDENTIAL_ID + 1)),
             Some(ErrorKind::CredentialIdInvalid)

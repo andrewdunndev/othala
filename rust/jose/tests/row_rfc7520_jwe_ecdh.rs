@@ -1,5 +1,6 @@
 //! RFC 7520 5.4, 5.5 and 5.13 (recipient 2): the ECDH-ES JWEs in each serialization given (CONTRACT R49, R52, R57).
 mod common_jwe;
+mod common_refusal;
 
 use base::{Entropy, b64url_decode, b64url_encode};
 use jose::{
@@ -52,16 +53,7 @@ fn ecdh_es() {
         };
         let outcome = parse(compact, &wire)
             .and_then(|jwe| common_jwe::decrypt(&case.alg, &case.enc, jwk, jwe));
-        // a token the parser refuses is Malformed; one the decryption refuses is Decrypt
-        assert_eq!(
-            outcome
-                .as_ref()
-                .err()
-                .map(|e| matches!(e.kind(), ErrorKind::Decrypt | ErrorKind::Malformed)),
-            (!case.expect.ok).then_some(true),
-            "{}",
-            case.id
-        );
+        common_refusal::assert_outcome(&outcome, case.expect.ok, None, &case.id);
         if let Some(want) = &case.expect.plaintext {
             let got = outcome.ok().map(|plaintext| b64url_encode(&plaintext));
             assert_eq!(got.as_ref(), Some(want), "{}", case.id);

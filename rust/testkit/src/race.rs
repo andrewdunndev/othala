@@ -31,8 +31,12 @@ where
             let mut serial = start.clone();
             for &(i, op) in &pick(ops, order) {
                 if let Some(effect) = decide(&serial, op, seed(i, 0)) {
-                    assert!(
-                        serial.apply(&effect, now).expect("reference store").is_ok(),
+                    assert_eq!(
+                        serial
+                            .apply(&effect, now)
+                            .expect("reference store")
+                            .map(drop),
+                        Ok(()),
                         "serial {order:?}: op {i}"
                     );
                 }
@@ -77,9 +81,15 @@ where
             continue;
         };
         let mut twice = start.clone();
-        let first = twice.apply(&effect, now).expect("reference store").is_ok();
+        let first = twice
+            .apply(&effect, now)
+            .expect("reference store")
+            .map(drop);
         assert_eq!(
-            twice.apply(&effect, now).expect("reference store").is_ok(),
+            twice
+                .apply(&effect, now)
+                .expect("reference store")
+                .map(drop),
             first,
             "op {i} applied twice"
         );
@@ -122,7 +132,7 @@ where
         let Some(effect) = decide(state, op, seed(i, round)) else {
             return BTreeSet::new();
         };
-        if state.apply(&effect, now).expect("reference store").is_ok() {
+        if let Ok(_applied) = state.apply(&effect, now).expect("reference store") {
             return writes(&effect);
         }
     }

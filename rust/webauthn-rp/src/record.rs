@@ -911,8 +911,8 @@ mod tests {
             Ok(vec![1])
         );
         assert_eq!(
-            CredentialId::from_bytes(&[0; MAX_CREDENTIAL_ID]).map(drop),
-            Ok(())
+            CredentialId::from_bytes(&[0; MAX_CREDENTIAL_ID]).map(|i| i.as_bytes().to_vec()),
+            Ok(vec![0; MAX_CREDENTIAL_ID])
         );
         assert_eq!(
             CredentialId::from_bytes(&[0; MAX_CREDENTIAL_ID + 1])
@@ -962,8 +962,9 @@ mod tests {
         );
         let wrapped = Row::new((1, credential(keys().remove(0))?), Version::new(3));
         assert_eq!(
-            Credential::from_row(&wrapped, |(_, r)| Some(r)).map(drop),
-            Ok(())
+            Credential::from_row(&wrapped, |(_, r)| Some(r))
+                .map(|r| (Record::Credential(r.record().clone()), r.version())),
+            Ok((credential(keys().remove(0))?, Version::new(3)))
         );
         assert_eq!(
             Credential::from_row(&wrapped, |_| None)
@@ -1094,16 +1095,17 @@ mod tests {
                 c.options.extensions.cred_props = flag;
             }
         }
+        let (on_record, off_record) = (on.clone(), off.clone());
         let (on, off) = (on.encode()?, off.encode()?);
         let flag = on
             .iter()
             .zip(&off)
             .position(|(a, b)| a != b)
             .ok_or_else(|| bad(()))?;
-        for byte in [0, 1] {
+        for (byte, expected) in [(0, off_record), (1, on_record)] {
             let mut row = on.clone();
             row[flag] = byte;
-            assert_eq!(Record::decode(&row).map(drop), Ok(()));
+            assert_eq!(Record::decode(&row), Ok(expected));
         }
         let mut row = on.clone();
         row[flag] = 2;

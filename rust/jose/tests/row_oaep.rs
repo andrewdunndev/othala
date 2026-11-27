@@ -2,6 +2,8 @@
 //! decryption path.
 #![cfg(feature = "rsa-decrypt")]
 
+mod common_refusal;
+
 use base::{Entropy, b64url_decode, b64url_encode};
 use jose::{
     A128CbcHs256, A128Gcm, A256CbcHs512, A256Gcm, BlindedKeyAlg, Enc, ErrorKind, Jwe, Jwk,
@@ -104,18 +106,7 @@ fn row(file: Vector, total: usize, checked: usize) {
                 &mut draws,
             ),
         });
-        // a token that does not parse is refused whole; one that parses is refused by the decryption
-        let refusal = if parse(compact, &wire).map(drop) == Ok(()) {
-            ErrorKind::Decrypt
-        } else {
-            ErrorKind::Malformed
-        };
-        assert_eq!(
-            outcome.as_ref().err().map(|e| e.kind()),
-            (!case.expect.ok).then_some(refusal),
-            "{}",
-            case.id
-        );
+        common_refusal::assert_outcome(&outcome, case.expect.ok, None, &case.id);
         if let Some(want) = &case.expect.plaintext {
             assert_eq!(
                 outcome.ok().map(|p| b64url_encode(&p)).as_ref(),

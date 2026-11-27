@@ -278,8 +278,11 @@ mod tests {
             Some(ErrorKind::Malformed)
         );
         assert_eq!(
-            decode(&[0xa2, 0x02, 0x02, 0x01, 0x01], Order::TopTolerant).map(drop),
-            Ok(())
+            decode(&[0xa2, 0x02, 0x02, 0x01, 0x01], Order::TopTolerant),
+            Ok(Value::Map(vec![
+                (Value::Unsigned(2), Value::Unsigned(2)),
+                (Value::Unsigned(1), Value::Unsigned(1))
+            ]))
         );
     }
 

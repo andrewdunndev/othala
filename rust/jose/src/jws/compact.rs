@@ -217,10 +217,8 @@ mod tests {
         let long = |payload: usize| format!("eyJhbGciOiJIUzI1NiJ9.{}.AAAA", "A".repeat(payload));
         assert_eq!(long(MAX_COMPACT_LEN - 26).len(), MAX_COMPACT_LEN);
         assert_eq!(
-            Jws::parse(&long(MAX_COMPACT_LEN - 26))
-                .err()
-                .map(|e| e.kind()),
-            None
+            Jws::parse(&long(MAX_COMPACT_LEN - 26)).map(|j| j.kids().len()),
+            Ok(0)
         );
         let over = long(MAX_COMPACT_LEN - 25);
         assert_eq!(
@@ -240,8 +238,8 @@ mod tests {
             );
         }
         assert_eq!(
-            Jws::parse(&format!("{head}..")).err().map(|e| e.kind()),
-            None
+            Jws::parse(&format!("{head}..")).map(|j| j.kids().len()),
+            Ok(0)
         );
     }
 

@@ -172,19 +172,22 @@ fn floored(path: &str, total: usize, checked: usize, floor: usize) -> Tally {
     Tally { total, checked }
 }
 
-/// A vector case's verdict: `outcome` is `Ok` exactly when `ok`, and a refusal the vector names as `kind` is that
-/// kind (`kind_of`'s `Debug` text). A refusal the vector leaves unnamed is checked for the refusal alone.
+/// A vector case's verdict: `outcome` is `Ok` exactly when `ok`, and a refusal is the `kind` the case names
+/// (`kind_of`'s `Debug` text). A refusing case that names no kind fails, so no refusal is checked as a bare "an error".
 pub fn assert_verdict<T, E: std::fmt::Debug, K: std::fmt::Debug>(
     outcome: &Result<T, E>,
     ok: bool,
     kind: Option<&str>,
-    kind_of: impl FnOnce(&E) -> K,
+    kind_of: impl Fn(&E) -> K,
     id: &str,
 ) {
-    assert_eq!(outcome.is_ok(), ok, "{id}: {:?}", outcome.as_ref().err());
-    if let (Err(error), Some(named)) = (outcome, kind) {
-        assert_eq!(format!("{:?}", kind_of(error)), named, "{id}");
-    }
+    assert!(
+        ok || kind.is_some(),
+        "{id}: a refusing vector names no kind"
+    );
+    let seen = outcome.as_ref().err().map(|e| format!("{:?}", kind_of(e)));
+    let want = if ok { None } else { kind.map(str::to_owned) };
+    assert_eq!(seen, want, "{id}");
 }
 
 #[cfg(test)]
@@ -211,18 +214,23 @@ notes = "a source with no files"
     #[test]
     fn a_verdict_that_matches_passes() {
         assert_verdict::<u8, &str, _>(&Ok(1), true, None, |e| *e, "ok");
-        assert_verdict::<u8, &str, _>(&Err("bad"), false, None, |e| *e, "unnamed");
         assert_verdict::<u8, &str, _>(&Err("bad"), false, Some("\"bad\""), |e| *e, "named");
     }
 
     #[test]
-    #[should_panic(expected = "accepted: None")]
-    fn a_refusal_expected_but_accepted_fails() {
-        assert_verdict::<u8, &str, _>(&Ok(1), false, None, |e| *e, "accepted");
+    #[should_panic(expected = "unnamed: a refusing vector names no kind")]
+    fn a_refusal_without_a_kind_fails() {
+        assert_verdict::<u8, &str, _>(&Err("bad"), false, None, |e| *e, "unnamed");
     }
 
     #[test]
-    #[should_panic(expected = "refused: Some(\"bad\")")]
+    #[should_panic(expected = "accepted")]
+    fn a_refusal_expected_but_accepted_fails() {
+        assert_verdict::<u8, &str, _>(&Ok(1), false, Some("\"bad\""), |e| *e, "accepted");
+    }
+
+    #[test]
+    #[should_panic(expected = "refused")]
     fn an_acceptance_expected_but_refused_fails() {
         assert_verdict::<u8, &str, _>(&Err("bad"), true, None, |e| *e, "refused");
     }

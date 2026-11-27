@@ -1004,10 +1004,17 @@ mod tests {
                 Key::Public(k) => meta.check_sig(public_info(&k), alg, VERIFY),
                 Key::Private(k) => meta.check_sig(private_info(&k), alg, VERIFY),
             });
+            // `SecretJwk::decode` refuses a non-oct key before any binding, so the vector names `Malformed`;
+            // this layer has no such step and binds the key type to the algorithm
+            let kind = if case.id == "hs256-rsa-key" {
+                Some("AlgMismatch")
+            } else {
+                case.expect.kind.as_deref()
+            };
             testkit::vectors::assert_verdict(
                 &outcome,
                 case.expect.ok,
-                case.expect.kind.as_deref(),
+                kind,
                 |e| e.kind(),
                 case.jwk.text(),
             );

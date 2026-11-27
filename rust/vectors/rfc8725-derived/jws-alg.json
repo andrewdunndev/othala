@@ -13,7 +13,8 @@
    },
    "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ._5ywKLk6yFUvnb30rRLtHp0ghoaMY3VGaZIkMVK0wv4",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "ES256 key record, header HS256, valid HMAC keyed by the public key as jwk-json"
   },
@@ -29,7 +30,8 @@
    },
    "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.0XoKhD7rQLVpU6pHye0q0oCPFGC3GUg7zqIbPGt6KNM",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "ES256 key record, header HS256, valid HMAC keyed by the public key as sec1-point"
   },
@@ -45,7 +47,8 @@
    },
    "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.nH2XPrlQD7yQgM2dfrXkribzODpuhz3wrC7WoYc8NbI",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "ES256 key record, header HS256, valid HMAC keyed by the public key as spki-der"
   },
@@ -61,7 +64,8 @@
    },
    "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.Mz1ZQOm8HClaKeHwHJKFv6TtgffsrTz6_ZYhKqMK3xI",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "ES256 key record, header HS256, valid HMAC keyed by the public key as spki-pem"
   },
@@ -77,7 +81,8 @@
    },
    "jws": "eyJhbGciOiJFUzM4NCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.wnyGb6InOhhddUiCyrrt7oE_Z-yg0fUWY13GLNn0TTM9CseV-6Voe7TeL5lfJK4KDmENjSRT2zeZcu_rl8wc6Q",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "ES256 key record, header ES384, valid ES384 signature by the same key"
   },
@@ -92,7 +97,8 @@
    },
    "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.fnekMZD5k4qryCdLiWMNLJ1jyCC6Oc6508J42npLh5s",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "RS256 key record, header HS256, valid HMAC keyed by the public key as modulus"
   },
@@ -107,7 +113,8 @@
    },
    "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.RoJSkft7ZXbo-CpKG0gKX3AdI-l6yTSxaggj2PBq13M",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "RS256 key record, header HS256, valid HMAC keyed by the public key as jwk-json"
   },
@@ -122,7 +129,8 @@
    },
    "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.aiL6SKPbia3QLy03W1QhKn6QbEkiOAhni4Mglwfpk-Y",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "RS256 key record, header HS256, valid HMAC keyed by the public key as spki-der"
   },
@@ -137,7 +145,8 @@
    },
    "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.u08EVWx_6oUSzw0fB4I3RULQvWIv0YED3OAKJ7Augys",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "RS256 key record, header HS256, valid HMAC keyed by the public key as spki-pem"
   },
@@ -152,7 +161,8 @@
    },
    "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.QR3eoDnQbdbuUu8XpvNTiHL62592jwG6kdc4_205x7s",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "RS256 key record, header HS256, valid HMAC keyed by the public key as pkcs1-pem"
   },
@@ -167,7 +177,8 @@
    },
    "jws": "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.SSOBVKchwqlQc-MfRI19u7FcuDXVSs2FkGYMn8Bnhoaz58Mzw4Hxw5GKI9hDzhErFrMX06A23C5KGfGPMHFo81oRK4PVBzwtqMjDjij0ruNb4fZ6hASGmBUsosHS69rvIdmniQipcW3mUBYpU5xbxceot1OUqGpOvOWRc3M6X8y2LhC54463R3YYbZ0r0hwDQrQL2lAtemZWAOBERhnPe63twSHHb4PinIYlOdZba6vLlljNIxR3FXCDut_RjKuErSWpHQh13537l6di1cCIKLMCosXUYAyWh3Y5NaTWSQ0f9kCm63FqMknxAqdBLJkrsGWfaZ0b8grm7tbSjfUB7Q",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "RS256 key record, header RS512, valid RS512 signature by the same key"
   },
@@ -181,7 +192,8 @@
    },
    "jws": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.tGSvItWnKfm1qAWvbJw53Zioivh_JbB0Cyuz2D2Khi-nMdU2Wq8ka01G4FSPTwhPxj8OkKVA9jA7JACMuOXq5A",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "HS256 key record, header ES256, valid ES256 signature by an unrelated key"
   },
@@ -195,7 +207,8 @@
    },
    "jws": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.JF0VozxGdfNdW4fnO7M_T43ggX6-2oZjaULScagLyGDEcaK2GTLdGz9IioRRO-FBIk07uLXie0ecZ8Ng4gnZ7fEWFTuTHWeSEoA443E11amRTlKOnGE0WQ4mNbQ1W2Yw_jMdPP_ot7XUDiCPIfCbBRJnl8kEtYF2rOP3eLejXYXibWnCk4gCrBh925O7ZEOe5NUNCORKHAfTnxI3OvRIT1jGwy86ZTyaVseeMJhnSWV7QmboQT0hqD3_kemMZssvkPzVkW3oNJSFWNbQqzlcljeDW1lOVrcw84DufhEqkepi8fhssP0LIJ-jxB2jQWk4Gx0AsQFjP-2aQMebIzlNvw",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "HS256 key record, header RS256, valid RS256 signature by an unrelated key"
   },
@@ -211,7 +224,8 @@
    },
    "jws": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "ES256 key record, header none, empty signature"
   },
@@ -226,7 +240,8 @@
    },
    "jws": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "RS256 key record, header none, empty signature"
   },
@@ -240,7 +255,8 @@
    },
    "jws": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "HS256 key record, header none, empty signature"
   },
@@ -256,7 +272,8 @@
    },
    "jws": "eyJhbGciOiJFUzM4NCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.LS_wx9eBi1cCQB-asqjmlCZYt6vFGyQBUIMLtNZzfK667j8I-ZdlXuAahL0_nO0K8WEvjc7ksd0WTJM7tnuQBQ",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "ES256 key record, header ES384, signature valid under the key alg only"
   },
@@ -272,7 +289,8 @@
    },
    "jws": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.pWtL9StvazKf3AQe9SLsizlXgK4iWX-IakCOMV8PweibhPy3tK_FeRyhHxDNBsyrZlZesh1E7gX2myxim6sh9w",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "ES256 key record, header none, signature valid under the key alg only"
   },
@@ -287,7 +305,8 @@
    },
    "jws": "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.N6s2m2UdEVFHucX4BCz-KVsYqKC2xkkXFkICAqh-NelmwoARQKQXCDz5o5Lm0CvotoV-1_M0dxhBPaIM3RRh5HFoN78bVn20fmyF57THiazk8oabj5bmmCZyyi0sIIyWCh4813FeQrRZO9TDQ2E1kgUwiIv7pJsj0bjJUmp-Mtv9jWrbPpbxQoo_Gx4T9o5fiAADtBURZ2mPeKqgNEOPmJqgZ-Vp7eEXlLslyriXNJ0uMzOZjwHDEXQgARiA-NPqVJFRDEYnzk6J8jbdaLQmGduGeV5HKmfg3tkPrdLUQef7Gx8bPv6FH8DdOPzLpOTWMIsWy57Uvpzi3A-FvYP60w",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "RS256 key record, header RS512, signature valid under the key alg only"
   },
@@ -302,7 +321,8 @@
    },
    "jws": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.uluHiMcLE27uENUjh2AeaB8UKwujAf1iRKheErz2p3RwAWbZWaYHKDzj1HLk2mU-tNodzP74qWrInzZbB1SaMpqntqecVvcYtrNgu8LyIKvlr4USYh9GMw9nuGLwA2xASxvyjLq-4s8PTOtD4k-qASerXvEDkY50e73k4tPGG549gziUjd7cO4QhC8BjjUB1t7Uv48SBmnfGvX61nRwYslcUdsFr8fFZfqLUdHtrK1HyliVKgno8glo1hRwtaaFFgA3cOrh26B1UXbq1HoFEvlCvEbDxlLZgfnjeEECPeq7p9kJbgq8y6tuDk5neXAbj-E4BdaO6hX1SlleXM9CK5g",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "RS256 key record, header none, signature valid under the key alg only"
   },
@@ -316,7 +336,8 @@
    },
    "jws": "eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.K_GglGKE3xDOrGH8CN3wUtlPqynBuRL2Lrs-QYZHsOo",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "HS256 key record, header HS384, signature valid under the key alg only"
   },
@@ -330,7 +351,8 @@
    },
    "jws": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.yeBV-zl3T7g4KU2AdbpbfMQ2hB2V3Nw2YuuD8QfMEsE",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    },
    "note": "HS256 key record, header none, signature valid under the key alg only"
   },

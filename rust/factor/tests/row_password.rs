@@ -147,7 +147,10 @@ fn presented_passwords() -> Result<(), Boxed> {
         cost(7_168, 5, 1)?,
         &mut testkit::seeded(9),
     )?;
-    assert_eq!(verify(&stored, &a, cost(7_168, 5, 1)?)?.0.map(drop), Ok(()));
+    assert!(matches!(
+        verify(&stored, &a, cost(7_168, 5, 1)?)?.0,
+        Ok(hit) if matches!(hit.rehash(), Rehash::Current)
+    ));
     assert!(matches!(
         verify(&stored, &b, cost(7_168, 5, 1)?)?.0,
         Err(Rejected::Wrong)

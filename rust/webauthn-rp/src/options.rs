@@ -485,8 +485,8 @@ mod tests {
             Ok(vec![7])
         );
         assert_eq!(
-            UserHandle::from_stored(&[0; MAX_USER_HANDLE]).map(drop),
-            Ok(())
+            UserHandle::from_stored(&[0; MAX_USER_HANDLE]).map(|h| h.as_bytes().to_vec()),
+            Ok(vec![0; MAX_USER_HANDLE])
         );
         assert_eq!(
             kind(UserHandle::from_stored(&[0; MAX_USER_HANDLE + 1])),
@@ -498,7 +498,12 @@ mod tests {
     fn names_are_bounded_and_never_printed() {
         assert_eq!(kind(UserName::parse("")), Some(ErrorKind::Malformed));
         assert_eq!(UserName::parse("a").as_ref().map(UserName::as_str), Ok("a"));
-        assert_eq!(UserName::parse(&"a".repeat(MAX_NAME)).map(drop), Ok(()));
+        assert_eq!(
+            UserName::parse(&"a".repeat(MAX_NAME))
+                .as_ref()
+                .map(UserName::as_str),
+            Ok("a".repeat(MAX_NAME).as_str())
+        );
         assert_eq!(
             kind(UserName::parse(&"a".repeat(MAX_NAME + 1))),
             Some(ErrorKind::TooLarge)
@@ -511,7 +516,12 @@ mod tests {
             DisplayName::parse("Ada").as_ref().map(DisplayName::as_str),
             Ok("Ada")
         );
-        assert_eq!(DisplayName::parse(&"a".repeat(MAX_NAME)).map(drop), Ok(()));
+        assert_eq!(
+            DisplayName::parse(&"a".repeat(MAX_NAME))
+                .as_ref()
+                .map(DisplayName::as_str),
+            Ok("a".repeat(MAX_NAME).as_str())
+        );
         assert_eq!(
             kind(DisplayName::parse(&"a".repeat(MAX_NAME + 1))),
             Some(ErrorKind::TooLarge)

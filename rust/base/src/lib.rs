@@ -5,7 +5,7 @@
 //! the verdict counts only once a [`Store`] has applied that effect and answered its [`Receipt`]:
 //!
 //! ```
-//! use base::{Effect, Entropy, Pending, Rows, Scope, Slot, Store, StoreKey, UnixTime};
+//! use base::{Effect, Entropy, Failure, Pending, Rows, Scope, Slot, Store, StoreKey, UnixTime};
 //! use testkit::{MemStore, seeded};
 //!
 //! #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -27,7 +27,9 @@
 //!
 //! let (now, e) = (UnixTime::new(1_000), &mut seeded(1));
 //! let mut store = MemStore::new();
-//! assert!(store.apply(&Effect::created(e, Ticket(1), "admit one", None), now).unwrap().is_ok());
+//! let created = Effect::created(e, Ticket(1), "admit one", None);
+//! let receipt = store.apply(&created, now).unwrap().unwrap();
+//! assert_eq!(receipt.effect_id(), created.id());
 //!
 //! // two decisions over the same rows race; the first to apply wins
 //! let rows = store.load(&[Ticket(1)], now).unwrap();
@@ -36,7 +38,8 @@
 //! assert_eq!(first.settle(receipt).unwrap(), "admit one");
 //!
 //! // the loser's guard fails, so its verdict never settles; re-decided on fresh rows, nothing is left to redeem
-//! assert!(store.apply(second.effect(), now).unwrap().is_err());
+//! let conflict = store.apply(second.effect(), now).unwrap().unwrap_err();
+//! assert_eq!(conflict.failures(), [(Ticket(1), Failure::Missing)]);
 //! let rows = store.load(&[Ticket(1)], now).unwrap();
 //! assert!(redeem(&rows, e).is_none());
 //! ```

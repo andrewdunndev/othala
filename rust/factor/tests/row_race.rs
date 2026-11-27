@@ -326,7 +326,7 @@ fn no_internal_totp() -> Result<(), TestError<Constructed>> {
             .check(None, UnixTime::new(time))
             .map_err(|_| fail("permit"))?;
         let verdict = t.verify(permit, &OtpCode::parse(&code).map_err(fail)?, held, &mut e);
-        prop_assert_eq!(verdict.map(drop), Ok(()));
+        let _pending = verdict.map_err(fail)?;
         Ok(())
     })
 }
@@ -355,10 +355,7 @@ fn no_internal_recovery() -> Result<(), TestError<(u8, u64, bool)>> {
             let permit = Throttle::unlimited()
                 .check(None, NOW)
                 .map_err(|_| fail("permit"))?;
-            prop_assert_eq!(
-                recovery_verify(permit, code, hash, &mut e).map(drop),
-                Ok(())
-            );
+            let _pending = recovery_verify(permit, code, hash, &mut e).map_err(fail)?;
             Ok(())
         },
     )
