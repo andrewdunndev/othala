@@ -18,7 +18,7 @@ Coverage (each row becomes a CONTRACT.md line as covered, feature-gated, or name
 - factor: RFC 4226/6238, NIST SP 800-63B look-up secrets and length rules, OWASP Argon2id floor; hashing via RustCrypto argon2.
 DAG: othala-native and othala-worker -> othala-core -> {oidc-provider -> jose, webauthn-rp, factor} -> base; webauthn-mds -> webauthn-rp; testkit is a dev-dependency of every crate and depends on base only. No publishable crate depends on an Othala crate, on another crate's internals, or on an I/O crate.
 
-## 2. Public contracts (signatures only)
+## 2. Public contracts (each built crate's surface is its generated public-api.txt)
 Rules for all: every public struct has private fields, a named constructor and accessors; every public enum is #[non_exhaustive]; no all-pub structs. Traits are sealed unless extension is their purpose. Errors are Error { kind: ErrorKind, .. } with a fieldless Copy kind; Display never carries secret-derived detail. Every parser takes input bounded by rule 5.7.
 Claims ledger: each claim is tagged by what carries it, and section 4 gives the proof each tag requires. Type: the program does not compile. Runtime: a check returns an error. Obligation: the caller must do something the crate cannot see; it is named in CONTRACT.md and tested against every store. Nothing is called unrepresentable unless it is Type.
 ### base
@@ -38,7 +38,6 @@ Public signatures: `rust/base/public-api.txt`, generated and gated by `just api`
 Public signatures: `rust/jose/public-api.txt`, generated and gated by `just api`.
 - Type: a payload or claims read before verification; JWT claims read without a Policy carrying issuer, audience and typ; an ID token accepted as an access token (TokenKind::TYP, 8725 3.11); fetching jku/x5u/jwk (no fetch exists); an Ed25519 key in ECDH, or an X25519 key signing.
 - Runtime: none and the RS-to-HS swap (AlgMismatch; header alg compared, never selecting code; 8725 3.1); claims mismatched or absent (Issuer, Audience, Type, MissingClaim); a non-numeric exp treated as absent (ClaimType; GHSA-h395-gr6q-cpjc); a JWK without alg used dynamically (KeyAlgMissing); weak keys (WeakKey).
-Note: D3 (JWE now) and the rsa-sign/rsa-decrypt features postdate this text.
 
 ### webauthn-rp
 Public signatures: `rust/webauthn-rp/public-api.txt`, generated and gated by `just api`.
