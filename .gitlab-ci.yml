@@ -321,7 +321,7 @@ check-rust-scheduled:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
   trigger:
-    strategy: depend
+    strategy: mirror
     include:
       - artifact: rust/slow-plan.yml
         job: plan-rust-slow
