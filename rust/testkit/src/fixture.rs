@@ -42,3 +42,25 @@ pub fn replay<T>(name: &str, run: impl FnOnce() -> T + std::panic::UnwindSafe) -
         std::panic::panic_any(format!("corpus file {name} panicked: {message}"))
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::replay;
+
+    #[test]
+    fn a_clean_run_returns_its_value() {
+        assert_eq!(replay("one", || 7), 7);
+    }
+
+    #[test]
+    #[should_panic(expected = "corpus file one panicked: boom")]
+    fn a_panic_names_the_file_and_keeps_the_message() {
+        replay("one", || std::panic::panic_any("boom"));
+    }
+
+    #[test]
+    #[should_panic(expected = "corpus file two panicked: lost")]
+    fn an_owned_message_is_kept() {
+        replay("two", || std::panic::panic_any(String::from("lost")));
+    }
+}

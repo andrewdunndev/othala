@@ -189,7 +189,7 @@ pub fn assert_verdict<T, E: std::fmt::Debug, K: std::fmt::Debug>(
 
 #[cfg(test)]
 mod tests {
-    use super::{Outcome, Tally, Vector, run_against};
+    use super::{Outcome, Tally, Vector, assert_verdict, run_against};
 
     const SOURCES: &str = r#"
 [source."a"]
@@ -206,6 +206,31 @@ notes = "a source with no files"
     #[derive(serde::Deserialize)]
     struct Case {
         n: u8,
+    }
+
+    #[test]
+    fn a_verdict_that_matches_passes() {
+        assert_verdict::<u8, &str, _>(&Ok(1), true, None, |e| *e, "ok");
+        assert_verdict::<u8, &str, _>(&Err("bad"), false, None, |e| *e, "unnamed");
+        assert_verdict::<u8, &str, _>(&Err("bad"), false, Some("\"bad\""), |e| *e, "named");
+    }
+
+    #[test]
+    #[should_panic(expected = "accepted: None")]
+    fn a_refusal_expected_but_accepted_fails() {
+        assert_verdict::<u8, &str, _>(&Ok(1), false, None, |e| *e, "accepted");
+    }
+
+    #[test]
+    #[should_panic(expected = "refused: Some(\"bad\")")]
+    fn an_acceptance_expected_but_refused_fails() {
+        assert_verdict::<u8, &str, _>(&Err("bad"), true, None, |e| *e, "refused");
+    }
+
+    #[test]
+    #[should_panic(expected = "kind")]
+    fn a_refusal_of_another_kind_fails() {
+        assert_verdict::<u8, &str, _>(&Err("bad"), false, Some("\"worse\""), |e| *e, "kind");
     }
 
     #[test]
