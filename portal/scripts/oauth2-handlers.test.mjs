@@ -2,7 +2,7 @@
 
 import { test, describe, it, expect, vi } from 'vitest';
 import assert from 'node:assert/strict';
-import { handleLogin, loginRememberFor, handleConsent, handleConsentPost, handleLogout, buildLoginReturnTo } from '../src/lib/oauth2-handlers.ts';
+import { handleLogin, promptIsNone, loginRememberFor, handleConsent, handleConsentPost, handleLogout, buildLoginReturnTo } from '../src/lib/oauth2-handlers.ts';
 // The default slide would call Kratos; each test below that exercises it injects its own.
 vi.mock('../src/lib/session-slide.ts', () => ({ slide: async (s) => ({ session: s, setCookie: [] }) }));
 import { describeScopeList, SCOPE_DESCRIPTIONS } from '../src/lib/scope-descriptions.ts';
@@ -1781,4 +1781,176 @@ test('a denied login and a step-up bounce never slide the session (pins the slid
     manifest: () => loadManifest('grafana'),
   });
   assert.equal(slideSession.mock.calls.length, 0);
+});
+
+// prompt=none: a silent check gets an OIDC error at its redirect_uri, never a sign-in or consent page.
+const AUTHZ = 'https://sso.othala.test/oauth2/auth?client_id=grafana&response_type=code';
+const NONE_URL = `${AUTHZ}&prompt=none`;
+const aal2Member = () => activeMember({ credentials: withCredentials(activeMember(), 'password', 'totp').credentials });
+
+async function silentLogin({ url, skip = true, getSession = defaultSession(), identity = aal2Member(), subject = 'id-1' }) {
+  const { api, calls } = stubOAuth2({
+    getOAuth2LoginRequest: async () => oauth2LoginRequest({ skip, subject, request_url: url, session_id: 'sid' }),
+  });
+  const slideSession = vi.fn(async (s) => ({ session: s }));
+  const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+    oauth2: api, getIdentity: async () => identity, getSession, slideSession, manifest: () => loadManifest('grafana'),
+  });
+  return { res, calls, slideSession };
+}
+
+const noUi = (res) => assert.ok(!(res.headers.get('location') ?? '').includes('/auth/login'), 'no sign-in UI redirect');
+
+test('promptIsNone: none, absent, other prompts, malformed and device urls', () => {
+  assert.equal(promptIsNone(NONE_URL), true);
+  assert.equal(promptIsNone(AUTHZ), false);
+  assert.equal(promptIsNone(`${AUTHZ}&prompt=login`), false);
+  assert.equal(promptIsNone('not a url'), false);
+  assert.equal(promptIsNone(`${DEVICE_URL}&prompt=none`), false);
+  assert.equal(promptIsNone(undefined), false);
+  assert.equal(promptIsNone(`${AUTHZ}&prompt=`), false);
+  assert.equal(promptIsNone(`${AUTHZ}&prompt=nonexistent`), false);
+});
+
+test('prompt=none login: aal1 session that needs step-up is rejected login_required, no UI, no slide', async () => {
+  const { res, calls, slideSession } = await silentLogin({ url: NONE_URL });
+  noUi(res);
+  assert.equal(res.headers.get('location'), 'https://sso.othala.test/login-rejected');
+  assert.equal(calls.rejectLoginError, 'login_required');
+  assert.equal(calls.rejectLoginStatus, 400);
+  assert.equal(calls.acceptLogin, 0);
+  assert.equal(slideSession.mock.calls.length, 0);
+});
+
+test('login without prompt=none still bounces an aal1 session to aal2 (control)', async () => {
+  const { res, calls } = await silentLogin({ url: AUTHZ });
+  assert.equal(new URL(res.headers.get('location'), 'https://x').searchParams.get('aal'), 'aal2');
+  assert.equal(calls.rejectLogin, 0);
+});
+
+test('prompt=none login: no Kratos session is rejected login_required, no UI', async () => {
+  const { res, calls } = await silentLogin({ url: NONE_URL, getSession: async () => null });
+  noUi(res);
+  assert.equal(calls.rejectLoginError, 'login_required');
+  assert.equal(calls.rejectLoginStatus, 400);
+});
+
+test('login without prompt=none and no Kratos session still bounces (control)', async () => {
+  const { res, calls } = await silentLogin({ url: AUTHZ, getSession: async () => null });
+  assert.equal(new URL(res.headers.get('location'), 'https://x').pathname, '/auth/login');
+  assert.equal(calls.rejectLogin, 0);
+});
+
+test('prompt=none login: aal2 session is accepted and slides (no regression)', async () => {
+  const { res, calls, slideSession } = await silentLogin({
+    url: NONE_URL, getSession: defaultSession({ authenticator_assurance_level: 'aal2' }),
+  });
+  assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-login');
+  assert.equal(calls.acceptLogin, 1);
+  assert.equal(slideSession.mock.calls.length, 1);
+});
+
+test('prompt=none login: stale max_age is rejected login_required, no UI', async () => {
+  const { res, calls } = await silentLogin({
+    url: `${NONE_URL}&max_age=60`,
+    getSession: defaultSession({ authenticator_assurance_level: 'aal2', authenticated_at: ago(3600).toISOString() }),
+  });
+  noUi(res);
+  assert.equal(calls.rejectLoginError, 'login_required');
+});
+
+test('prompt=none login: access deny stays access_denied 403', async () => {
+  const { res, calls } = await silentLogin({
+    url: NONE_URL, identity: activeMember({ metadata_admin: { groups: [] } }),
+  });
+  noUi(res);
+  assert.equal(calls.rejectLoginError, 'access_denied');
+  assert.equal(calls.rejectLoginStatus, 403);
+});
+
+test('prompt=none login: Hydra subject differing from the live session re-evaluates through Hydra, no UI', async () => {
+  const { res, calls } = await silentLogin({ url: NONE_URL, subject: 'someone-else' });
+  noUi(res);
+  assert.equal(res.headers.get('location'), NONE_URL);
+  assert.equal(calls.revokeLoginSessions.length, 1);
+  assert.equal(calls.rejectLogin, 0);
+});
+
+test('device login on aal1 still steps up when the request url carries prompt=none', async () => {
+  const { api, calls } = stubOAuth2({
+    getOAuth2LoginRequest: async () => oauth2LoginRequest({ skip: true, subject: 'id-1', request_url: `${DEVICE_URL}&prompt=none` }),
+  });
+  const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+    oauth2: api, getIdentity: async () => aal2Member(), getSession: defaultSession(), manifest: () => loadManifest('grafana'),
+  });
+  assert.equal(new URL(res.headers.get('location'), 'https://x').pathname, '/auth/login');
+  assert.equal(calls.rejectLogin, 0);
+});
+
+const NON_SKIP = () => ({
+  clientId: 'grafana', clientName: 'grafana', accessGroups: ['grafana-access'], skipConsent: false,
+  skipAccessCheck: false, roles: [], groupRoleMap: {}, emitGroupsClaim: null,
+});
+
+async function silentConsent({ url, skip = true, getSession = defaultSession(), manifest = () => loadManifest('grafana') }) {
+  const { api, calls } = stubOAuth2({
+    getOAuth2ConsentRequest: async () => oauth2ConsentRequest({
+      skip, subject: 'id-1', client: { client_id: 'grafana' }, requested_scope: ['email'], request_url: url,
+    }),
+  });
+  const res = await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
+    oauth2: api, getIdentity: async () => activeMember(), getSession, manifest,
+  });
+  return { res, calls };
+}
+
+const noConsentUi = (res) => assert.ok(!(res.headers.get('location') ?? '').includes('/auth/consent'), 'no consent UI redirect');
+const otherSubject = async () => session('aal1', ['password'], { identity: whoamiIdentity(activeMember({ id: 'id-2' })) });
+
+test('prompt=none consent: a client that shows the grant screen gets consent_required, no UI', async () => {
+  const { res, calls } = await silentConsent({ url: NONE_URL, skip: false, manifest: NON_SKIP });
+  noConsentUi(res);
+  assert.equal(calls.rejectConsentError, 'consent_required');
+  assert.equal(calls.rejectConsentStatus, 400);
+  assert.equal(calls.acceptConsent, 0);
+});
+
+test('consent without prompt=none still shows the grant screen (control)', async () => {
+  const { res, calls } = await silentConsent({ url: AUTHZ, skip: false, manifest: NON_SKIP });
+  assert.ok(res.headers.get('location')?.startsWith('/auth/consent'));
+  assert.equal(calls.rejectConsent, 0);
+});
+
+test('prompt=none consent: skip with no Kratos session is login_required', async () => {
+  const { res, calls } = await silentConsent({ url: NONE_URL, getSession: async () => null });
+  noConsentUi(res);
+  assert.equal(calls.rejectConsentError, 'login_required');
+  assert.equal(calls.rejectConsentStatus, 400);
+});
+
+test('prompt=none consent: skip with a different session subject is login_required', async () => {
+  const { calls } = await silentConsent({ url: NONE_URL, getSession: otherSubject });
+  assert.equal(calls.rejectConsentError, 'login_required');
+  assert.equal(calls.rejectConsentStatus, 400);
+});
+
+test('consent skip without prompt=none keeps access_denied 403 for no session and mismatch (control)', async () => {
+  const none = await silentConsent({ url: AUTHZ, getSession: async () => null });
+  assert.equal(none.calls.rejectConsentError, 'access_denied');
+  assert.equal(none.calls.rejectConsentStatus, 403);
+  const other = await silentConsent({ url: AUTHZ, getSession: otherSubject });
+  assert.equal(other.calls.rejectConsentError, 'access_denied');
+});
+
+test('prompt=none consent: skip with a valid session accepts and remembers (regression)', async () => {
+  const { calls } = await silentConsent({ url: NONE_URL });
+  assert.equal(calls.acceptConsent, 1);
+  assert.equal(calls.acceptConsentBody.remember_for, 86400);
+  assert.equal(calls.rejectConsent, 0);
+});
+
+test('device consent with prompt=none in the url never reaches the silent path', async () => {
+  const { calls } = await silentConsent({ url: `${DEVICE_URL}&prompt=none` });
+  assert.equal(calls.rejectConsentError, 'access_denied');
+  assert.equal(calls.rejectConsentReason, 'device code not entered in this browser');
 });
