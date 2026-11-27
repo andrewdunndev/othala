@@ -12,11 +12,13 @@ gate: gate-rust claims vectors
 # the gates that run on CI's ci-rust image, which has no node or python3; claims and vectors run on theirs
 gate-rust: (tool-pins "jq") lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api
 
-# the slow gates, run on a schedule and on main: the per-crate mutation floors, the scoreboard they feed, the features-off jose run and the fuzz targets; `just gate-slow <crate> <k>/<n>` runs shard k of n (cargo-mutants' own, k from 0) of one crate's mutants and, in shard 0, the rest of its share (CI runs the jobs `slow-plan` lists), and with no argument runs everything unsharded
+# the slow gates, run on a schedule and on main: the per-crate mutation floors, the scoreboard they feed, the features-off jose run and the fuzz targets; `just gate-slow <crate> <k>/<n>` runs shard k of n (cargo-mutants' own, k from 0) of one crate's mutants and, in shard 0, the rest of its share (CI runs the jobs `slow-plan` lists): a shard proves 0 missed and 0 timed out and at least one caught, and the gates.json floor is held by the unsharded runs, which is `just gate-slow` with no argument and the pre-merge `mutants-changed`
 gate-slow crate="" shard="": (tool-pins)
     #!/usr/bin/env bash
     set -euo pipefail
     c="{{crate}}"; shard="{{shard}}"
+    just shard-check "$shard"
+    [ -z "$shard" ] || [ -n "$c" ] || { echo "gate-slow: a shard needs a crate"; exit 1; }
     if [ -n "$c" ]; then
         units=$(just slow-units)
         grep -qx "$c" <<< "$units" || { echo "gate-slow: '$c' is not one of: $(tr '\n' ' ' <<< "$units")"; exit 1; }
@@ -26,6 +28,12 @@ gate-slow crate="" shard="": (tool-pins)
     just rows "$c"
     if [ -z "$c" ] || [ "$c" = jose ]; then just mutants-off; fi
     just fuzz 600 "$c"
+
+# a shard is empty or k/n with 0 <= k < n, cargo-mutants' own numbering; the one place its shape is typed
+shard-check shard:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [ -z "{{shard}}" ] || { [[ "{{shard}}" =~ ^(0|[1-9][0-9]*)/([1-9][0-9]*)$ ]] && [ "${BASH_REMATCH[1]}" -lt "${BASH_REMATCH[2]}" ]; } || { echo "shard '{{shard}}' is not k/n with 0 <= k < n"; exit 1; }
 
 # the crates the slow gates run, derived: each with a mutants floor or a fuzz target
 slow-units:
@@ -144,27 +152,29 @@ tool-pins *tools="cargo-mutants jq cargo-deny":
         [ "$want" = "$have" ] || { echo "$t ${have:-unknown} is installed, mise.toml pins $want"; exit 1; }
     done
 
-# each run (the whole crate, or shard k of n with cargo-mutants' own k from 0) catches something and misses or times out nothing, so a filter that empties it fails; skips are in .cargo/mutants.toml. cargo-mutants exits 2 for a missed and 3 for a timed-out mutant, 0 otherwise: those three reach the outcomes check below, any other exit is its own failure
+# a whole-crate run catches at least its gates.json floor (unviable mutants do not count) and a shard k/n (cargo-mutants' own, k from 0) at least one, each with none missed or timed out, so a filter that empties it fails; skips are in .cargo/mutants.toml. cargo-mutants exits 2 for a missed and 3 for a timed-out mutant, 0 otherwise: those three reach the outcomes check, any other exit is its own failure
 mutants crate="" shard="": (tool-pins "cargo-mutants" "jq")
     #!/usr/bin/env bash
     set -euo pipefail
     sharding=()
     if [ -n "{{shard}}" ]; then
         [ -n "{{crate}}" ] || { echo "mutants: a shard needs a crate"; exit 1; }
-        [[ "{{shard}}" =~ ^(0|[1-9][0-9]*)/([1-9][0-9]*)$ ]] && [ "${BASH_REMATCH[1]}" -lt "${BASH_REMATCH[2]}" ] || { echo "mutants: shard '{{shard}}' is not k/n with 0 <= k < n"; exit 1; }
+        just shard-check "{{shard}}"
         sharding=(--shard "{{shard}}")
     fi
-    runs=$(./crates.sh | jq -r --arg c "{{crate}}" 'select(.mutants and ($c == "" or .name == $c)) | "\(.name) \(.mutants.tests // [] | join(","))"')
+    runs=$(./crates.sh | jq -r --arg c "{{crate}}" 'select(.mutants and ($c == "" or .name == $c)) | "\(.name) \(.mutants.floor) \(.mutants.tests // [] | join(","))"')
     [ -n "$runs" ] || { echo "mutants: no crate with a mutants floor matches '{{crate}}'"; exit 1; }
-    while read -r c tests; do
+    while read -r c floor tests; do
         if [ -n "$tests" ]; then scope=(--test-package "$tests"); else scope=(--test-workspace=true); fi
         mkdir -p "{{target}}/mutants/$c"
         jobs=$(nproc); [ "$jobs" -le "${MUTANTS_JOBS:-4}" ] || jobs=${MUTANTS_JOBS:-4}
         rc=0
         env -u CARGO_TARGET_DIR cargo mutants --package "$c" "${scope[@]}" --jobs "$jobs" --no-shuffle --minimum-test-timeout 60 "${sharding[@]}" --output "{{target}}/mutants/$c" < /dev/null || rc=$?
         case $rc in 0 | 2 | 3) ;; *) echo "mutants $c: cargo mutants exited $rc"; exit "$rc" ;; esac
-        jq -e '.caught > 0 and .missed == 0 and .timeout == 0' \
-            "{{target}}/mutants/$c/mutants.out/outcomes.json" > /dev/null || { echo "mutants $c: nothing caught, or a mutant missed or timed out"; exit 1; }
+        # a shard holds a share of the mutants, so only the whole-crate run can hold the floor
+        want=$floor; [ -z "{{shard}}" ] || want=1
+        jq -e --argjson want "$want" '.caught >= $want and .missed == 0 and .timeout == 0' \
+            "{{target}}/mutants/$c/mutants.out/outcomes.json" > /dev/null || { echo "mutants $c: caught under $want (the gates.json floor for a whole-crate run, 1 for a shard), or a mutant missed or timed out"; exit 1; }
     done <<< "$runs"
 
 # the features-off run of the jose files whose refusals are dead code with all features on: it skips only when the jose crate is absent, fails when a listed file is missing, and the floor is the caught count of a real run
