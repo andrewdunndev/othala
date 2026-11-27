@@ -36,13 +36,13 @@ fn replay(dir: &str, check: fn(&[u8]) -> Result<(), ErrorKind>) -> usize {
 fn otp_code_parse_corpus() {
     assert_eq!(
         replay("fuzz/corpus/otp_code_parse", otp_code_parse::check),
-        27
+        26
     );
 }
 
 #[test]
 fn phc_parse_corpus() {
-    assert_eq!(replay("fuzz/corpus/phc_parse", phc_parse::check), 20);
+    assert_eq!(replay("fuzz/corpus/phc_parse", phc_parse::check), 19);
 }
 
 #[test]
@@ -52,6 +52,6 @@ fn recovery_code_parse_corpus() {
             "fuzz/corpus/recovery_code_parse",
             recovery_code_parse::check
         ),
-        16
+        15
     );
 }

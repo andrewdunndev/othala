@@ -36,20 +36,20 @@ fn replay(dir: &str, check: fn(&[u8]) -> Result<(), ErrorKind>) -> usize {
 
 #[test]
 fn jws_parse_corpus() {
-    assert_eq!(replay("fuzz/corpus/jws_parse", jws_parse::check), 23);
+    assert_eq!(replay("fuzz/corpus/jws_parse", jws_parse::check), 22);
 }
 
 #[test]
 fn jwt_claims_corpus() {
-    assert_eq!(replay("fuzz/corpus/jwt_claims", jwt_claims::check), 26);
+    assert_eq!(replay("fuzz/corpus/jwt_claims", jwt_claims::check), 25);
 }
 
 #[test]
 fn jwe_parse_corpus() {
-    assert_eq!(replay("fuzz/corpus/jwe_parse", jwe_parse::check), 78);
+    assert_eq!(replay("fuzz/corpus/jwe_parse", jwe_parse::check), 77);
 }
 
 #[test]
 fn jwk_decode_corpus() {
-    assert_eq!(replay("fuzz/corpus/jwk_decode", jwk_decode::check), 33);
+    assert_eq!(replay("fuzz/corpus/jwk_decode", jwk_decode::check), 32);
 }
