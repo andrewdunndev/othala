@@ -1,8 +1,8 @@
 # factor contract
 
 One claim per line, each naming the check that proves it. Tags follow the claims ledger: *Type* (the program does not compile), *Runtime* (a check returns an error or a verdict), *Obligation* (the host's or the consumer's, proven where it is named); *Build* lines are gate claims and *Non-claim* lines claim nothing.
-Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code given) and its compiling twin `tests/ui/pass/x.rs`, one line and one token away (`just ledger`, `just twins`); `api` is the committed `public-api.txt` (`just api`); `row:f` is `tests/row_f.rs`; `unit:m::t` is a test in `src/m.rs`; `prop:t` and `race:t` are tests `t` in `tests/row_race.rs` (the row m3-factor-race) over `testkit::MemStore` and `testkit::race`; `vec:p` is `vectors/p` read through `testkit::vectors`, which asserts the file's hash and the case count `SOURCES.toml` declares; `vec:factor-derived/*` is the oracle's family under R-b (`Replayed` is its kind name for a replay), and `oracle: factor-derived/x.json` one still pending from the oracle lane; an error kind is compared only where the oracle names one; `mutants:m` is `just mutants` over `src/m.rs`; `unit:` checks run under `just test`, which no row's command includes; `fuzz:t` is `fuzz/fuzz_targets/t.rs` with its corpus replayed on every pipeline; `fuzz-pending:t (reason)` is a target not written yet, its reason inline (`just claims` counts them and fails once the target exists).
-State: live now are every `ui:` check, `api`, R1, R2 and B1 to B6. Every other check lands with the item in brackets, which also lands the bodies of the signatures it names; until then the line is the specification its check is written to.
+Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code given) and its compiling twin `tests/ui/pass/x.rs`, one line and one token away (`just ledger`, `just twins`); `api:I` is an item `I` that the committed `public-api.txt` declares (a path such as `Type::method`, or a bare name matching a path's last segment; impl and attr lines declare none) and `api-absent:I` one it does not declare, in the snapshot `just api` checks; `row:f` is `tests/row_f.rs`; `unit:m::t` is a test in `src/m.rs`; `prop:t` and `race:t` are tests `t` in `tests/row_race.rs` (the row m3-factor-race) over `testkit::MemStore` and `testkit::race`; `vec:p` is `vectors/p` read through `testkit::vectors`, which asserts the file's hash and the case count `SOURCES.toml` declares; `vec:factor-derived/*` is the oracle's family under R-b (`Replayed` is its kind name for a replay), and `oracle: factor-derived/x.json` one still pending from the oracle lane; an error kind is compared only where the oracle names one; `mutants:m` is `just mutants` over `src/m.rs`; `unit:` checks run under `just test`, which no row's command includes; `fuzz:t` is `fuzz/fuzz_targets/t.rs` with its corpus replayed on every pipeline; `fuzz-pending:t (reason)` is a target not written yet, its reason inline (`just claims` counts them and fails once the target exists).
+State: live now are every `ui:` check, every `api:` and `api-absent:` ref, R1, R2 and B1 to B6. Every other check lands with the item in brackets, which also lands the bodies of the signatures it names; until then the line is the specification its check is written to.
 Shape: every verifier takes the one `Permit` from `Throttle::check`, the presented secret and the factor row it read, and returns `Result<Pending<Result<Match, Rejected>>, Error>`. The outer `Result` carries `Error` only, never a verdict (R-g); the verdict leaves `Pending` only against the receipt of its effect (base T10). The consumer runs check, verify, apply and settle per factor, in sequence, never merged (architecture section 3, E4).
 
 ## Signatures
@@ -90,22 +90,22 @@ pub fn recovery_verify(permit: Permit, code: &RecoveryCode, stored: Option<Row<&
 ```
 
 ## Type
-- T1 `Password` has no `Display`, `Clone` or `PartialEq`: ui:password_display, ui:password_clone, ui:password_eq (E0277 each), api.
-- T2 `NewPassword` has no `Display`, `Clone` or `PartialEq`: ui:new_password_display, ui:new_password_clone, ui:new_password_eq (E0277 each), api.
-- T3 `OtpKey` has no `Display`, `Clone` or `PartialEq`: ui:otp_key_display, ui:otp_key_clone, ui:otp_key_eq (E0277 each), api.
-- T4 `OtpCode` has no `Display`, `Clone` or `PartialEq`: ui:otp_code_display, ui:otp_code_clone, ui:otp_code_eq (E0277 each), api.
-- T5 `RecoveryCode` has no `Display`, `Clone` or `PartialEq`; `display`, written on demand from the code, is its one text form: ui:recovery_code_display, ui:recovery_code_clone, ui:recovery_code_eq (E0277 each), api.
-- T6 `Totp`, which holds its key, has no `Clone` or `PartialEq`: ui:totp_clone, ui:totp_eq (E0277 each), api.
-- T7 `Phc` has no `PartialEq`, so no hash is compared with `==` (R-g), and no `Display`, so a hash reaches text only through `as_str`: ui:phc_eq, ui:phc_display (E0277 each), api.
-- T8 `Permit` has no public constructor or field, so only `Throttle::check` issues one: ui:permit_forge (E0451), api.
-- T9 `Permit` is not `Clone`, and each verifier takes it by value, so one permit pays for one verify: ui:permit_clone (E0277), api; the by-value cases land with each verifier, ui:permit_twice_totp [factor-06], ui:permit_twice_password [factor-07], ui:permit_twice_recovery [factor-08] (E0382 each).
-- T10 `OtpMatch`, `PasswordMatch` and `RecoveryMatch` are made only inside their verifiers: ui:otp_match_forge, ui:password_match_forge (E0451 each), ui:recovery_match_forge (E0423), api.
-- T11 `Attempts`, `TotpStep` and `RecoveryHash` have no public constructor or field, so a stored value enters only through a verdict or `Record::decode`: ui:attempts_forge (E0451), ui:totp_step_forge, ui:recovery_hash_forge (E0423 each), api.
-- T12 `Error` has no public constructor or field: ui:error_forge (E0451), api.
-- T13 Every public enum is `#[non_exhaustive]`: ui:error_kind_exhaustive (E0004), api (each `enum` line has its `attr` line).
-- T14 Every verdict, and the codes `recovery_generate` draws, is a `base::Pending`, so base T10 (settle only) and `must_use` hold for it: api (each return type) [factor-06, -07, -08].
-- T15 A presented `Password` does not convert to a `NewPassword`, so only a password held to its length rule is hashed by `password_hash`: api (no `From` between them) [factor-07].
-- T16 No factor type implements `Serialize`: the crate has no serde dependency (B3), api.
+- T1 `Password` has no `Display`, `Clone` or `PartialEq`: ui:password_display, ui:password_clone, ui:password_eq (E0277 each), api:Password.
+- T2 `NewPassword` has no `Display`, `Clone` or `PartialEq`: ui:new_password_display, ui:new_password_clone, ui:new_password_eq (E0277 each), api:NewPassword.
+- T3 `OtpKey` has no `Display`, `Clone` or `PartialEq`: ui:otp_key_display, ui:otp_key_clone, ui:otp_key_eq (E0277 each), api:OtpKey.
+- T4 `OtpCode` has no `Display`, `Clone` or `PartialEq`: ui:otp_code_display, ui:otp_code_clone, ui:otp_code_eq (E0277 each), api:OtpCode.
+- T5 `RecoveryCode` has no `Display`, `Clone` or `PartialEq`; `display`, written on demand from the code, is its one text form: ui:recovery_code_display, ui:recovery_code_clone, ui:recovery_code_eq (E0277 each), api:RecoveryCode.
+- T6 `Totp`, which holds its key, has no `Clone` or `PartialEq`: ui:totp_clone, ui:totp_eq (E0277 each), api:Totp.
+- T7 `Phc` has no `PartialEq`, so no hash is compared with `==` (R-g), and no `Display`, so a hash reaches text only through `as_str`: ui:phc_eq, ui:phc_display (E0277 each), api:Phc.
+- T8 `Permit` has no public constructor or field, so only `Throttle::check` issues one: ui:permit_forge (E0451), api:Permit.
+- T9 `Permit` is not `Clone`, and each verifier takes it by value, so one permit pays for one verify: ui:permit_clone (E0277), api:Permit; the by-value cases land with each verifier, ui:permit_twice_totp [factor-06], ui:permit_twice_password [factor-07], ui:permit_twice_recovery [factor-08] (E0382 each).
+- T10 `OtpMatch`, `PasswordMatch` and `RecoveryMatch` are made only inside their verifiers: ui:otp_match_forge, ui:password_match_forge (E0451 each), ui:recovery_match_forge (E0423), api:OtpMatch api:PasswordMatch api:RecoveryMatch.
+- T11 `Attempts`, `TotpStep` and `RecoveryHash` have no public constructor or field, so a stored value enters only through a verdict or `Record::decode`: ui:attempts_forge (E0451), ui:totp_step_forge, ui:recovery_hash_forge (E0423 each), api:Attempts api:TotpStep api:RecoveryHash.
+- T12 `Error` has no public constructor or field: ui:error_forge (E0451), api:Error.
+- T13 Every public enum is `#[non_exhaustive]`: ui:error_kind_exhaustive (E0004), `just api` (each `enum` line has its `attr` line).
+- T14 Every verdict, and the codes `recovery_generate` draws, is a `base::Pending`, so base T10 (settle only) and `must_use` hold for it: `just api` (each return type) [factor-06, -07, -08].
+- T15 A presented `Password` does not convert to a `NewPassword`, so only a password held to its length rule is hashed by `password_hash`: api:Password api:NewPassword (no `From` between them) [factor-07].
+- T16 No factor type implements `Serialize`: the crate has no serde dependency (B3), `just api`.
 
 ## Runtime
 Store (architecture section 2, R-g)
@@ -177,7 +177,7 @@ Recovery codes (NIST SP 800-63B-4 3.1.2)
 - B3 The runtime dependencies are exactly argon2 (`alloc`, `password-hash`, `zeroize`; no `getrandom`, no `std`), base, expose, hmac and sha1 (each with `zeroize`), sha2, subtle and zeroize (D6): `just deps` over `deps.txt`, `just deny` over `gates.json` `allow`.
 - B4 The public API is the committed snapshot: `just api` over `public-api.txt`.
 - B5 The ledger runs every case on disk and pins 32 cases and 32 twins, so a glob that matched nothing cannot pass: `just ledger` (`CASES` in `tests/ledger.rs`), `just twins`.
-- B6 Every workspace deny-list lint is `forbid` here, so no module calls base's `host_applied` or allows a lint: `just canary`, `just lint`. `OtpKey`, `OtpCode`, `Password` and `RecoveryCode` wrap base `SecretBytes`, which base wipes (base R32) (R-j), and the crate's own transient secret buffers (a parsed code's bytes, an HMAC tag) are `Zeroizing` and wiped on drop: api, review.
+- B6 Every workspace deny-list lint is `forbid` here, so no module calls base's `host_applied` or allows a lint: `just canary`, `just lint`. `OtpKey`, `OtpCode`, `Password` and `RecoveryCode` wrap base `SecretBytes`, which base wipes (base R32) (R-j), and the crate's own transient secret buffers (a parsed code's bytes, an HMAC tag) are `Zeroizing` and wiped on drop: api:OtpKey api:OtpCode api:Password api:RecoveryCode, review.
 - B7 `src/` is mutated with a factor floor and `missed == 0`: `just mutants factor`, floor in `gates.json` `mutants`.
 - B8 The fuzz targets live in `factor/fuzz` with their corpora replayed: fuzz:record_decode [factor-04], and for R19, R27 and R32 fuzz:otp_code_parse, fuzz:phc_parse and fuzz:recovery_code_parse, replayed by `tests/fuzz_corpus.rs`.
 

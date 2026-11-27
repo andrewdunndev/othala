@@ -4,7 +4,7 @@ Every public signature is listed below verbatim, with the item that lands its bo
 
 Checks:
 - `ui:x (Ennnn)` is `tests/ui/fail/x.rs` with its committed `.stderr` opening with that rustc code, and its compiling twin `tests/ui/pass/x.rs` one line and one token away (`just twins`). `tests/ledger.rs` fails unless the cases on disk are exactly the names below; `ui:x (Ennnn, jose-NN)` lands with that item, since its case calls a function that item writes. `off_*` cases run with every feature off, the rest with every feature on.
-- `api` is the committed `public-api.txt` (`just api`): an absence (no accessor, no constructor, no impl) is held there.
+- `api:I` is an item `I` that the committed `public-api.txt` declares (a path such as `Type::method`, or a bare name matching a path's last segment; impl and attr lines declare none) and `api-absent:I` one it does not declare; the snapshot is under `just api`. An absent accessor or constructor is an `api-absent:` ref; an absent impl is held by the snapshot (`just api`) and its `ui:` case.
 - `vec:f#id` is a case of `rust/vectors/f`; `vec:f` is the whole file. A refusal's error kind is compared only where the oracle file names one (`kind named`); elsewhere the check is refusal alone. Rows read files through testkit's typed readers (`testkit::vectors::{wycheproof, sections, figures}`, testkit `b0aba876`), which check each file's SHA-256 and count against `SOURCES.toml`.
 - `row:x` is `tests/row_x.rs`, one file per family (Layout below). `lib:m::x` is a row run as a `--lib` filter over a `#[cfg(test)]` module of `src/m.rs`, where the inputs are raw primitive values no public item takes (ruling R-l). `prop:t` is a fixed-seed proptest in a row file; `unit:m::t` a test in `src/m.rs`.
 - `gate:x` is `just x` with jose's `gates.json`.
@@ -181,30 +181,30 @@ Each bound is a named `pub const` at the crate root; each is checked before anyt
 - `MAX_JSON_LEN`, `MAX_ENTRIES`, `MAX_NAME_LEN`, `MAX_LEEWAY`, `MAX_RSA_BITS`, `MAX_RSA_EXPONENT`: oracle gap, no oversize case yet in jose-derived/limits.json; requested of the oracle lane.
 
 ## Type
-- T1 A parsed `Jws` has no payload accessor; the payload exists only as the `Payload` that a verify returns: api.
-- T2 A parsed `Jwt` has no claims or payload accessor, and a `VerifiedJwt` none either, so `claims` with a `Policy` is the only way out (RFC 8725 3.8, 3.9, 3.11): api.
-- T3 `Payload`, `VerifiedJwt` and `Plaintext` have no public constructor or field: api.
+- T1 A parsed `Jws` has no payload accessor; the payload exists only as the `Payload` that a verify returns: api:Jws api:Payload.
+- T2 A parsed `Jwt` has no claims or payload accessor, and a `VerifiedJwt` none either, so `claims` with a `Policy` is the only way out (RFC 8725 3.8, 3.9, 3.11): api:Jwt api:VerifiedJwt api:Policy.
+- T3 `Payload`, `VerifiedJwt` and `Plaintext` have no public constructor or field: api:Payload api:VerifiedJwt api:Plaintext.
 - T4 `Policy` has no `Default`: ui:policy_default (E0277).
 - T5 Issuer and audience are distinct types, so they cannot be swapped into a policy (8725 3.8, 3.9): ui:policy_swap (E0308).
 - T6 A policy is typed by its kind, so an ID-token policy is not an access-token policy (8725 3.11, 3.12): ui:kind_policy (E0308).
 - T7 Only a `ReadBack` kind has `Policy::read_back`, the one policy that skips the audience and the one that takes `Expiry::Unchecked`; every `Policy::new` requires `exp`: ui:read_back_kind (E0599).
 - T8 A verify key verifies only its own algorithm, and `Jws::verify::<A>` takes only a `VerifyKey<A>` (8725 3.1): ui:alg_bound (E0308).
 - T9 Issuing is typed like verifying: `Header<A>` and `Unsigned<A>` carry the algorithm in the type, so a header cannot name one algorithm while another signs: ui:unsigned_alg_bound (E0308).
-- T10 A `Signer<A>` returns `A::Signature`: a fixed-size array for HS, ES and EdDSA, so `finish` and `sign` cannot receive a signature of the wrong length for those: api.
+- T10 A `Signer<A>` returns `A::Signature`: a fixed-size array for HS, ES and EdDSA, so `finish` and `sign` cannot receive a signature of the wrong length for those: api:Signer api:Alg::Signature.
 - T11 An HMAC key cannot come from a public JWK: `Jwk::verify_key` takes only `PublicAlg`, which no HS marker implements, closing the RS-to-HS swap on the static path (8725 3.1): ui:hmac_public_jwk (E0277).
 - T12 `none` is not a `SigningAlg`, so no header the crate issues carries it (8725 3.2, RFC 7518 3.6): ui:no_none_alg (E0599).
 - T13 A decrypt key decrypts only under its own key-management algorithm: ui:decrypt_key_bound (E0308).
 - T14 `EncryptKey` and `DecryptKey` take only a key-management algorithm, so no JWS algorithm (EdDSA among them) is a JWE key's: ui:jws_alg_jwe_key (E0277).
 - T15 This crate's own RSA private key never signs through `Signer`, which takes no entropy: `SigningKey<Rs*>` and `SigningKey<Ps*>` are not `Signer`s and sign only through `sign_blinded`; with `rsa-sign` off no RS or PS `SigningKey` exists and `BlindedAlg` does not exist. A host's own `Signer<Rs256>` (WebCrypto, a KMS) is allowed: ui:rsa_signer (E0277), ui:off_rsa_sign (E0405).
 - T16 `SecretJwk`, `SigningKey`, `DecryptKey` and `Plaintext` are not `Serialize`, so private key material and plaintext cannot become a store record or a log field: ui:secret_jwk_serialize (E0277), ui:signing_key_serialize (E0277), ui:decrypt_key_serialize (E0277), ui:plaintext_serialize (E0277).
-- T17 `SecretJwk`, `Plaintext` and `VerifyKey` are not `Clone`: ui:secret_jwk_clone (E0277), ui:plaintext_clone (E0277), ui:verify_key_clone (E0277); nor are `SigningKey`, `AnyVerifyKey`, `AnySigningKey`, `EncryptKey` and `DecryptKey`: api.
-- T18 `Compact` is a bearer value with no equality and no `Display`: ui:compact_eq (E0277), api.
+- T17 `SecretJwk`, `Plaintext` and `VerifyKey` are not `Clone`: ui:secret_jwk_clone (E0277), ui:plaintext_clone (E0277), ui:verify_key_clone (E0277); nor are `SigningKey`, `AnyVerifyKey`, `AnySigningKey`, `EncryptKey` and `DecryptKey`: api:SigningKey api:AnyVerifyKey api:AnySigningKey api:EncryptKey api:DecryptKey.
+- T18 `Compact` is a bearer value with no equality and no `Display`: ui:compact_eq (E0277), api:Compact.
 - T19 `Alg`, `KeyAlg` and `Enc` are sealed, and through them every marker trait, so a consumer cannot add an algorithm the contract did not review: ui:sealed_alg (E0277), ui:sealed_key_alg (E0277), ui:sealed_enc (E0277). `Signer`, `TokenKind` and `ReadBack` are open on purpose (an HSM, a token kind).
-- T20 Every public enum is `#[non_exhaustive]`: ui:error_kind_exhaustive (E0004), api.
-- T21 No function fetches: nothing takes a URL, a socket or a file, and `jku`, `x5u`, `x5c` and header `jwk` have no accessor (8725 3.10): api, gate:lint (sockets and files are `disallowed_methods`).
+- T20 Every public enum is `#[non_exhaustive]`: ui:error_kind_exhaustive (E0004), `just api`.
+- T21 No function fetches: nothing takes a URL, a socket or a file, and `jku`, `x5u`, `x5c` and header `jwk` have no accessor (8725 3.10): api-absent:jku api-absent:x5u api-absent:x5c api-absent:Header::jwk, gate:lint (sockets and files are `disallowed_methods`).
 - T22 With `es512` off `Es512` does not exist, and with `rsa-decrypt` off neither do `RsaOaep` and `RsaOaep256`: ui:off_es512 (E0425), ui:off_rsa_decrypt (E0425).
-- T23 jose is stateless: no signature names `Effect`, `Pending`, `Store`, `Row` or `Receipt`, so it adds no transaction domain: api.
-- T24 Time enters only as a `UnixTime` argument and randomness only as `&mut impl Entropy`; no verify and no `decrypt` takes entropy: api, gate:lint (clock and OS randomness are `disallowed_methods`).
+- T23 jose is stateless: no signature names `Effect`, `Pending`, `Store`, `Row` or `Receipt`, so it adds no transaction domain: api-absent:Effect api-absent:Pending api-absent:Store api-absent:Row api-absent:Receipt.
+- T24 Time enters only as a `UnixTime` argument and randomness only as `&mut impl Entropy`; no verify and no `decrypt` takes entropy: `just api`, gate:lint (clock and OS randomness are `disallowed_methods`).
 - T25 `no_std` plus `alloc` for wasm32-unknown-unknown and thumbv7em-none-eabi, with no features and with every feature: gate:wasm, gate:thumb.
 - T26 MSRV 1.89 against the committed lock: gate:msrv.
 - T27 The direct runtime dependencies are `deps.txt`'s (base, serde, serde_json without `arbitrary_precision` or `preserve_order`, sha2, hmac, p256, p384, ecdsa, ed25519-dalek, rsa, aes, aes-gcm, cbc, aes-kw, one-step-kdf; `es512` adds p521, `rsa-decrypt` sha1 and rand_core, `rsa-sign` rand_core); curve crates without `std`; the `Entropy`-to-`rand_core` adapter rsa needs is private to jose: gate:deps, gate:deny.
@@ -315,9 +315,9 @@ These are the types `oidc-provider` takes from jose rather than defining its own
 - N7 Detached content (RFC 7515 F): R3.
 - N8 Key fetching (`jku`, `x5u`, JWKS refresh) and header-embedded keys (`jwk`, `x5c`): T21, R14.
 - N9 X.509 in a JWK (`x5c`, `x5t`, `x5t#S256`, `x5u`): ignored at decode and never written: R30.
-- N10 Producing a multi-recipient JWE, and a JWE key chosen at runtime by the JWK's `alg`: api; parsing and decrypting a general JWE is R52.
+- N10 Producing a multi-recipient JWE, and a JWE key chosen at runtime by the JWK's `alg`: `just api`; parsing and decrypting a general JWE is R52.
 - N11 Claims from an encrypted-only JWT: `Plaintext` has no claims path (T3); a nested JWT is verified as a `Jwt` (R38, R60).
-- N12 Key generation: api.
+- N12 Key generation: api-absent:generate.
 - N13 RFC 9278 thumbprint URIs, RFC 9864 fully-specified algorithm names and ML-DSA: additive later; `Ed25519` is `UnsupportedAlg` today (R65).
 
 ## Non-claim

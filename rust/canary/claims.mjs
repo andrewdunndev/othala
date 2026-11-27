@@ -3,19 +3,26 @@
 // usage: claims.mjs [--root RUST_DIR]
 //
 // A ref is `prefix:value` outside the legend. The legend is the first `Checks:` line and the bullet or indented lines directly under it,
-// up to the first blank line; nothing else is exempt, fenced code is skipped, and an unterminated fence fails. Every resolver prefix (and its `-pending` form) found in
+// up to the first blank line; nothing else is exempt. Fenced code is skipped, with CommonMark fences: an opener is 0-3 spaces then three or more
+// backticks or tildes, and a backtick opener's info string holds no backtick (so ```x``` is inline code); the closer is 0-3 spaces then the
+// same character at least as many times and nothing but spaces; an unterminated fence fails. Every resolver prefix (and its `-pending` form) found in
 // a body must be named in the legend, and a legend prefix with no resolver fails the run. A pending ref is `<prefix>-pending:value (reason)`:
-// the reason is inline and three words or more, the target must not exist yet, and the run counts them. `<crate> unit:...` names the crate a ref lives in.
+// the reason is inline and has three or more words of two or more letters each, the target must not exist yet, and the run counts them.
+// `<crate> unit:...` names the crate a ref lives in.
 // Rust sources are read with comments and string literals blanked, so a commented-out test or a `proptest!` in a comment counts for nothing.
 // unit/lib/it/store resolve in the exact module path given: a file for the longest `src/a/b.rs` prefix (lib.rs for none), then inline `mod`s.
 // fuzz:t is a non-empty fuzz/fuzz_targets/t.rs with a committed file (not a dotfile) in fuzz/corpus/t and a test under tests/ whose string literal names fuzz/corpus/t.
 // vec/oracle `#id` is an `id` field value in the JSON file, w3c `#s` a `section` field value.
+// api:Item and api-absent:Item read the crate's committed public-api.txt (and need a `just api` recipe). Its items are the path each line
+// declares, generics dropped (`method Jws::parse fn(..)` declares Jws::parse); impl and attr lines declare none. A value with `::` must equal
+// a declared path, one without must equal a path's last segment. api:Item resolves when the item is declared, api-absent:Item when it is not.
 // A quoted floor is a line naming both `mutants` and `floor`: `crate N`, `crate: N`, `floor N`, `floor: N`, `floor = N`, `floor for crate is N`.
-// A claim is a line `- <id> <text>` with an R, T or B id (`- R26b ...`); any other line opening with such an id (numbered, table cell,
-// emphasis, `+`, a bracket) fails as a claim form, and so does one inside the legend. N, NC and P lines claim nothing, and an O line is
-// proven by the owner it names, outside the crate. Each claim carries at least one proof token: a ref or pending ref as above, a
-// backticked `just <recipe>` naming a justfile recipe, or `api` (the committed public-api.txt under `just api`), which counts only
-// backticked or after the line's last `:`, and only on a line that names a code item in backticks. Naming another claim is no proof.
+// A claim is a line `- <id> <text>` with an R, T or B id (`- R26b ...`). A line that is not a claim fails as a claim form when, after
+// nothing but non-letter, non-digit characters (and optionally one `1.` or `1)` list number or `[x]` task box), its first letter or digit
+// starts such an id not followed by a letter or digit: `- [ ] R1`, `- ~~R1~~`, R1 in backticks, `1. R1`, `| R1 |`, `- **R1**`, `- R1:`;
+// so does such a line inside the legend. N, NC and P lines claim
+// nothing, and an O line is proven by the owner it names, outside the crate. Each claim carries at least one proof token: a ref or pending
+// ref as above, or a backticked `just <recipe>` naming a justfile recipe. A bare `api` is no proof, and naming another claim is no proof.
 // Known limits: a claim or a floor split across two lines is not seen; the legend is the first `Checks:` block only.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -190,6 +197,27 @@ const family = (c, v, dirs, key) => {
     return hit ? vecIn(hit, v, key) : `no ${f} under vectors`;
 };
 
+// the item paths a crate's public-api.txt declares, or the reason it cannot be read
+const KINDS = new Set(['constant', 'enum', 'field', 'function', 'method', 'macro', 'module', 'static', 'struct', 'trait', 'trait_item', 'type_alias', 'union', 'variant']);
+function apiItems(c) {
+    const p = join(c.dir, 'public-api.txt');
+    const crate = c.dir.slice(c.rust.length + 1);
+    if (!isFile(p)) return `no rust/${crate}/public-api.txt`;
+    if (!recipes(c.rust).has('api')) return 'no just recipe api';
+    const k = `items ${p}`;
+    if (!cache.has(k)) {
+        const paths = [];
+        for (const l of read(p).split('\n')) {
+            const [kind, decl] = l.split(' ');
+            if (!KINDS.has(kind) || !decl) continue;
+            paths.push(decl.replace(/:$/, '').split('::').map((seg) => seg.replace(/<.*$/, '')).join('::'));
+        }
+        cache.set(k, paths);
+    }
+    return cache.get(k);
+}
+const apiHas = (paths, v) => (v.includes('::') ? paths.includes(v) : paths.some((x) => x.split('::').at(-1) === v));
+
 // each resolver returns 'ok' or the reason the ref is dangling
 const resolvers = {
     unit,
@@ -233,15 +261,20 @@ const resolvers = {
     },
     store: (c, v) => testFile(join(c.rust, 'store/tests'), v, 'store/tests'),
     wipe: (c, v) => (anyTest([...walk(join(c.rust, 'wipe/src'), '.rs'), ...walk(join(c.rust, 'wipe/tests'), '.rs')], v.split('::').at(-1)) === 'ok' ? 'ok' : `no test fn ${v} in wipe`),
+    api: (c, v) => {
+        const items = apiItems(c);
+        return typeof items === 'string' ? items : apiHas(items, v) ? 'ok' : `no item ${v} in ${c.dir.slice(c.rust.length + 1)}/public-api.txt`;
+    },
+    'api-absent': (c, v) => {
+        const items = apiItems(c);
+        return typeof items === 'string' ? items : apiHas(items, v) ? `${c.dir.slice(c.rust.length + 1)}/public-api.txt declares ${v}` : 'ok';
+    },
     gate: (c, v) => (isFile(join(c.rust, 'justfile')) && new RegExp(`^${esc(v)}(\\s[^:=\\n]*)?:(?!=)`, 'm').test(read(join(c.rust, 'justfile'))) ? 'ok' : `no just recipe ${v}`),
 };
-const PREFIXES = Object.keys(resolvers);
+const PREFIXES = Object.keys(resolvers).sort((a, b) => b.length - a.length);
 const CLAIM = /^- ([RTB]\d+[a-z]?) /;
 // an R, T or B id opening a line behind any list, table, emphasis or bracket mark
-const CLAIMISH = /^[\s>*+|(\[_-]*(?:\d+[.)]\s*)?[\s*_(\[]*([RTB]\d+[a-z]?)\b/;
-const API = /(?<![\w`./-])`?api`?(?![\w`/-]|\.\w)/g;
-// the names a public-api.txt line declares: `method Jws::parse fn(..)` gives Jws and parse
-const apiNames = (p) => new Set(read(p).split('\n').flatMap((l) => (l.split(' ')[1] ?? '').replace(/<.*$/, '').split('::')).filter((n) => /^[A-Za-z_]\w+$/.test(n)));
+const CLAIMISH = /^[^\p{L}\p{N}]*(?:(?:\d+[.)]|\[[xX]\])[^\p{L}\p{N}]*)?([RTB]\d+[a-z]?)(?![\p{L}\p{N}])/u;
 const JUST = /`just ([a-z_][a-z0-9_-]*)\b/g;
 const recipes = (rust) => (isFile(join(rust, 'justfile')) ? new Set([...read(join(rust, 'justfile')).matchAll(/^@?([a-z_][a-z0-9_-]*)(?:\s+[*+$]?[a-z_][a-z0-9_-]*(?:=(?:"[^"\n]*"|'[^'\n]*'|[^\s:]+))?)*\s*:(?!=)/gm)].map((m) => m[1])) : new Set());
 const NAME = '(?:[A-Za-z0-9_./*#:-]|\\{[^}\\s]*\\})+';
@@ -273,34 +306,28 @@ function check(rust) {
         }
         for (const i of legend) if (CLAIMISH.test(lines[i])) fail(i, CLAIMISH.exec(lines[i])[1], 'a claim inside the `Checks:` legend is never checked; end the legend with a blank line first');
         const defined = new Set();
-        for (const i of legend) for (const m of lines[i].matchAll(/`([a-z][a-z0-9]*(?:-pending)?):(?!:)/g)) defined.add(m[1]);
+        for (const i of legend) for (const m of lines[i].matchAll(/`([a-z][a-z0-9]*(?:-[a-z][a-z0-9]*)*):(?!:)/g)) defined.add(m[1]);
         for (const p of defined) if (!resolvers[p.replace(/-pending$/, '')]) fail(start, `legend prefix ${p}:`, 'the claims tool has no resolver for it');
         const ctx = { dir: join(rust, d), rust, derived: vdirs(/-derived$/), w3c: vdirs(/^w3c-/) };
         const known = recipes(rust);
-        const snapshot = join(rust, d, 'public-api.txt');
-        const api = isFile(snapshot) && known.has('api') ? 'ok' : `no rust/${d}/public-api.txt under \`just api\``;
-        const names = isFile(snapshot) ? apiNames(snapshot) : new Set();
-        let fence = false;
-        let opened = -1;
+        let fence = null;
         const seen = new Set();
         lines.forEach((line, i) => {
-            if (/^```/.test(line)) ((fence = !fence), (opened = i));
-            if (fence || legend.has(i)) return;
+            if (fence) {
+                const close = /^ {0,3}(`{3,}|~{3,}) *$/.exec(line);
+                if (close && close[1][0] === fence.ch && close[1].length >= fence.len) fence = null;
+                return;
+            }
+            const open = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+            if (open && !(open[1][0] === '`' && open[2].includes('`'))) {
+                fence = { ch: open[1][0], len: open[1].length, at: i };
+                return;
+            }
+            if (legend.has(i)) return;
             const claim = CLAIM.exec(line)?.[1];
             const claimish = CLAIMISH.exec(line)?.[1];
-            if (claimish && !claim) fail(i, claimish, 'claim form: a claim is a line `- <id> <text>`, not a numbered, table, emphasised or bracketed id');
+            if (claimish && !claim) fail(i, claimish, 'claim form: a claim is a line `- <id> <text>` with the id undecorated');
             let proofs = 0;
-            // on a claim, `api` proves only in the proof position (backticked, or after the line's last `:`) and only when the
-            // line names in backticks a code item the snapshot holds, or (an absence claim) one it must not
-            const prose = line.replace(/`[^`]*`/g, (q) => ' '.repeat(q.length));
-            const cut = Math.max(-1, ...[...prose.matchAll(/(?<!:):(?=\s|$)/g)].map((m) => m.index));
-            const spans = [...line.matchAll(/`([^`]+)`/g)].map((q) => q[1]).filter((q) => q !== 'api' && !/^just /.test(q));
-            const named = spans.some((q) => [...q.matchAll(/[A-Za-z_]\w+/g)].some((w) => names.has(w[0]))) || spans.some((q) => /^[A-Za-z_][\w:<>&, ]*$/.test(q));
-            for (const m of claim ? line.matchAll(API) : []) {
-                if (!(m[0].startsWith('`') && m[0].endsWith('`')) && m.index < cut) continue;
-                if (api !== 'ok') fail(i, 'api', api);
-                else if (named) proofs++;
-            }
             for (const m of line.matchAll(JUST)) {
                 proofs++;
                 if (!known.has(m[1])) fail(i, `just ${m[1]}`, `no just recipe ${m[1]}`);
@@ -321,13 +348,14 @@ function check(rust) {
                     const after = line.slice(m.index + m[0].length - (m[2].length - raw.length));
                     if (!seen.has(key)) out.pending.push(`${file}:${i + 1}: ${kind}:${raw}`);
                     const why = /^\s*\(([^)]*)\)/.exec(after)?.[1];
-                    if (!why || why.split(/\s+/).filter(Boolean).length < 3) fail(i, `${kind}:${raw}`, 'no inline reason of three words or more, write `(reason)` after it');
+                    const words = (why ?? '').split(/\s+/).filter((w) => (w.match(/\p{L}/gu) ?? []).length >= 2);
+                    if (words.length < 3) fail(i, `${kind}:${raw}`, 'no inline reason of three or more words of two or more letters each, write `(reason)` after it');
                     else if (res === 'ok') fail(i, `${kind}:${raw}`, `its target exists, retag it ${base}:`);
                 } else if (res !== 'ok') fail(i, `${kind}:${raw}`, res);
                 else if (!seen.has(key)) out.resolved++;
                 seen.add(key);
             }
-            if (claim && !proofs) fail(i, claim, 'the claim names no proof: add a ref, `api`, `just <recipe>` or `<prefix>-pending:<target> (reason)`');
+            if (claim && !proofs) fail(i, claim, 'the claim names no proof: add a ref (`api:<Item>`, `api-absent:<Item>`, ...), `just <recipe>` or `<prefix>-pending:<target> (reason)`');
             // a quoted mutants floor
             if (/mutants/i.test(line) && /floor/i.test(line)) {
                 const quoted = [];
@@ -358,7 +386,7 @@ function check(rust) {
                 }
             }
         });
-        if (fence) fail(opened, 'fence', 'an unterminated ``` fence hides every line after it');
+        if (fence) fail(fence.at, 'fence', `an unterminated ${fence.ch.repeat(fence.len)} fence hides every line after it`);
     }
     return out;
 }
