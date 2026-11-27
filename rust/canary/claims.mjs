@@ -282,11 +282,10 @@ const resolvers = {
 };
 const PREFIXES = Object.keys(resolvers).sort((a, b) => b.length - a.length);
 const CLAIM = /^- ([RTB]\d+[a-z]?) /;
-// an R, T or B id opening a line behind any list, table, emphasis or bracket mark
 // a non-claim ledger entry, whose own id stands where a claim's would
 const LEDGER = /^- (?:NC|N|P|O|W-S)\d+(?:\.\d+)*[a-z]?[ :]/;
 // the first R, T or B id token among a line's first five whitespace-separated words; a table row (`|` first) is read up to its second `|`
-const ID = /(?<![\p{L}\p{N}_])[RTB]\d+[\p{L}\p{N}_]*/u;
+const ID = /(?<![\p{L}\p{N}])[RTB]\d+[\p{L}\p{N}_]*/u;
 const idNear = (l) =>
     (/^\s*\|/.test(l) ? l.replace(/^(\s*\|[^|]*).*$/, '$1') : l)
         .split(/\s+/)
