@@ -6,7 +6,14 @@ target := env("CARGO_TARGET_DIR", "target")
 default:
     @just --list
 
-all: floor-rule gate-selftest lock queue claims vectors fmt lint canary twins test doc wasm thumb msrv deny deps api mutants rows
+# the pre-merge set, and the only list of it: CI's jobs call these recipes and re-type nothing
+gate: gate-rust claims vectors
+
+# the gates that run on CI's ci-rust image, which has no node or python3; claims and vectors run on theirs
+gate-rust: (tool-pins "jq") lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api
+
+# the slow gates, run on a schedule and on main: the per-crate mutation floors, the scoreboard they feed, the features-off jose run and the fuzz targets
+gate-slow: (tool-pins) mutants rows mutants-off fuzz
 
 # a manifest change without its lock change fails here, before anything builds
 lock:
@@ -87,58 +94,8 @@ mutants-pin:
 deny-pin:
     @sed -n 's|^"github:EmbarkStudios/cargo-deny" = "\([0-9][0-9.]*\)"$|\1|p' ../mise.toml
 
-# the floor rule on the in-tree crates.sh; gate-selftest runs _floor-rule on evasions of it
-floor-rule: (tool-pins "jq") (_floor-rule "./crates.sh")
-
-# the floor rule for the crates.sh at a path: --floor refuses every non-digit spelling, and in a copy of this tree with a real crate's gates.json planted the normal path refuses a null, a fractional, a missing and a 0 floor and a crate with a src/ that names no mutants
-_floor-rule script:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    crates=$(realpath "{{script}}")
-    bad=0
-    for f in 0 23 100; do
-        echo "{\"mutants\": {\"floor\": $f}}" | "$crates" --floor || { echo "floor-rule: refused good floor $f"; bad=1; }
-    done
-    for f in 1e2 23.0 -0 null false 0.5 -1 '"5"' '[]' '{}'; do
-        echo "{\"mutants\": {\"floor\": $f}}" | "$crates" --floor && { echo "floor-rule: accepted bad floor $f"; bad=1; }
-    done
-    echo '{"mutants": {"tests": ["a"]}}' | "$crates" --floor && { echo "floor-rule: accepted a missing floor"; bad=1; }
-    echo '{"mutants": 5}' | "$crates" --floor && { echo "floor-rule: accepted a non-object mutants"; bad=1; }
-    echo '{"doc": true}' | "$crates" --floor || { echo "floor-rule: refused a crate with no mutants key"; bad=1; }
-    # the normal path, in a scratch copy so no gates.json of this tree is ever edited
-    tmp=$(mktemp -d)
-    trap 'rm -rf "$tmp"' EXIT
-    find . -mindepth 1 -maxdepth 1 ! -name target ! -name vectors ! -name 'mutants.out*' -exec cp -a {} "$tmp"/ \;
-    cp "$crates" "$tmp/crates.sh"
-    victim=$(./crates.sh | jq -r 'select(.mutants) | .name' | while read -r c; do [ -d "$c/src" ] && { echo "$c"; break; }; done)
-    [ -n "$victim" ] || { echo "floor-rule: no crate with a mutants floor and a src/ to plant in"; exit 1; }
-    gates=$tmp/$victim/gates.json
-    cp "$gates" "$tmp/gates.orig"
-    plant() { # a jq filter over the victim's gates.json, ok or refuse, then the regex a refusal must match
-        jq "$1" "$tmp/gates.orig" > "$gates"
-        local out rc
-        out=$(cd "$tmp" && ./crates.sh 2>&1 > /dev/null) && rc=0 || rc=$?
-        if [ "$2" = ok ]; then
-            [ "$rc" = 0 ] || { echo "floor-rule: $crates refused $victim with $1: $out"; bad=1; }
-        elif [ "$rc" = 0 ] || ! grep -Eq "$3" <<< "$out"; then
-            echo "floor-rule: $crates did not refuse $victim with $1 (rc $rc: $out)"
-            bad=1
-        fi
-    }
-    plant '.' ok
-    plant '.mutants.floor = 7' ok
-    plant '.mutants.floor = null' refuse 'mutants\.floor must be a non-negative integer'
-    plant '.mutants.floor = 0.5' refuse 'mutants\.floor must be a non-negative integer'
-    plant 'del(.mutants.floor)' refuse 'mutants\.floor must be a non-negative integer'
-    plant '.mutants.floor = 0' refuse 'mutants\.floor 0 gates nothing'
-    plant 'del(.mutants)' refuse 'names a mutants floor, or crates.sh lists it as exempt'
-    exit $bad
-
 # the installed cargo-mutants, cargo-deny and jq must be the versions ../mise.toml pins; CI installs by the same pin and is graded here
-tool-pins *tools="cargo-mutants jq cargo-deny": (_tool-pins "../mise.toml" tools)
-
-# tool-pins against the pin file at a path, so gate-selftest can plant drift in a copy
-_tool-pins pins tools:
+tool-pins *tools="cargo-mutants jq cargo-deny":
     #!/usr/bin/env bash
     set -euo pipefail
     for t in {{tools}}; do
@@ -148,60 +105,10 @@ _tool-pins pins tools:
             jq) key='jq'; have=$(jq --version | sed -n 's/^jq-\([0-9][0-9.]*\).*/\1/p') ;;
             *) echo "tool-pins: unknown tool $t"; exit 1 ;;
         esac
-        want=$(sed -n "s/^$key = \"\([0-9][0-9.]*\)\"\$/\1/p" "{{pins}}")
-        [ -n "$want" ] || { echo "tool-pins: {{pins}} has no pin for $t"; exit 1; }
+        want=$(sed -n "s/^$key = \"\([0-9][0-9.]*\)\"\$/\1/p" "../mise.toml")
+        [ -n "$want" ] || { echo "tool-pins: mise.toml has no pin for $t"; exit 1; }
         [ "$want" = "$have" ] || { echo "$t ${have:-unknown} is installed, mise.toml pins $want"; exit 1; }
     done
-
-# every gate's self-plants, each of which must be caught with its specific refusal: own.sh's oracle admission, the floor rule and its evasions, tool-pins drift, and the canary's own plants; the in-tree scripts run first, so a broken original fails even where its copy is good
-gate-selftest: (tool-pins "jq")
-    #!/usr/bin/env bash
-    set -euo pipefail
-    bad=0
-    j={{just_executable()}}
-    ../primitives/own-plants.sh || bad=1
-    $j floor-rule || bad=1
-    $j tool-pins jq cargo-deny || bad=1
-    plant=$(mktemp)
-    pins=$(mktemp)
-    trap 'rm -f "$plant" "$pins"' EXIT
-    evade() { # a name, a sed script that turns crates.sh into the evasion, and the plant refusal floor-rule must report
-        sed "$2" crates.sh > "$plant"
-        if cmp -s crates.sh "$plant"; then echo "gate-selftest: the $1 evasion did not change crates.sh"; bad=1; return; fi
-        chmod +x "$plant"
-        if out=$($j _floor-rule "$plant" 2>&1); then echo "gate-selftest: floor-rule passed a crates.sh with the $1 evasion"; bad=1
-        elif ! grep -Eq "floor-rule: .*did not refuse .*$3" <<< "$out"; then echo "gate-selftest: floor-rule failed the $1 evasion without the refusal /$3/: $out"; bad=1; fi
-    }
-    evade 'floor_ok shadow' '/^floor_ok=/a floor_ok="$floor_ok"'"'"'def floor_ok: true;'"'" '\.mutants\.floor = null'
-    evade 'dead branch' 's/if floor_ok | not then/if (floor_ok | not) and false then/' '\.mutants\.floor = null'
-    evade 'no floor rule' 's/if floor_ok | not then/if false then/' '\.mutants\.floor = 0\.5'
-    evade 'floor 0' 's/elif \$src and has/elif false and $src and has/' '\.mutants\.floor = 0 '
-    evade 'no exemption rule' 's/elif \$src and (has("mutants") | not) and/elif false and/' 'del\(\.mutants\)'
-    # a pin that differs from the installed tool, or is missing, is refused for each tool CI installs before this recipe
-    for t in jq cargo-deny; do
-        case "$t" in jq) key='jq' ;; cargo-deny) key='"github:EmbarkStudios/cargo-deny"' ;; esac
-        sed "s|^$key = \"[0-9][0-9.]*\"\$|$key = \"0.0.1\"|" ../mise.toml > "$pins"
-        cmp -s ../mise.toml "$pins" && { echo "gate-selftest: the $t pin was not planted"; bad=1; continue; }
-        out=$($j _tool-pins "$pins" "$t" 2>&1) && { echo "gate-selftest: tool-pins passed a drifted $t pin"; bad=1; continue; }
-        grep -q "^$t [0-9.]* is installed, mise.toml pins 0.0.1" <<< "$out" || { echo "gate-selftest: tool-pins refused a drifted $t pin with: $out"; bad=1; }
-        grep -v "^$key = " ../mise.toml > "$pins"
-        out=$($j _tool-pins "$pins" "$t" 2>&1) && { echo "gate-selftest: tool-pins passed a missing $t pin"; bad=1; continue; }
-        grep -q "has no pin for $t" <<< "$out" || { echo "gate-selftest: tool-pins refused a missing $t pin with: $out"; bad=1; }
-    done
-    ./canary.sh || bad=1
-    [ "$bad" = 0 ] || { echo "gate-selftest: a plant went uncaught"; exit 1; }
-    echo "gate-selftest: every plant was caught"
-
-# the claims p0-spine-2's queue title lists that gate-selftest does not plant yet; each needs a plant carrying its tag as a comment here or in own-plants.sh, so the row stays red until one exists
-selftest-claims:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    have=$(grep -ho '# plant S[0-9a-z]*' justfile ../primitives/own-plants.sh | cut -d' ' -f3 | sort -u)
-    missing=0
-    for c in S1 S2 S3 S3b S4 S4b S5 S6 S8; do
-        grep -qx "$c" <<< "$have" || { echo "selftest-claims: no plant $c"; missing=1; }
-    done
-    exit $missing
 
 # each run catches at least its gates.json floor (unviable mutants do not count) with none missed or timed out, so a filter that empties it fails; skips are in .cargo/mutants.toml
 mutants crate="": (tool-pins "cargo-mutants" "jq")

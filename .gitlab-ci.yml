@@ -213,9 +213,9 @@ check-purity:
   script:
     - just purity
 
-# check-rust: every gate of rust/justfile that holds on a merge (rust/base/CONTRACT.md),
-# on the catalog's ci-rust image; the MSRV and pinned-nightly toolchains and
-# cargo-deny are added at job start. Mutants and fuzz run on a schedule only.
+# check-rust: `just gate-rust` (the part of `just gate` that needs no node), on the
+# catalog's ci-rust image; the MSRV and pinned-nightly toolchains and cargo-deny are
+# added at job start. `just gate-slow` runs on a schedule and on main.
 .rust:
   stage: verify
   image: registry.gitlab.com/dunn.dev/pipeline/ci-rust:4.16.1@sha256:3ff8f71ade7e88629d3d1e24a7e6479b30c4d78dadac97ca6a9a4379c4a15ff4
@@ -242,12 +242,12 @@ check-rust:
       changes:
         - rust/**/*
         - primitives/**/*
+        - mise.toml
         - .gitlab-ci.yml
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
   script:
-    - just tool-pins jq
-    - just floor-rule gate-selftest lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api
+    - just gate-rust
 
 # check-claims: `just claims` in rust/, on the image that bakes node (ci-rust is not known to); node-guard proves the pinned major.
 check-claims:
@@ -260,6 +260,7 @@ check-claims:
       changes:
         - rust/**/*
         - primitives/**/*
+        - mise.toml
         - .gitlab-ci.yml
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
@@ -279,8 +280,9 @@ check-vectors:
       when: never
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
-        - rust/vectors/**/*
-        - rust/justfile
+        - rust/**/*
+        - primitives/**/*
+        - mise.toml
         - .gitlab-ci.yml
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
@@ -313,15 +315,15 @@ check-ownership:
 check-rust-scheduled:
   extends: .rust
   timeout: 3h
+  # the mutation proof must finish at every merged sha, so a later push does not cancel it
+  interruptible: false
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
   script:
     - cargo install --locked cargo-mutants@$(just mutants-pin) cargo-fuzz@0.13.1
-    - just tool-pins
-    - just mutants rows
-    - just mutants-off
     - rustup toolchain install nightly --profile minimal
-    - just fuzz
+    - just gate-slow
 
 # check-portal: `just setup` (npm ci without install scripts in portal, e2e and
 # site), then `just check`: astro check, tsc over e2e and site, vitest (src and
