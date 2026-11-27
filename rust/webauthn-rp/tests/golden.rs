@@ -39,11 +39,8 @@ fn golden(name: &str) -> Vec<u8> {
     text.and_then(|t| unhex(&t)).unwrap_or_default()
 }
 
-fn decoded(name: &str) -> Record {
-    match Record::decode(&golden(name)) {
-        Ok(record) => record,
-        Err(e) => panic!("{name}: {e}"),
-    }
+fn decoded(name: &str) -> Option<Record> {
+    Record::decode(&golden(name)).ok()
 }
 
 #[test]
@@ -63,7 +60,8 @@ fn committed_v1_bytes_re_encode_byte_for_byte() {
     for name in NAMES {
         let bytes = golden(name);
         assert_eq!(bytes.first(), Some(&1), "{name}: version byte");
-        assert_eq!(decoded(name).encode().as_deref(), Ok(&bytes[..]), "{name}");
+        let again = decoded(name).map(|r| r.encode());
+        assert_eq!(again, Some(Ok(bytes.clone())), "{name}");
     }
 }
 
@@ -71,15 +69,15 @@ fn committed_v1_bytes_re_encode_byte_for_byte() {
 fn committed_v1_bytes_decode_to_their_stated_values() {
     let shown: Vec<String> = NAMES
         .iter()
-        .map(|n| format!("{n}: {:?}\n", decoded(n)))
+        .map(|n| decoded(n).map_or_else(String::new, |r| format!("{n}: {r:?}\n")))
         .collect();
     assert_eq!(shown.concat(), include_str!("golden/debug.txt"));
 }
 
 #[test]
-fn the_credential_fixture_reads_through_the_public_accessors() {
-    let Record::Credential(c) = decoded("credential_es256") else {
-        panic!("not a credential");
+fn the_credential_fixture_reads_through_the_public_accessors() -> Result<(), String> {
+    let Some(Record::Credential(c)) = decoded("credential_es256") else {
+        return Err("credential_es256 is not a credential".into());
     };
     assert_eq!(c.id().as_bytes(), b"credential");
     assert_eq!(c.user().as_bytes(), b"user");
@@ -93,4 +91,5 @@ fn the_credential_fixture_reads_through_the_public_accessors() {
     assert_eq!(c.attestation().kind(), AttestationType::AttCa);
     assert_eq!(c.attestation().trust(), Trust::Anchored);
     assert_eq!(c.attestation().chain().len(), 2);
+    Ok(())
 }
