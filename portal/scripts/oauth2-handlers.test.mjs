@@ -509,7 +509,24 @@ test('T1: consent skip=true auto-accepts (REGRESSION GUARD)', async () => {
     'a@othala.test',
     'id_token.email must be set on skip path',
   );
-  assert.equal(calls.acceptConsentBody.remember, false, 'consent must not be remembered');
+  assert.equal(calls.acceptConsentBody.remember, true, 'skip_consent client consent is remembered');
+  assert.equal(calls.acceptConsentBody.remember_for, 86400);
+});
+
+test('skip=true consent for an identity that fails the gate is rejected, not accepted', async () => {
+  for (const identity of [activeMember({ state: 'inactive' }), activeMember({ metadata_admin: { groups: [] } }), null]) {
+    const { api, calls } = stubOAuth2({
+      getOAuth2ConsentRequest: async () => oauth2ConsentRequest({ skip: true, subject: 'id-1', client: { client_id: 'grafana' }, requested_scope: ['email'] }),
+    });
+    await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
+      oauth2: api,
+      getIdentity: async () => identity,
+      getSession: defaultSession(),
+      manifest: () => loadManifest('grafana'),
+    });
+    assert.equal(calls.acceptConsent, 0, 'gate must run on a remembered-consent skip');
+    assert.equal(calls.rejectConsent, 1);
+  }
 });
 
 test('T2: consent skip=false bounces to /auth/consent with challenge', async () => {
@@ -582,7 +599,7 @@ test('T3: POST Allow accepts without remembering consent, with claims', async ()
       active: true,
       identity: { id: 'id-1', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
     }),
-    manifest: () => loadManifest('grafana'),
+    manifest: () => ({ ...loadManifest('grafana'), skipConsent: false }),
   });
   assert.equal(res.status, 302);
   assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-consent');
@@ -916,7 +933,7 @@ test('D3: grafana skip path injects grafana_role from manifest (regression guard
   assert.equal(calls.acceptConsent, 1);
   const idToken = calls.acceptConsentBody.session.id_token;
   assert.deepEqual(idToken.grafana_role, ['Viewer'], 'grafana_role must be injected for grafana viewer');
-  assert.equal(calls.acceptConsentBody.remember, false);
+  assert.equal(calls.acceptConsentBody.remember, true);
   assert.deepEqual(calls.acceptConsentBody.grant_scope, ['email', 'profile'], 'grant_scope must match');
   assert.equal(idToken.email, 'a@othala.test', 'id_token.email must be set');
 });

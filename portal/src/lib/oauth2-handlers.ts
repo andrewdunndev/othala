@@ -251,6 +251,8 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
   }
 }
 
+const CONSENT_REMEMBER_SECONDS = 86400;
+
 export async function acceptConsentRequest(
   challenge: string,
   consent: OAuth2ConsentRequest,
@@ -260,14 +262,16 @@ export async function acceptConsentRequest(
 ): Promise<Response> {
   const manifest = d.manifest(clientId);
   const idTokenClaims = composeIDTokenClaims(identity, manifest, consent.requested_scope ?? []);
+  const remembered = !!manifest?.skipConsent && !isDeviceRequest(consent.request_url);
   try {
     const { redirect_to } = await d.oauth2.acceptOAuth2ConsentRequest({
       consentChallenge: challenge,
       acceptOAuth2ConsentRequest: {
         grant_scope: consent.requested_scope,
         grant_access_token_audience: consent.requested_access_token_audience,
-        // Not remembered, so every authorize passes the gate again.
-        remember: false,
+        // Remembered only so prompt=none can skip the grant screen; the login and consent gates still run on every authorize.
+        remember: remembered,
+        remember_for: remembered ? CONSENT_REMEMBER_SECONDS : undefined,
         session: {
           id_token: idTokenClaims,
           access_token: {},

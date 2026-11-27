@@ -6,6 +6,12 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 
+## [Unreleased]
+
+### Fixed
+
+- A `skip_consent` client's consent is remembered in Hydra for 86400 seconds, so a `prompt=none` authorize after an interactive sign-in (the Jellyfin Security plugin's onboarding check) is answered instead of failing with `consent_required`. The login and consent gates (access group, state, aal2, claims) still run on every authorize, and revoking a subject's sessions drops the remembered consent; clients that show the grant screen and device grants stay unremembered.
+
 ## [0.20.1] - 2026-11-24
 
 ### Fixed
