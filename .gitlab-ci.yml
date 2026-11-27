@@ -242,6 +242,7 @@ check-rust:
       changes:
         - rust/**/*
         - primitives/**/*
+        - mise.toml
         - .gitlab-ci.yml
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
@@ -259,6 +260,7 @@ check-claims:
       changes:
         - rust/**/*
         - primitives/**/*
+        - mise.toml
         - .gitlab-ci.yml
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
@@ -278,8 +280,9 @@ check-vectors:
       when: never
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
-        - rust/vectors/**/*
-        - rust/justfile
+        - rust/**/*
+        - primitives/**/*
+        - mise.toml
         - .gitlab-ci.yml
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
@@ -312,6 +315,8 @@ check-ownership:
 check-rust-scheduled:
   extends: .rust
   timeout: 3h
+  # the mutation proof must finish at every merged sha, so a later push does not cancel it
+  interruptible: false
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
