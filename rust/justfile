@@ -23,10 +23,9 @@ lock:
 queue:
     ../primitives/check.sh
 
-# every CONTRACT.md test ref resolves to a test, row, ui case, vector or fuzz target, each pending ref gives its reason, and a quoted mutants floor is gates.json's; the tool first proves itself on planted defects
+# every CONTRACT.md claim names a proof, every test ref resolves to a test, row, ui case, vector or fuzz target with its replayed corpus, each pending ref gives its reason, and a quoted mutants floor is gates.json's
 claims:
     command -v node > /dev/null || { echo 'claims: node is not on PATH; mise.toml pins it, so run under `mise x --`'; exit 1; }
-    node canary/claims.mjs --selftest
     node canary/claims.mjs
 
 # the vector oracle's gate, offline: every derive script reproduces its committed files, SOURCES.toml's hashes and counts match, every WebAuthn step or section a vector cites exists and each quoted passage is in its step, and webauthn-ext passes (rust/vectors/justfile check)

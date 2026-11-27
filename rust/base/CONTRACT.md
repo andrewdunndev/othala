@@ -1,28 +1,28 @@
 # base contract
 
 One claim per line, each naming the check that proves it. Tags follow the claims ledger: *Type* (the program does not compile), *Runtime* (a check returns an error), *Obligation* (the host's, proven against every `Store`), *Non-claim*.
-Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code given) and the compiling twin `tests/ui/pass/x.rs` one line and one token away (`just twins`; `just ledger` runs with every feature on, B13); `api` is the committed `public-api.txt` from rustdoc JSON on a pinned nightly (`just api`), one line per item, item attribute (`attr`), public field (tuple and variant fields included) and method with its full signature; `unit:m::t` is a test in `src/m.rs`; `it:f::t` is `tests/f.rs`; `mutants:m` is `just mutants` over `src/m.rs` (B14), named only where the claim's functions have a viable mutant (constructors and accessors whose every replacement fails to compile are measured by their unit tests); `conf:c` is case `c` of `testkit::store_conformance`, run against `store::MemStore`; `store:f::t` is `store/tests/f.rs`; `race:t` is `tests/race.rs`; `wipe:t` is a test of the `wipe` member, which reads freed memory and so is outside the workspace lints.
+Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code given) and the compiling twin `tests/ui/pass/x.rs` one line and one token away (`just twins`; `just ledger` runs with every feature on, B13); `api:<Item>` is an item path the committed `public-api.txt` declares (`Type::method`, or a bare top-level name; impl and attr lines declare none) and `api-absent:<Item>` one it does not declare (a bare name matches no path's last segment; `Type::b` needs `Type` declared), and `ui-pending:x` names a ui case not written yet; the snapshot is rustdoc JSON on a pinned nightly (`just api`), one line per item, item attribute (`attr`), public field (tuple and variant fields included) and method with its full signature; `unit:m::t` is a test in `src/m.rs`; `it:f::t` is `tests/f.rs`; `mutants:m` is `just mutants` over `src/m.rs` (B14), named only where the claim's functions have a viable mutant (constructors and accessors whose every replacement fails to compile are measured by their unit tests); `conf:c` is case `c` of `testkit::store_conformance`, run against `store::MemStore`; `store:f::t` is `store/tests/f.rs`; `race:t` is `tests/race.rs`; `wipe:t` is a test of the `wipe` member, which reads freed memory and so is outside the workspace lints.
 
 ## Type
-- T1 `Secret<N>` has no `Display`: ui:secret_display (E0277), api.
-- T2 `SecretBytes` has no `Display`: ui:secret_bytes_display (E0277), api.
-- T3 `Secret<N>` has no `Clone`: ui:secret_clone (E0277), api.
-- T4 `SecretBytes` has no `Clone`: ui:secret_bytes_clone (E0277), api.
-- T5 `Secret<N>` cannot be compared with `==`: ui:secret_eq (E0277), api.
-- T6 `SecretBytes` cannot be compared with `==`: ui:secret_bytes_eq (E0277), api.
-- T7 `Secret<N>` has no `Serialize`, so no serde record field holds one: ui:secret_serialize (E0277; the twin is `Digest`, which serializes only under `serde`), api.
-- T8 `SecretBytes` has no `Serialize`: ui:secret_bytes_serialize (E0277), api.
+- T1 `Secret<N>` has no `Display`: ui:secret_display (E0277), api:Secret.
+- T2 `SecretBytes` has no `Display`: ui:secret_bytes_display (E0277), api:SecretBytes.
+- T3 `Secret<N>` has no `Clone`: ui:secret_clone (E0277), api:Secret.
+- T4 `SecretBytes` has no `Clone`: ui:secret_bytes_clone (E0277), api:SecretBytes.
+- T5 `Secret<N>` cannot be compared with `==`: ui:secret_eq (E0277), api:Secret.
+- T6 `SecretBytes` cannot be compared with `==`: ui:secret_bytes_eq (E0277), api:SecretBytes.
+- T7 `Secret<N>` has no `Serialize`, so no serde record field holds one: ui:secret_serialize (E0277; the twin is `Digest`, which serializes only under `serde`), api:Secret.
+- T8 `SecretBytes` has no `Serialize`: ui:secret_bytes_serialize (E0277), api:SecretBytes.
 - T9 A secret cannot be a `StoreKey` (no `Clone`, no `Ord`); store-facing keys take `Digest`: ui:secret_key (E0277, E0369).
-- T10 A verdict leaves `Pending` only through `settle`: api (no accessor, no public field, no `map`; the `lift` and `join` signatures keep it inside), ui:pending_field (E0616), `Debug` prints only the effect id (it:golden::debug_redacts), and ui:pending_verdict shows a closure cannot move it out through `map` (E0599).
-- T11 `Receipt` has no public constructor or field; `Effect::host_applied` is the one mint: ui:receipt_fields (E0451), api (no public field; `effect_id` only reads); ui:receipt_forge (E0599) is the named-guess illustration.
-- T12 `Receipt` is not `Clone`: ui:receipt_clone (E0277), api.
-- T13 No put without a guard on its key (`create` is `Absent` plus put, `update` is `Unchanged` plus put): api (the only writes are the builder's six guarded ones and the four one-op constructors of R33); ui:unguarded_put (E0599) is the named-guess illustration.
-- T14 No delete without a guard on its key (`consume`, or `delete` against a seen row): api; ui:unguarded_delete (E0599) is the named-guess illustration.
-- T15 `EffectId` has no public constructor or field, so an id comes only from `Entropy` or a merge: ui:effect_id_fields (E0423), api.
-- T16 `SecretBytes` and `Secret<N>` hold their bytes in private fields, so only `expose::Expose` reads them: ui:secret_bytes_fields (E0423), api (no public field).
-- T17 `Pending` and `Builder` are `#[must_use]`, so an unsettled verdict dropped as a statement is the `unused_must_use` lint: ui:pending_unused (the lint at deny; the twin warns), api (`attr Pending must_use`, `attr Builder must_use`).
-- T18 Every public enum is `#[non_exhaustive]`, so a consumer's match keeps a wildcard arm: ui:error_kind_exhaustive (E0004), api (one `attr ... non_exhaustive` per enum).
-- T19 A `BrowserBinding` has no constructor other than `From<&Secret<32>>`; under `serde`, any digest text deserializes into one: ui:browser_binding_from (E0277), ui:browser_binding_fields (E0423), api (no public field; `From<&Secret<32>>` is the one constructor). `Secret::new` is a public `const fn`, so the type does not stop a constant secret; that is O16.
+- T10 A verdict leaves `Pending` only through `settle`: api:Pending api:Pending::settle (no accessor, no public field, no `map`; the `lift` and `join` signatures keep it inside), ui:pending_field (E0616), `Debug` prints only the effect id (it:golden::debug_redacts), and ui:pending_verdict shows a closure cannot move it out through `map` (E0599).
+- T11 `Receipt` has no public constructor or field; `Effect::host_applied` is the one mint: ui:receipt_fields (E0451), api:Effect::host_applied api-absent:Receipt::new api-absent:Receipt::0 (no public field; `effect_id` only reads); ui:receipt_forge (E0599) is the named-guess illustration.
+- T12 `Receipt` is not `Clone`: ui:receipt_clone (E0277), api:Receipt.
+- T13 No put without a guard on its key (`create` is `Absent` plus put, `update` is `Unchanged` plus put): api:Builder (the only writes are the builder's six guarded ones and the four one-op constructors of R33); ui:unguarded_put (E0599) is the named-guess illustration.
+- T14 No delete without a guard on its key (`consume`, or `delete` against a seen row): api:Builder::consume api:Builder::delete; ui:unguarded_delete (E0599) is the named-guess illustration.
+- T15 `EffectId` has no public constructor or field, so an id comes only from `Entropy` or a merge: ui:effect_id_fields (E0423), api-absent:EffectId::new api-absent:EffectId::0.
+- T16 `SecretBytes` and `Secret<N>` hold their bytes in private fields, so only `expose::Expose` reads them: ui:secret_bytes_fields (E0423), api-absent:SecretBytes::0 api-absent:Secret::0 (no public field).
+- T17 `Pending` and `Builder` are `#[must_use]`, so an unsettled verdict dropped as a statement is the `unused_must_use` lint: ui:pending_unused (the lint at deny; the twin warns), `just api` (`attr Pending must_use`, `attr Builder must_use`), ui-pending:builder_unused (no case drops a builder yet).
+- T18 Every public enum is `#[non_exhaustive]`, so a consumer's match keeps a wildcard arm: ui:error_kind_exhaustive (E0004), `just api` (one `attr ... non_exhaustive` per enum).
+- T19 A `BrowserBinding` has no constructor other than `From<&Secret<32>>`; under `serde`, any digest text deserializes into one: ui:browser_binding_from (E0277), ui:browser_binding_fields (E0423), api-absent:BrowserBinding::new api-absent:BrowserBinding::0 (no public field; `From<&Secret<32>>` is the one constructor). `Secret::new` is a public `const fn`, so the type does not stop a constant secret; that is O16.
 
 ## Runtime
 - R1 `b64url_encode` and `b64url_decode` (a wrapper over `base64ct`'s unpadded base64url) agree with RFC 4648 section 10 under the section 5 alphabet: it:vectors::rfc4648_section10 (total 28, 7 checked), mutants:b64url.
@@ -54,7 +54,7 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - R27 `Secret::<N>::from_b64url` takes canonical unpadded base64url of exactly `N` bytes and is `Malformed` otherwise: unit:secret::from_b64url_takes_exactly_n, unit:b64url::exact_length.
 - R28 `Digest` has a text form (43-symbol unpadded base64url) that round-trips, and under `serde` serializes as that text and deserializes only from it, with an error that does not echo the rejected text: unit:secret::digest_text_round_trips, unit:secret::digest_serde_is_text.
 - R29 The vector runner counts only checked cases against its floor, and a zero floor, a total or SHA-256 that disagrees with `SOURCES.toml` or an unlisted file fails: testkit unit:vectors (seven cases).
-- R30 The builder takes and returns itself by value (`#[must_use]`), so a decision is one expression; `update`, `delete` and `expect` take the seen row as any `Row<S>` and read only its version, so a consumer guards a typed row in an effect over its store record: unit:effect::seen_rows_of_any_type, api.
+- R30 The builder takes and returns itself by value (`#[must_use]`), so a decision is one expression; `update`, `delete` and `expect` take the seen row as any `Row<S>` and read only its version, so a consumer guards a typed row in an effect over its store record: unit:effect::seen_rows_of_any_type, api:Builder.
 - R31 `b64url_decode` reads at most `MAX_B64URL_TEXT` (65,536 symbols, asserted as a literal); longer text is `TooLarge` (displayed as `input or effect exceeds its bound`), before anything is allocated and before any `Malformed`: unit:b64url::text_past_the_cap_is_too_large, unit:error::too_large_names_text_and_effects, mutants:b64url.
 - R32 The storage a secret owns is wiped: a dropped `Secret<N>` leaves its slot zero, a dropped `SecretBytes` buffer is zero when freed, and a text `b64url_decode` refuses leaves its decode buffer zero when freed: wipe:owned_storage_is_wiped (a slot dropped in place, and a global allocator that reads each block as it is freed), mutants:secret.
 - R33 `Effect::created`, `updated`, `consumed` and `deleted` return, without a `Result`, the one-op effect the builder's `create`, `update`, `consume` and `delete` build from the same entropy: unit:effect::single_ops_are_the_builder_ops.
