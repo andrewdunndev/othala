@@ -10,22 +10,28 @@ default:
 gate: gate-rust claims vectors
 
 # the gates that run on CI's ci-rust image, which has no node or python3; claims and vectors run on theirs
-gate-rust: (tool-pins "jq") lock queue slow-units-ci fmt lint canary twins test doc wasm thumb msrv deny deps api
+gate-rust: (tool-pins "jq") lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api
 
-# the slow gates, run on a schedule and on main: the per-crate mutation floors, the scoreboard they feed, the features-off jose run and the fuzz targets; `just gate-slow <crate>` runs one crate's share of each (CI runs one job per crate of `slow-units`), and with no crate runs them all
-gate-slow crate="": (tool-pins)
+# the slow gates, run on a schedule and on main: the per-crate mutation floors, the scoreboard they feed, the features-off jose run and the fuzz targets; `just gate-slow <crate> <k>/<n>` runs shard k of n of one crate's mutants and, in shard 1, the rest of its share (CI runs the jobs `slow-plan` lists), and with no argument runs everything unsharded
+gate-slow crate="" shard="": (tool-pins)
     #!/usr/bin/env bash
     set -euo pipefail
-    c="{{crate}}"
+    c="{{crate}}"; shard="{{shard}}"; k=1
     if [ -n "$c" ]; then
         just slow-units | grep -qx "$c" || { echo "gate-slow: '$c' is not one of: $(just slow-units | tr '\n' ' ')"; exit 1; }
     fi
-    if [ -z "$c" ] || ./crates.sh | jq -e --arg c "$c" 'select(.name == $c and .mutants)' > /dev/null; then just mutants "$c"; fi
+    if [ -n "$shard" ]; then
+        [ -n "$c" ] || { echo "gate-slow: a shard needs a crate"; exit 1; }
+        [[ "$shard" =~ ^([1-9][0-9]*)/([1-9][0-9]*)$ ]] && [ "${BASH_REMATCH[1]}" -le "${BASH_REMATCH[2]}" ] || { echo "gate-slow: shard '$shard' is not k/n with 1 <= k <= n"; exit 1; }
+        k=${BASH_REMATCH[1]}
+    fi
+    if [ -z "$c" ] || ./crates.sh | jq -e --arg c "$c" 'select(.name == $c and .mutants)' > /dev/null; then just mutants "$c" "$shard"; fi
+    [ "$k" = 1 ] || exit 0
     just rows
     if [ -z "$c" ] || [ "$c" = jose ]; then just mutants-off; fi
     just fuzz 600 "$c"
 
-# the crates the slow gates run per job, derived: each with a mutants floor or a fuzz target; CI's check-rust-scheduled matrix names these and slow-units-ci fails when they differ
+# the crates the slow gates run, derived: each with a mutants floor or a fuzz target
 slow-units:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -33,14 +39,18 @@ slow-units:
         if ./crates.sh | jq -e --arg c "$c" 'select(.name == $c and .mutants)' > /dev/null || [ -d "$c/fuzz" ]; then echo "$c"; fi
     done
 
-# the matrix of CI's check-rust-scheduled names exactly the slow-units
-slow-units-ci:
+# the child pipeline of CI's check-rust-scheduled: one job per crate shard, each `just gate-slow <crate> <k>/<n>`. A crate's shard count is the one number below; size it so a shard fits well under the job's 3h at CI speed (about 7x a local MUTANTS_JOBS=6 run)
+slow-plan:
     #!/usr/bin/env bash
     set -euo pipefail
-    ci=$(sed -n '/^check-rust-scheduled:/,/^[a-z#]/ s/^ *- CRATE: \[\(.*\)\]$/\1/p' ../.gitlab-ci.yml | tr -d ' ' | tr ',' '\n' | sort)
-    [ -n "$ci" ] || { echo "slow-units-ci: no CRATE matrix in check-rust-scheduled"; exit 1; }
-    want=$(just slow-units | sort)
-    [ "$ci" = "$want" ] || { echo "slow-units-ci: .gitlab-ci.yml names [$(tr '\n' ' ' <<< "$ci")], slow-units is [$(tr '\n' ' ' <<< "$want")]"; exit 1; }
+    declare -A shards=([jose]=8)
+    echo "stages: [verify]"
+    just slow-units | while read -r c; do
+        n=${shards[$c]:-1}
+        for ((k = 1; k <= n; k++)); do
+            printf '\nslow-%s-%sof%s:\n  extends: .slow\n  variables:\n    CRATE: %s\n    SHARD: %s/%s\n' "$c" "$k" "$n" "$c" "$k" "$n"
+        done
+    done
 
 # a manifest change without its lock change fails here, before anything builds
 lock:
@@ -137,18 +147,24 @@ tool-pins *tools="cargo-mutants jq cargo-deny":
         [ "$want" = "$have" ] || { echo "$t ${have:-unknown} is installed, mise.toml pins $want"; exit 1; }
     done
 
-# each run catches at least its gates.json floor (unviable mutants do not count) with none missed or timed out, so a filter that empties it fails; skips are in .cargo/mutants.toml
-mutants crate="": (tool-pins "cargo-mutants" "jq")
+# each run catches at least its gates.json floor (a shard k/n, its share of it: the floor over n, rounded up; unviable mutants do not count) with none missed or timed out, so a filter that empties it fails; skips are in .cargo/mutants.toml
+mutants crate="" shard="": (tool-pins "cargo-mutants" "jq")
     #!/usr/bin/env bash
     set -euo pipefail
+    n=1; sharding=()
+    if [ -n "{{shard}}" ]; then
+        [ -n "{{crate}}" ] || { echo "mutants: a shard needs a crate"; exit 1; }
+        [[ "{{shard}}" =~ ^([1-9][0-9]*)/([1-9][0-9]*)$ ]] && [ "${BASH_REMATCH[1]}" -le "${BASH_REMATCH[2]}" ] || { echo "mutants: shard '{{shard}}' is not k/n with 1 <= k <= n"; exit 1; }
+        n=${BASH_REMATCH[2]}; sharding=(--shard "{{shard}}")
+    fi
     runs=$(./crates.sh | jq -r --arg c "{{crate}}" 'select(.mutants and ($c == "" or .name == $c)) | "\(.name) \(.mutants.floor) \(.mutants.tests // [] | join(","))"')
     [ -n "$runs" ] || { echo "mutants: no crate with a mutants floor matches '{{crate}}'"; exit 1; }
     while read -r c floor tests; do
         if [ -n "$tests" ]; then scope=(--test-package "$tests"); else scope=(--test-workspace=true); fi
         mkdir -p "{{target}}/mutants/$c"
         jobs=$(nproc); [ "$jobs" -le "${MUTANTS_JOBS:-4}" ] || jobs=${MUTANTS_JOBS:-4}
-        env -u CARGO_TARGET_DIR cargo mutants --package "$c" "${scope[@]}" --jobs "$jobs" --no-shuffle --minimum-test-timeout 60 --output "{{target}}/mutants/$c" < /dev/null
-        jq -e --argjson floor "$floor" '.caught >= $floor and .missed == 0 and .timeout == 0' \
+        env -u CARGO_TARGET_DIR cargo mutants --package "$c" "${scope[@]}" --jobs "$jobs" --no-shuffle --minimum-test-timeout 60 "${sharding[@]}" --output "{{target}}/mutants/$c" < /dev/null
+        jq -e --argjson floor "$(( (floor + n - 1) / n ))" '.caught >= $floor and .missed == 0 and .timeout == 0' \
             "{{target}}/mutants/$c/mutants.out/outcomes.json" > /dev/null || { echo "mutants $c: under the floor of $floor, or missed or timed out"; exit 1; }
     done <<< "$runs"
 

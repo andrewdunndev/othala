@@ -29,6 +29,7 @@ stages:
   - automerge-gate
 
 include:
+  - local: .gitlab/rust.yml
   - component: gitlab.com/dunn.dev/pipeline/reference-check@4.17.0
     inputs:
       reference_ref: v0.11.0
@@ -213,26 +214,6 @@ check-purity:
   script:
     - just purity
 
-# check-rust: `just gate-rust` (the part of `just gate` that needs no node), on the
-# catalog's ci-rust image; the MSRV and pinned-nightly toolchains and cargo-deny are
-# added at job start. `just gate-slow` runs on a schedule and on main.
-.rust:
-  stage: verify
-  image: registry.gitlab.com/dunn.dev/pipeline/ci-rust:4.16.1@sha256:3ff8f71ade7e88629d3d1e24a7e6479b30c4d78dadac97ca6a9a4379c4a15ff4
-  variables:
-    CARGO_HOME: "$CI_PROJECT_DIR/.cargo-home"
-  cache:
-    key: rust-$CI_JOB_NAME
-    paths:
-      - .cargo-home/registry
-      - rust/target
-  before_script:
-    - git config --global --add safe.directory "$CI_PROJECT_DIR"
-    - cd rust
-    - rustup toolchain install
-    - rustup toolchain install 1.89.0 nightly-2026-11-24 --profile minimal
-    - cargo install --locked cargo-deny@$(just deny-pin)
-
 check-rust:
   extends: .rust
   rules:
@@ -244,6 +225,7 @@ check-rust:
         - primitives/**/*
         - mise.toml
         - .gitlab-ci.yml
+        - .gitlab/rust.yml
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
   script:
@@ -312,22 +294,37 @@ check-ownership:
     - base=$(git merge-base origin/main HEAD)
     - git show "$base:primitives/own.sh" | bash -s -- "${branch#item/}"
 
-check-rust-scheduled:
+# check-rust-scheduled: `just gate-slow` on a schedule and on main, as the child pipeline `just slow-plan` writes
+# (one job per crate shard, .gitlab/rust.yml's .slow), so no crate list or shard count lives in this file.
+plan-rust-slow:
   extends: .rust
-  timeout: 3h
-  # the mutation proof must finish at every merged sha, so a later push does not cancel it
   interruptible: false
-  # one job per crate: the matrix is `just slow-units`, and `just slow-units-ci` (in gate-rust) fails when they differ
-  parallel:
-    matrix:
-      - CRATE: [base, factor, jose, store, testkit, webauthn-rp]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  before_script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - cd rust
+    - rustup toolchain install
   script:
-    - cargo install --locked cargo-mutants@$(just mutants-pin) cargo-fuzz@0.13.1
-    - rustup toolchain install nightly --profile minimal
-    - just gate-slow "$CRATE"
+    - just slow-plan | tee slow-plan.yml
+  artifacts:
+    paths:
+      - rust/slow-plan.yml
+
+check-rust-scheduled:
+  stage: verify
+  needs: [plan-rust-slow]
+  # the mutation proof must finish at every merged sha, so a later push does not cancel it
+  interruptible: false
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  trigger:
+    strategy: depend
+    include:
+      - artifact: rust/slow-plan.yml
+        job: plan-rust-slow
 
 # check-portal: `just setup` (npm ci without install scripts in portal, e2e and
 # site), then `just check`: astro check, tsc over e2e and site, vitest (src and
