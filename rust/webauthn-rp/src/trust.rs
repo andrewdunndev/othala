@@ -105,6 +105,8 @@ impl TrustQuery<'_> {
     }
 }
 
+/// Unbuilt: `finish_registration` takes a source and never asks it until trust dispatch lands with webauthn-09 (CONTRACT, Planned).
+///
 /// Where registrations find acceptable attestation roots and refusals (L3 7.1 step 23). Implemented by hosts and by `webauthn-mds`.
 pub trait TrustSource {
     /// Decide one statement with a trust path; never asked for none or self attestation.
@@ -131,6 +133,8 @@ pub struct TrustQuery<'a> {
     pub(crate) chain: &'a [Digest],
 }
 
+/// Unbuilt: `from_der` and the chain walk that reads it land with webauthn-09 (CONTRACT, Planned).
+///
 /// A root certificate, parsed and bounded; its X.509 form stays inside the crate.
 #[derive(Clone, Debug)]
 #[expect(dead_code, reason = "read by the chain walk, webauthn-09")]

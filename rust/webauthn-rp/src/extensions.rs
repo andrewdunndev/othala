@@ -1,4 +1,4 @@
-//! Client extension inputs, outputs and their processing (R120 to R128; L3 10.1); lands with webauthn-14.
+//! Unbuilt: Client extension inputs, outputs and their processing (R120 to R128; L3 10.1); lands with webauthn-14.
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -6,10 +6,14 @@ use base::{Secret, SecretBytes};
 
 use crate::record::CredentialId;
 
+/// Unbuilt: lands with webauthn-14; no public function takes or returns it yet (CONTRACT, Planned).
+///
 /// A FIDO AppID (L3 10.1.1): an `https` URL, hashed as written.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AppId(pub(crate) String);
 
+/// Unbuilt: lands with webauthn-14; no public function takes or returns it yet (CONTRACT, Planned).
+///
 /// PRF salts to evaluate (L3 10.1.4 `AuthenticationExtensionsPRFValues`); a salt past `MAX_PRF_SALT` is `TooLarge` from the `start_*` that sends it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PrfEval {
@@ -17,6 +21,8 @@ pub struct PrfEval {
     pub(crate) second: Option<Vec<u8>>,
 }
 
+/// Unbuilt: lands with webauthn-14; no public function takes or returns it yet (CONTRACT, Planned).
+///
 /// The `prf` input of a registration.
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -27,6 +33,8 @@ pub enum PrfRequest {
     Eval(PrfEval),
 }
 
+/// Unbuilt: lands with webauthn-14; no public function takes or returns it yet (CONTRACT, Planned).
+///
 /// The `largeBlob` input of an authentication: one operation per ceremony.
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -37,6 +45,8 @@ pub enum LargeBlobOp {
     Write(Vec<u8>),
 }
 
+/// Unbuilt: lands with webauthn-14; no public function takes or returns it yet (CONTRACT, Planned).
+///
 /// The `largeBlob` support input of a registration.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -47,6 +57,8 @@ pub enum LargeBlobRequest {
     Preferred,
 }
 
+/// Unbuilt: lands with webauthn-14; no public function takes or returns it yet (CONTRACT, Planned).
+///
 /// `credProps.rk`.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -61,6 +73,8 @@ pub enum Discoverability {
     NonDiscoverable,
 }
 
+/// Unbuilt: lands with webauthn-14; no public function takes or returns it yet (CONTRACT, Planned).
+///
 /// The `prf` client output.
 #[non_exhaustive]
 #[derive(Debug)]
@@ -77,6 +91,8 @@ pub enum PrfResult {
     Evaluated(PrfOutputs),
 }
 
+/// Unbuilt: lands with webauthn-14; no public function takes or returns it yet (CONTRACT, Planned).
+///
 /// PRF results: secrets, never printed or serialized.
 #[derive(Debug)]
 #[expect(dead_code, reason = "read by the accessors of webauthn-14")]
@@ -85,6 +101,8 @@ pub struct PrfOutputs {
     pub(crate) second: Option<Secret<32>>,
 }
 
+/// Unbuilt: lands with webauthn-14; no public function takes or returns it yet (CONTRACT, Planned).
+///
 /// The `largeBlob` registration output.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -99,6 +117,8 @@ pub enum LargeBlobSupport {
     Unsupported,
 }
 
+/// Unbuilt: lands with webauthn-14; no public function takes or returns it yet (CONTRACT, Planned).
+///
 /// The `largeBlob` authentication output.
 #[non_exhaustive]
 #[derive(Debug)]
@@ -115,6 +135,8 @@ pub enum LargeBlobOutcome {
     NotDone,
 }
 
+/// Unbuilt: lands with webauthn-14; no public function takes or returns it yet (CONTRACT, Planned).
+///
 /// The `appid` client output.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
