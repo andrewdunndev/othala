@@ -1,13 +1,52 @@
-/// Declares `ErrorKind` and, from the same lines, `ALL` and the fixed sentence of each kind, so a kind is written once.
-macro_rules! error_kinds {
-    ($($(#[$meta:meta])* $name:ident => $text:literal,)*) => {
-        /// What went wrong; never carries key-, plaintext- or claim-derived detail.
-        #[non_exhaustive]
-        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-        pub enum ErrorKind {
-            $($(#[$meta])* $name,)*
-        }
+/// What went wrong; never carries key-, plaintext- or claim-derived detail.
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ErrorKind {
+    /// Not the grammar the RFC defines: segments, base64url, JSON, UTF-8, member types, curve points.
+    Malformed,
+    /// Input past one of the crate's named bounds.
+    TooLarge,
+    /// A JSON member named twice at any depth, or a header member in more than one of a token's headers.
+    DuplicateMember,
+    /// An algorithm, curve or compression value this crate does not implement, or one whose feature is off.
+    UnsupportedAlg,
+    /// The header's `alg` or `enc` is an implemented one other than the key's, or the key's type or curve cannot
+    /// take the algorithm.
+    AlgMismatch,
+    /// A JWK without `alg` used where the algorithm must come from the key.
+    KeyAlgMissing,
+    /// A `crit` header member, which names no extension this crate understands.
+    CriticalHeader,
+    /// An RSA modulus below [`crate::MIN_RSA_BITS`], or a symmetric key shorter than its algorithm requires.
+    WeakKey,
+    /// A key whose `use` or `key_ops` does not permit the operation.
+    KeyUse,
+    /// No signature verified under the key.
+    BadSignature,
+    /// Decryption failed; one value for every cause, so no failure is an oracle.
+    Decrypt,
+    /// `exp` is at or before `now` minus the leeway.
+    Expired,
+    /// `nbf` or `iat` is after `now` plus the leeway.
+    NotYetValid,
+    /// `iss` is not the policy's issuer.
+    Issuer,
+    /// `aud` does not contain the policy's audience.
+    Audience,
+    /// `typ` is not the token kind's.
+    Type,
+    /// A claim the policy requires is absent.
+    MissingClaim,
+    /// A registered claim is present with the wrong JSON type.
+    ClaimType,
+    /// A [`crate::Signer`] could not sign (an HSM or KMS failure).
+    Signer,
+}
 
+/// Lists every kind once more with its fixed text, and from that list builds `ALL` and the text lookup. A kind
+/// missing here fails to compile (the match below is exhaustive), and so does a name that is not a kind.
+macro_rules! kind_texts {
+    ($($name:ident => $text:literal,)*) => {
         impl ErrorKind {
             /// Every kind, for the table test.
             #[cfg(test)]
@@ -23,45 +62,25 @@ macro_rules! error_kinds {
     };
 }
 
-error_kinds! {
-    /// Not the grammar the RFC defines: segments, base64url, JSON, UTF-8, member types, curve points.
+kind_texts! {
     Malformed => "input is not well-formed; reject it, it cannot be repaired",
-    /// Input past one of the crate's named bounds.
     TooLarge => "input exceeds a size bound; reject it, or raise the bound if the input is trusted",
-    /// A JSON member named twice at any depth, or a header member in more than one of a token's headers.
     DuplicateMember => "a member appears twice; reject the input, it is ambiguous",
-    /// An algorithm, curve or compression value this crate does not implement, or one whose feature is off.
     UnsupportedAlg => "algorithm, curve or compression is not supported; choose an implemented one or enable its feature",
-    /// The header's `alg` or `enc` is an implemented one other than the key's, or the key's type or curve cannot
-    /// take the algorithm.
     AlgMismatch => "algorithm does not match the key; use a key of the type and curve the algorithm takes",
-    /// A JWK without `alg` used where the algorithm must come from the key.
     KeyAlgMissing => "key has no alg; set the algorithm on the key or pass it explicitly",
-    /// A `crit` header member, which names no extension this crate understands.
     CriticalHeader => "token requires a critical header extension this crate does not understand; reject the token",
-    /// An RSA modulus below [`crate::MIN_RSA_BITS`], or a symmetric key shorter than its algorithm requires.
     WeakKey => "key is below the algorithm's minimum size; use a larger key",
-    /// A key whose `use` or `key_ops` does not permit the operation.
     KeyUse => "key does not permit this operation; use a key whose use and key_ops allow it",
-    /// No signature verified under the key.
     BadSignature => "no signature verified; reject the token, or check that the verification key is the issuer's",
-    /// Decryption failed; one value for every cause, so no failure is an oracle.
     Decrypt => "decryption failed; reject the token, no cause is given",
-    /// `exp` is at or before `now` minus the leeway.
     Expired => "token has expired; obtain a fresh token",
-    /// `nbf` or `iat` is after `now` plus the leeway.
     NotYetValid => "token is not valid yet; retry later or check the clocks and leeway",
-    /// `iss` is not the policy's issuer.
     Issuer => "issuer is not the expected one; reject the token or check the policy's issuer",
-    /// `aud` does not contain the policy's audience.
     Audience => "audience does not include this recipient; reject the token or check the policy's audience",
-    /// `typ` is not the token kind's.
     Type => "token type is not the expected one; reject the token or check the policy's type",
-    /// A claim the policy requires is absent.
     MissingClaim => "a required claim is absent; reject the token or check the policy's required claims",
-    /// A registered claim is present with the wrong JSON type.
     ClaimType => "a registered claim has the wrong JSON type; reject the token",
-    /// A [`crate::Signer`] could not sign (an HSM or KMS failure).
     Signer => "the signer failed; check the HSM or KMS and retry",
 }
 

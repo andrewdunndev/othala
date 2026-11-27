@@ -11,17 +11,70 @@ pub struct Error {
     step: Option<SpecStep>,
 }
 
-/// Declares `ErrorKind` and, from the same lines, `ALL` and the fixed sentence of each kind, so a kind is written once.
-/// A sentence is what failed, then the caller's next action; `Display` puts the step between them.
-macro_rules! error_kinds {
-    ($($(#[$meta:meta])* $name:ident => $what:literal, $action:literal,)*) => {
-        /// Why a call failed. Kinds are for logs; a host shows the client one refusal for every ceremony failure (O10).
-        #[non_exhaustive]
-        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-        pub enum ErrorKind {
-            $($(#[$meta])* $name,)*
-        }
+/// Why a call failed. Kinds are for logs; a host shows the client one refusal for every ceremony failure (O10).
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ErrorKind {
+    /// Input is not well-formed, or is empty where a value is required: CBOR, JSON, COSE, DER, base64url or a field shape.
+    Malformed,
+    /// Input or a list exceeds its stated bound.
+    TooLarge,
+    /// `C.type` is not the ceremony's type.
+    Type,
+    /// `C.challenge` is not the ceremony's challenge.
+    ChallengeMismatch,
+    /// `C.origin` is not an origin of the relying party.
+    OriginMismatch,
+    /// `C.crossOrigin` is true and the relying party does not allow it.
+    CrossOriginDenied,
+    /// `C.topOrigin` is present and not allowed.
+    TopOriginDenied,
+    /// `rpIdHash` is not the hash of the RP ID (or of the AppID, when used).
+    RpIdHash,
+    /// The UP flag is not set where it must be.
+    UserNotPresent,
+    /// User verification is required and the UV flag is clear.
+    UserNotVerified,
+    /// BS is set without BE.
+    BackupStateWithoutEligibility,
+    /// BE differs from the stored credential's.
+    BackupEligibilityChanged,
+    /// The credential's algorithm was not offered, or is not supported.
+    Algorithm,
+    /// `fmt` names no supported attestation statement format.
+    UnknownFormat,
+    /// `fmt` names a format whose cargo feature is off.
+    FormatDisabled,
+    /// The attestation statement or its certificate chain does not verify.
+    AttestationInvalid,
+    /// The attestation verified but is not trustworthy: denied by the `TrustSource`, or not anchored under `TrustPolicy::RequireTrusted`.
+    Untrusted,
+    /// The attested credential id is longer than `MAX_CREDENTIAL_ID` or differs from the response's raw id.
+    CredentialIdInvalid,
+    /// The credential is not in the ceremony's allow list.
+    NotAllowed,
+    /// The response's credential id is not the stored credential's.
+    CredentialMismatch,
+    /// The user handle is missing where required, or names another user.
+    UserHandleMismatch,
+    /// The finishing browser's binding is not the one the ceremony started with.
+    BrowserMismatch,
+    /// The assertion signature does not verify.
+    Signature,
+    /// The signature counter did not advance under `CounterPolicy::Reject`.
+    CounterRegressed,
+    /// An extension input or output was not requested, or contradicts the request.
+    Extension,
+    /// The ceremony is at or past its deadline.
+    Expired,
+    /// A stored record does not decode, or a row is not the record kind its key names.
+    Corrupt,
+}
 
+/// Lists every kind once more with its fixed text, and from that list builds `ALL` and the text lookups. A kind
+/// missing here fails to compile (the matches below are exhaustive), and so does a name that is not a kind.
+macro_rules! kind_texts {
+    ($($name:ident => $what:literal, $action:literal,)*) => {
         impl ErrorKind {
             /// Every kind, for the table test.
             #[cfg(test)]
@@ -44,60 +97,33 @@ macro_rules! error_kinds {
     };
 }
 
-error_kinds! {
-    /// Input is not well-formed, or is empty where a value is required: CBOR, JSON, COSE, DER, base64url or a field shape.
+kind_texts! {
     Malformed => "input is not well-formed", "reject the request, it cannot be repaired",
-    /// Input or a list exceeds its stated bound.
     TooLarge => "input exceeds a size bound", "reject the request",
-    /// `C.type` is not the ceremony's type.
     Type => "client data type is not this ceremony's", "reject the response and restart the ceremony",
-    /// `C.challenge` is not the ceremony's challenge.
     ChallengeMismatch => "challenge is not this ceremony's", "reject the response and restart the ceremony",
-    /// `C.origin` is not an origin of the relying party.
     OriginMismatch => "origin is not one of the relying party's", "reject the response or add the origin to the relying party",
-    /// `C.crossOrigin` is true and the relying party does not allow it.
     CrossOriginDenied => "cross-origin use is not allowed", "reject the response or allow it on the relying party",
-    /// `C.topOrigin` is present and not allowed.
     TopOriginDenied => "top origin is not allowed", "reject the response or allow it on the relying party",
-    /// `rpIdHash` is not the hash of the RP ID (or of the AppID, when used).
     RpIdHash => "RP ID hash does not match", "check that the relying party's id is the one the client used",
-    /// The UP flag is not set where it must be.
     UserNotPresent => "user presence is not asserted", "reject the response and ask the user to retry",
-    /// User verification is required and the UV flag is clear.
     UserNotVerified => "user verification is required but not asserted", "reject the response and ask the user to retry with verification",
-    /// BS is set without BE.
     BackupStateWithoutEligibility => "backup state is set without backup eligibility", "reject the authenticator data as invalid",
-    /// BE differs from the stored credential's.
     BackupEligibilityChanged => "backup eligibility differs from the stored credential's", "reject the response",
-    /// The credential's algorithm was not offered, or is not supported.
     Algorithm => "credential algorithm was not offered or is not supported", "offer it or reject the credential",
-    /// `fmt` names no supported attestation statement format.
     UnknownFormat => "attestation format is not supported", "reject the credential or request attestation none",
-    /// `fmt` names a format whose cargo feature is off.
     FormatDisabled => "attestation format's feature is off", "enable the feature or reject the credential",
-    /// The attestation statement or its certificate chain does not verify.
     AttestationInvalid => "attestation does not verify", "reject the credential",
-    /// The attestation verified but is not trustworthy: denied by the `TrustSource`, or not anchored under `TrustPolicy::RequireTrusted`.
     Untrusted => "attestation is not trusted", "reject the credential or change the trust policy",
-    /// The attested credential id is longer than `MAX_CREDENTIAL_ID` or differs from the response's raw id.
     CredentialIdInvalid => "credential id is too long or differs from the raw id", "reject the credential",
-    /// The credential is not in the ceremony's allow list.
     NotAllowed => "credential is not in the allow list", "reject the response",
-    /// The response's credential id is not the stored credential's.
     CredentialMismatch => "credential id is not the stored credential's", "look up the stored credential by the response's id",
-    /// The user handle is missing where required, or names another user.
     UserHandleMismatch => "user handle is missing or names another user", "reject the response",
-    /// The finishing browser's binding is not the one the ceremony started with.
     BrowserMismatch => "browser binding differs from the one the ceremony started with", "reject the response and restart the ceremony",
-    /// The assertion signature does not verify.
     Signature => "signature does not verify", "reject the response",
-    /// The signature counter did not advance under `CounterPolicy::Reject`.
     CounterRegressed => "signature counter did not advance", "treat the credential as possibly cloned or change the counter policy",
-    /// An extension input or output was not requested, or contradicts the request.
     Extension => "extension was not requested or contradicts the request", "reject the response",
-    /// The ceremony is at or past its deadline.
     Expired => "ceremony has expired", "restart the ceremony",
-    /// A stored record does not decode, or a row is not the record kind its key names.
     Corrupt => "stored record does not decode", "discard the record and restart the ceremony",
 }
 
