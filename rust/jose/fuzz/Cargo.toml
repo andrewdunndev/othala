@@ -10,7 +10,7 @@ cargo-fuzz = true
 
 [dependencies]
 base = { path = "../../base" }
-jose = { path = ".." }
+jose = { path = "..", features = ["es512", "rsa-decrypt", "rsa-sign"] }
 libfuzzer-sys = "0.4"
 serde = { version = "1", default-features = false }
 

@@ -452,9 +452,12 @@ dependencies = [
  "one-step-kdf",
  "p256",
  "p384",
+ "p521",
+ "rand_core",
  "rsa",
  "serde",
  "serde_json",
+ "sha1",
  "sha2",
 ]
 
@@ -530,6 +533,20 @@ dependencies = [
  "ecdsa",
  "elliptic-curve",
  "fiat-crypto",
+ "primefield",
+ "primeorder",
+ "sha2",
+]
+
+[[package]]
+name = "p521"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ad64cc32c2dc466317c12ee5853e61f159f9eab1fe7efade0395dc2e7b43449"
+dependencies = [
+ "base16ct",
+ "ecdsa",
+ "elliptic-curve",
  "primefield",
  "primeorder",
  "sha2",
@@ -709,6 +726,17 @@ checksum = "66cf8fedced2fcf12406bcb34223dffb92eaf34908ede12fed414c82b7f00b3e"
 dependencies = [
  "base16ct",
  "serde",
+]
+
+[[package]]
+name = "sha1"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "digest",
 ]
 
 [[package]]

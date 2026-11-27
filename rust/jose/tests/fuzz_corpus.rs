@@ -3,6 +3,8 @@
 //! `jws_parse` rfc7515 (A.1 to A.3 and the A.6.4 and A.7 JSON forms), `jwt_claims` jose-derived/claims.json,
 //! `jwe_parse` rfc7516 and rfc7520 jwe-cases, `jwk_decode` jose-derived keys and jwks, each with a few minimal inputs.
 //! A file a fuzz run adds (a hash name) is replayed for panics only.
+//! The fuzz crate builds jose with every feature, so the outcomes are those of every feature on.
+#![cfg(all(feature = "es512", feature = "rsa-decrypt", feature = "rsa-sign"))]
 use jose::ErrorKind;
 
 #[path = "../fuzz/property/jwe_parse.rs"]
