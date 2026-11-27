@@ -152,16 +152,28 @@ trait Tag {
     fn tag(&self) -> u8;
 }
 
+const fn in_order(tags: &[u8], from: u8) -> bool {
+    match tags {
+        [] => true,
+        [first, rest @ ..] => *first == from && in_order(rest, from.wrapping_add(1)),
+    }
+}
+
 macro_rules! tags {
     ($ty:ident, $table:ident, { $($variant:ident = $tag:literal),+ $(,)? }) => {
+        tags!($ty, $table, { $([$ty::$variant] = $tag),+ });
+    };
+    ($ty:ident, $table:ident, { $([$($value:tt)+] = $tag:literal),+ $(,)? }) => {
         impl Tag for $ty {
             fn tag(&self) -> u8 {
                 match self {
-                    $($ty::$variant => $tag,)+
+                    $($($value)+ => $tag,)+
                 }
             }
         }
-        const $table: &[$ty] = &[$($ty::$variant),+];
+        const $table: &[$ty] = &[$($($value)+),+];
+        // a repeated or out-of-order number is a compile error: the table is read by index
+        const _: () = assert!(in_order(&[$($tag),+], 0));
     };
 }
 
@@ -178,6 +190,11 @@ tags!(AttestationType, KINDS, { None = 0, SelfAttestation = 1, Basic = 2, AttCa 
 tags!(Trust, TRUSTS, { Anchored = 0, Unanchored = 1 });
 tags!(LargeBlobRequest, LARGE_BLOBS, { Required = 0, Preferred = 1 });
 tags!(UserVerification, VERIFICATIONS, { Verified = 0, PresenceOnly = 1 });
+tags!(Backup, BACKUPS, {
+    [Backup::SingleDevice] = 0,
+    [Backup::MultiDevice(BackupState::NotBackedUp)] = 1,
+    [Backup::MultiDevice(BackupState::BackedUp)] = 2
+});
 
 fn put_pick<T: Tag>(out: &mut Vec<u8>, value: &T) -> Result<(), Error> {
     out.push(value.tag());
@@ -321,11 +338,7 @@ impl Record {
                 out.extend_from_slice(&c.sign_count.to_be_bytes());
                 put_pick(&mut out, &c.uv_initialized)?;
                 put_list(&mut out, &c.transports, put_pick)?;
-                out.push(match c.backup {
-                    Backup::SingleDevice => 0,
-                    Backup::MultiDevice(BackupState::NotBackedUp) => 1,
-                    Backup::MultiDevice(BackupState::BackedUp) => 2,
-                });
+                put_pick(&mut out, &c.backup)?;
                 put_bytes(&mut out, &c.user.0)?;
                 out.extend_from_slice(&c.aaguid.0);
                 let a = &c.attestation;
@@ -491,11 +504,7 @@ impl<'a> In<'a> {
             sign_count: self.u32()?,
             uv_initialized: self.pick(VERIFICATIONS)?,
             transports: self.list(|i| i.pick(TRANSPORTS))?,
-            backup: self.pick(&[
-                Backup::SingleDevice,
-                Backup::MultiDevice(BackupState::NotBackedUp),
-                Backup::MultiDevice(BackupState::BackedUp),
-            ])?,
+            backup: self.pick(BACKUPS)?,
             user: self.user()?,
             aaguid: Aaguid(self.array()?),
             attestation: Attestation {
@@ -1109,8 +1118,8 @@ mod tests {
     #[test]
     fn every_table_entry_encodes_as_its_index_and_decodes_back() {
         use super::{
-            ALGORITHMS, ATTACHMENTS, CONVEYANCES, FORMATS, HINTS, KINDS, LARGE_BLOBS, MEDIATIONS,
-            REQUIREMENTS, RESIDENT_KEYS, TRANSPORTS, TRUSTS, VERIFICATIONS,
+            ALGORITHMS, ATTACHMENTS, BACKUPS, CONVEYANCES, FORMATS, HINTS, KINDS, LARGE_BLOBS,
+            MEDIATIONS, REQUIREMENTS, RESIDENT_KEYS, TRANSPORTS, TRUSTS, VERIFICATIONS,
         };
         assert_tags(REQUIREMENTS);
         assert_tags(RESIDENT_KEYS);
@@ -1125,6 +1134,40 @@ mod tests {
         assert_tags(TRUSTS);
         assert_tags(LARGE_BLOBS);
         assert_tags(VERIFICATIONS);
+        assert_tags(BACKUPS);
+    }
+
+    #[test]
+    fn every_table_matches_the_committed_listing() {
+        use super::{
+            ALGORITHMS, ATTACHMENTS, BACKUPS, CONVEYANCES, FORMATS, HINTS, KINDS, LARGE_BLOBS,
+            MEDIATIONS, REQUIREMENTS, RESIDENT_KEYS, TRANSPORTS, TRUSTS, VERIFICATIONS,
+        };
+        let mut shown = alloc::string::String::new();
+        macro_rules! list {
+            ($($table:ident),+) => {$(
+                for (i, v) in $table.iter().enumerate() {
+                    shown.push_str(&alloc::format!("{} {i} {v:?}\n", stringify!($table)));
+                }
+            )+};
+        }
+        list!(
+            REQUIREMENTS,
+            RESIDENT_KEYS,
+            ATTACHMENTS,
+            CONVEYANCES,
+            HINTS,
+            MEDIATIONS,
+            TRANSPORTS,
+            ALGORITHMS,
+            FORMATS,
+            KINDS,
+            TRUSTS,
+            LARGE_BLOBS,
+            VERIFICATIONS,
+            BACKUPS
+        );
+        assert_eq!(shown, include_str!("../tests/golden/tags.txt"));
     }
 
     #[test]
