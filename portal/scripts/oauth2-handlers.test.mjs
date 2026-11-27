@@ -1548,6 +1548,20 @@ for (const [action, expected] of [['deny', `${publicUrl}/auth/error?reason=sign-
   });
 }
 
+test('device consent POST allow is never remembered, though the manifest skips consent', async () => {
+  _resetForTests();
+  const { api, calls } = stubOAuth2({
+    getOAuth2ConsentRequest: async () => oauth2ConsentRequest({ subject: 'id-1', client: { client_id: 'stepca' }, request_url: DEVICE_URL }),
+  });
+  await handleConsentPost(consentPost('allow'), {
+    oauth2: api, getSession: liveSession, getIdentity: async () => deviceMember('password', 'totp'),
+    manifest: () => ({ ...loadManifest('stepca'), skipConsent: true }),
+  });
+  assert.equal(calls.acceptConsent, 1);
+  assert.equal(calls.acceptConsentBody.remember, false);
+  assert.equal(calls.acceptConsentBody.remember_for, undefined);
+});
+
 test('login and consent REJECT access_denied for a client_id with no served manifest, whatever the member holds', async () => {
   const quiet = console.warn;
   console.warn = () => {};
