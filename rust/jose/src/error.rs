@@ -119,7 +119,7 @@ mod tests {
     use crate::{Error, ErrorKind};
 
     /// The exact text of every kind. The match has no `_` arm, so a new kind fails to compile here; `ErrorKind::ALL` comes
-    /// from the same macro lines as the enum, so no kind can be left out of the loop below.
+    /// from the `kind_texts!` list, whose exhaustive lookups refuse a kind the list leaves out, so none escapes the loop below.
     fn expected(kind: ErrorKind) -> &'static str {
         match kind {
             ErrorKind::Malformed => "input is not well-formed; reject it, it cannot be repaired",

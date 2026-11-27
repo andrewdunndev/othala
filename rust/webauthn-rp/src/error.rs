@@ -182,7 +182,8 @@ mod tests {
     use super::{Error, ErrorKind, SpecStep};
 
     /// The exact text of every kind without a step. The match has no `_` arm, so a new kind fails to compile here;
-    /// `ErrorKind::ALL` comes from the same macro lines as the enum, so no kind can be left out of the loop below.
+    /// `ErrorKind::ALL` comes from the `kind_texts!` list, whose exhaustive lookups refuse a kind the list leaves out, so none
+    /// escapes the loop below.
     fn expected(kind: ErrorKind) -> &'static str {
         match kind {
             ErrorKind::Malformed => {
