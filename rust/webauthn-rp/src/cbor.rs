@@ -268,14 +268,19 @@ mod tests {
             refused(&[0xa1, 0x01, 0xa2, 0x02, 0x02, 0x01, 0x01]),
             Some(ErrorKind::Malformed)
         );
-        assert!(
+        assert_eq!(
             decode(
                 &[0xa1, 0x01, 0xa2, 0x02, 0x02, 0x01, 0x01],
                 Order::TopTolerant
             )
-            .is_err()
+            .err()
+            .map(|e| e.kind()),
+            Some(ErrorKind::Malformed)
         );
-        assert!(decode(&[0xa2, 0x02, 0x02, 0x01, 0x01], Order::TopTolerant).is_ok());
+        assert_eq!(
+            decode(&[0xa2, 0x02, 0x02, 0x01, 0x01], Order::TopTolerant).map(drop),
+            Ok(())
+        );
     }
 
     #[test]

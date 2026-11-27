@@ -26,9 +26,8 @@ fn replay(dir: &str, check: fn(&[u8]) -> Result<(), ErrorKind>) -> usize {
         testkit::fixture::files(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(dir));
     let mut named = 0;
     for (name, data) in files {
-        let outcome = std::panic::catch_unwind(|| check(&data));
-        assert!(outcome.is_ok(), "{dir}/{name} panicked");
-        if let (Ok(outcome), Some((want, _))) = (outcome, name.split_once('-')) {
+        let outcome = testkit::fixture::replay(&format!("{dir}/{name}"), || check(&data));
+        if let Some((want, _)) = name.split_once('-') {
             assert_eq!(label(outcome), want, "{dir}/{name}");
             named += 1;
         }

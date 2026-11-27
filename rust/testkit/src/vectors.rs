@@ -172,6 +172,21 @@ fn floored(path: &str, total: usize, checked: usize, floor: usize) -> Tally {
     Tally { total, checked }
 }
 
+/// A vector case's verdict: `outcome` is `Ok` exactly when `ok`, and a refusal the vector names as `kind` is that
+/// kind (`kind_of`'s `Debug` text). A refusal the vector leaves unnamed is checked for the refusal alone.
+pub fn assert_verdict<T, E: std::fmt::Debug, K: std::fmt::Debug>(
+    outcome: &Result<T, E>,
+    ok: bool,
+    kind: Option<&str>,
+    kind_of: impl FnOnce(&E) -> K,
+    id: &str,
+) {
+    assert_eq!(outcome.is_ok(), ok, "{id}: {:?}", outcome.as_ref().err());
+    if let (Err(error), Some(named)) = (outcome, kind) {
+        assert_eq!(format!("{:?}", kind_of(error)), named, "{id}");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Outcome, Tally, Vector, run_against};

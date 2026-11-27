@@ -323,7 +323,7 @@ mod tests {
             ]
             .join(".")
         };
-        assert!(RpId::parse(&long(MAX_RP_ID)).is_ok());
+        assert_eq!(RpId::parse(&long(MAX_RP_ID)).map(drop), Ok(()));
         assert_eq!(
             kind(RpId::parse(&long(MAX_RP_ID + 1))),
             Some(ErrorKind::TooLarge)
@@ -446,7 +446,7 @@ mod tests {
             ))
         );
         assert_eq!(set.map(|r| r.cross_origin), Ok(CrossOrigin::AnyTop));
-        assert!(builder(MAX_ORIGINS - 1).build().is_ok());
+        assert_eq!(builder(MAX_ORIGINS - 1).build().map(drop), Ok(()));
         assert_eq!(
             kind(builder(MAX_ORIGINS).build()),
             Some(ErrorKind::TooLarge)
@@ -460,11 +460,12 @@ mod tests {
             Some(ErrorKind::Malformed)
         );
         let tops = |n: usize| CrossOrigin::Listed(vec![origin("https://top.example"); n]);
-        assert!(
+        assert_eq!(
             builder(0)
                 .cross_origin(tops(MAX_ORIGINS - 1))
                 .build()
-                .is_ok()
+                .map(drop),
+            Ok(())
         );
         assert_eq!(
             kind(builder(0).cross_origin(tops(MAX_ORIGINS)).build()),

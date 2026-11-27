@@ -52,7 +52,14 @@ fn section_5() {
             for alg in common_jwe::LOCAL {
                 let outcome = parse(compact, &wire)
                     .and_then(|jwe| common_jwe::decrypt(alg, &case.enc, jwk, jwe));
-                assert!(outcome.is_err(), "{}", case.id);
+                assert!(
+                    matches!(
+                        outcome.err().map(|e| e.kind()),
+                        Some(ErrorKind::AlgMismatch | ErrorKind::Malformed)
+                    ),
+                    "{}",
+                    case.id
+                );
             }
             assert_eq!(
                 JweAlg::parse(&case.alg).err().map(|e| e.kind()),
@@ -62,12 +69,18 @@ fn section_5() {
         }
         let outcome = parse(compact, &wire)
             .and_then(|jwe| common_jwe::decrypt(&case.alg, &case.enc, jwk, jwe));
+        // a token the parser refuses is Malformed; one the decryption refuses is Decrypt
         assert_eq!(
-            outcome.is_ok(),
-            case.expect.ok,
-            "{} {:?}",
-            case.id,
-            outcome.as_ref().err().map(|e| e.kind())
+            outcome.as_ref().err().map(|e| matches!(
+                e.kind(),
+                ErrorKind::Decrypt
+                    | ErrorKind::Malformed
+                    | ErrorKind::AlgMismatch
+                    | ErrorKind::UnsupportedAlg
+            )),
+            (!case.expect.ok).then_some(true),
+            "{}",
+            case.id
         );
         if let Some(want) = &case.expect.plaintext {
             let got = outcome.ok().map(|plaintext| b64url_encode(&plaintext));

@@ -35,14 +35,26 @@ fn row<A: PublicAlg>(file: Vector, curve: &str, size: usize, p1363: bool, total:
             coordinate(1 + size..1 + 2 * size)
         );
         let key = Jwk::decode(jwk.as_bytes()).and_then(|jwk| jwk.verify_key::<A>());
-        assert!(key.is_ok(), "{}", case.tc_id);
+        assert_eq!(key.as_ref().err().map(|e| e.kind()), None, "{}", case.tc_id);
         let message = hex(case.msg.as_deref().unwrap_or_default());
         let signature = hex(case.sig.as_deref().unwrap_or_default());
         let outcome = key.and_then(|key| key.verify_signature(&message, &signature));
         match (p1363, case.result) {
             (_, Expected::Acceptable) => return Outcome::NotApplicable,
-            (true, Expected::Valid) => assert!(outcome.is_ok(), "{}: {}", case.tc_id, case.comment),
-            _ => assert!(outcome.is_err(), "{}: {}", case.tc_id, case.comment),
+            (true, Expected::Valid) => assert_eq!(
+                outcome.err().map(|e| e.kind()),
+                None,
+                "{}: {}",
+                case.tc_id,
+                case.comment
+            ),
+            _ => assert_eq!(
+                outcome.err().map(|e| e.kind()),
+                Some(jose::ErrorKind::BadSignature),
+                "{}: {}",
+                case.tc_id,
+                case.comment
+            ),
         }
         Outcome::Checked
     });

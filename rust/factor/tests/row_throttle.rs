@@ -9,13 +9,25 @@ fn out_of_range<T>(r: Result<T, factor::Error>) -> bool {
 #[test]
 fn policy_bounds() {
     assert!(out_of_range(FreeAttempts::new(0)));
-    assert!(FreeAttempts::new(1).is_ok() && FreeAttempts::new(10).is_ok());
+    assert_eq!(
+        (
+            FreeAttempts::new(1).map(drop),
+            FreeAttempts::new(10).map(drop)
+        ),
+        (Ok(()), Ok(()))
+    );
     assert!(out_of_range(FreeAttempts::new(11)));
     assert!(out_of_range(Wait::new(0)));
-    assert!(Wait::new(1).is_ok() && Wait::new(3_600).is_ok());
+    assert_eq!(
+        (Wait::new(1).map(drop), Wait::new(3_600).map(drop)),
+        (Ok(()), Ok(()))
+    );
     assert!(out_of_range(Wait::new(3_601)));
     assert!(out_of_range(Cap::new(3_599)));
-    assert!(Cap::new(3_600).is_ok() && Cap::new(86_400).is_ok());
+    assert_eq!(
+        (Cap::new(3_600).map(drop), Cap::new(86_400).map(drop)),
+        (Ok(()), Ok(()))
+    );
     assert!(out_of_range(Cap::new(86_401)));
 }
 
@@ -27,8 +39,8 @@ fn no_row_permits() -> Result<(), factor::Error> {
         Cap::new(3_600)?,
     ));
     for now in [0, 1, u64::MAX].map(UnixTime::new) {
-        assert!(strict.check(None, now).is_ok());
-        assert!(Throttle::unlimited().check(None, now).is_ok());
+        assert_eq!(strict.check(None, now).map(drop), Ok(()));
+        assert_eq!(Throttle::unlimited().check(None, now).map(drop), Ok(()));
     }
     Ok(())
 }

@@ -255,7 +255,7 @@ mod tests {
                 .concat(),
             )
         };
-        assert!(AuthData::parse(&long(MAX_CREDENTIAL_ID)).is_ok());
+        assert_eq!(AuthData::parse(&long(MAX_CREDENTIAL_ID)).map(drop), Ok(()));
         assert_eq!(
             refused(&long(MAX_CREDENTIAL_ID + 1)),
             Some(ErrorKind::CredentialIdInvalid)

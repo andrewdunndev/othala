@@ -403,11 +403,12 @@ mod tests {
             .zip(public256.as_ref())
             .map(|(r, p)| agree(r, p).err().map(|e| e.kind()));
         assert_eq!(across, Some(Some(ErrorKind::Decrypt)));
-        assert!(
+        assert_eq!(
             private256
                 .as_ref()
                 .zip(public256.as_ref())
-                .is_some_and(|(r, p)| agree(r, p).is_ok())
+                .map(|(r, p)| agree(r, p).err().map(|e| e.kind())),
+            Some(None)
         );
         // wrapping to a non-EC key, and unwrapping without an `epk`, are refused
         let oct = Public::Oct(SecretBytes::new(alloc::vec![0; 16]));

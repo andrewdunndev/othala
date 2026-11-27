@@ -307,8 +307,14 @@ mod tests {
             kind(new(&[1; 1024], &json(), &data(1), b"s", b"u")),
             Some(ErrorKind::TooLarge)
         );
-        assert!(new(&[1; 1023], &json(), &data(1), b"s", b"u").is_ok());
-        assert!(new(b"i", &json(), &data(1), &[0; MAX_SIGNATURE], b"u").is_ok());
+        assert_eq!(
+            new(&[1; 1023], &json(), &data(1), b"s", b"u").map(drop),
+            Ok(())
+        );
+        assert_eq!(
+            new(b"i", &json(), &data(1), &[0; MAX_SIGNATURE], b"u").map(drop),
+            Ok(())
+        );
         assert_eq!(
             kind(new(b"i", &json(), &data(1), &[0; MAX_SIGNATURE + 1], b"u")),
             Some(ErrorKind::TooLarge)
@@ -324,7 +330,10 @@ mod tests {
             )),
             Some(ErrorKind::TooLarge)
         );
-        assert!(new(b"i", &json(), &data(1), b"s", &[1; MAX_USER_HANDLE]).is_ok());
+        assert_eq!(
+            new(b"i", &json(), &data(1), b"s", &[1; MAX_USER_HANDLE]).map(drop),
+            Ok(())
+        );
         assert_eq!(
             kind(new(
                 b"i",
@@ -439,7 +448,10 @@ mod tests {
             split(&reordered).map(|s| (s.fmt, s.auth_data_bytes == data.as_slice())),
             Ok(("none", true))
         );
-        assert!(RegistrationResponse::new(b"cred", &json, &reordered, &[]).is_ok());
+        assert_eq!(
+            RegistrationResponse::new(b"cred", &json, &reordered, &[]).map(drop),
+            Ok(())
+        );
         Ok(())
     }
 

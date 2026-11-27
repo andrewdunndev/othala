@@ -1,8 +1,9 @@
 //! Committed fixture files read at test time (fuzz corpora, ui cases).
 #![expect(
     clippy::expect_used,
+    clippy::panic,
     clippy::disallowed_methods,
-    reason = "fixtures are files by nature, and one that does not load fails its test"
+    reason = "fixtures are files by nature, and one that does not load, or panics, fails its test"
 )]
 use std::path::{Path, PathBuf};
 
@@ -28,4 +29,16 @@ pub fn files(dir: &Path) -> Vec<(String, Vec<u8>)> {
             (name, std::fs::read(&path).expect("fixture file"))
         })
         .collect()
+}
+
+/// What `run` returns for the corpus file `name`; a panic in it fails the test, naming the file and keeping the message.
+pub fn replay<T>(name: &str, run: impl FnOnce() -> T + std::panic::UnwindSafe) -> T {
+    std::panic::catch_unwind(run).unwrap_or_else(|payload| {
+        let message = payload
+            .downcast_ref::<&str>()
+            .map(|text| (*text).to_owned())
+            .or_else(|| payload.downcast_ref::<String>().cloned())
+            .unwrap_or_default();
+        std::panic::panic_any(format!("corpus file {name} panicked: {message}"))
+    })
 }

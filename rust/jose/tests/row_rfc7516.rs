@@ -55,7 +55,13 @@ fn row(file: Vector, total: usize, applicable: usize) {
             ]
         };
         if refused {
-            assert!(outcomes.iter().all(Result::is_err), "{}", case.id);
+            assert!(
+                outcomes
+                    .iter()
+                    .all(|o| matches!(o, Err(e) if matches!(e.kind(), ErrorKind::UnsupportedAlg | ErrorKind::AlgMismatch | ErrorKind::Malformed))),
+                "{}",
+                case.id
+            );
             assert_eq!(
                 JweAlg::parse(&case.alg).err().map(|e| e.kind()),
                 Some(ErrorKind::UnsupportedAlg)
@@ -66,19 +72,17 @@ fn row(file: Vector, total: usize, applicable: usize) {
             .into_iter()
             .next()
             .unwrap_or(Err(ErrorKind::Malformed.into()));
-        assert_eq!(outcome.is_ok(), case.expect.ok, "{}", case.id);
+        testkit::vectors::assert_verdict(
+            &outcome,
+            case.expect.ok,
+            case.expect.kind.as_deref(),
+            |e| e.kind(),
+            &case.id,
+        );
         if let Some(want) = &case.expect.plaintext {
             assert_eq!(
                 outcome.as_ref().ok().map(|p| b64url_encode(p)).as_ref(),
                 Some(want),
-                "{}",
-                case.id
-            );
-        }
-        if let Some(kind) = &case.expect.kind {
-            assert_eq!(
-                outcome.err().map(|e| format!("{:?}", e.kind())).as_ref(),
-                Some(kind),
                 "{}",
                 case.id
             );
@@ -205,7 +209,7 @@ fn jwe_round_trip() {
         all_enc!(Dir, None::<usize>, &payload, seed, at);
         Ok(())
     });
-    assert!(outcome.is_ok(), "{outcome:?}");
+    assert_eq!(outcome, Ok(()));
     assert_eq!(cek_len("A128GCM"), 16);
 }
 
@@ -290,7 +294,7 @@ fn jwe_tamper_is_decrypt() {
         tamper::<Dir, A256CbcHs512>(64, &payload, seed)?;
         Ok(())
     });
-    assert!(outcome.is_ok(), "{outcome:?}");
+    assert_eq!(outcome, Ok(()));
     // a CEK of the wrong length: a direct key that is not the encryption's
     let token = key::<Dir>(16).and_then(|(k, _)| k.encrypt::<A128Gcm>(b"x", &mut Counter(1)).ok());
     let short = key::<Dir>(24).and_then(|(_, s)| s.decrypt_key::<Dir>().ok());
@@ -335,7 +339,7 @@ fn jwe_serializations_agree() {
         );
         Ok(())
     });
-    assert!(outcome.is_ok(), "{outcome:?}");
+    assert_eq!(outcome, Ok(()));
 }
 
 fn compact_again(token: &Compact, key: &jose::DecryptKey<A128Kw>) -> Option<Vec<u8>> {

@@ -46,7 +46,19 @@ fn row(file: Vector, floor: usize, total: usize) {
                     Some(out)
                 );
             }
-            (None, ok) => assert_eq!((ok, digest.is_err()), (Some(false), true), "{}", case.id),
+            (None, ok) => assert_eq!(
+                (ok, digest.err().map(|e| e.kind())),
+                (
+                    Some(false),
+                    Some(if case.id == "kty-unknown" {
+                        jose::ErrorKind::UnsupportedAlg
+                    } else {
+                        jose::ErrorKind::Malformed
+                    })
+                ),
+                "{}",
+                case.id
+            ),
         }
         Outcome::Checked
     });

@@ -29,13 +29,13 @@ fn row<A: PublicAlg>(file: Vector, total: usize) {
             member(jwk.and_then(|k| k.e.as_ref()))
         );
         let key = Jwk::decode(json.as_bytes()).and_then(|jwk| jwk.verify_key::<A>());
-        assert!(key.is_ok(), "{}", case.tc_id);
+        assert_eq!(key.as_ref().err().map(|e| e.kind()), None, "{}", case.tc_id);
         let message = hex(case.msg.as_deref().unwrap_or_default());
         let signature = hex(case.sig.as_deref().unwrap_or_default());
         let outcome = key.and_then(|key| key.verify_signature(&message, &signature));
         assert_eq!(
-            outcome.is_ok(),
-            case.result == Expected::Valid,
+            outcome.err().map(|e| e.kind()),
+            (case.result != Expected::Valid).then_some(jose::ErrorKind::BadSignature),
             "{}: {}",
             case.tc_id,
             case.comment

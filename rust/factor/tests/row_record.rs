@@ -98,7 +98,6 @@ fn record_decode_corpus() {
     let files = testkit::fixture::files(&dir("fuzz/corpus/record_decode"));
     assert!(files.len() >= 20, "corpus has {} files", files.len());
     for (name, data) in files {
-        let replay = std::panic::catch_unwind(|| property::check(&data));
-        assert!(replay.is_ok(), "corpus file {name}");
+        testkit::fixture::replay(&name, || property::check(&data));
     }
 }

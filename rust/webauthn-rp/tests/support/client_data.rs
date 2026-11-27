@@ -76,8 +76,9 @@ pub(crate) fn cases() {
         }
         let origin = Origin::parse(&data.origin);
         assert_eq!(
-            origin.is_ok(),
-            !matches!(c.id.as_str(), "origin-trailing-slash" | "origin-http"),
+            origin.as_ref().err().map(|e| e.kind()),
+            matches!(c.id.as_str(), "origin-trailing-slash" | "origin-http")
+                .then_some(webauthn_rp::ErrorKind::Malformed),
             "{}",
             c.id
         );
@@ -93,7 +94,7 @@ pub(crate) fn cases() {
                     | "origin-http"
             )
         );
-        assert!(RpId::parse(&c.rp_id).is_ok());
+        assert_eq!(RpId::parse(&c.rp_id).map(drop), Ok(()));
         Outcome::Checked
     });
     assert_eq!((tally.total(), tally.checked()), (20, 20));
@@ -101,7 +102,10 @@ pub(crate) fn cases() {
 
 pub(crate) fn bounds() {
     let padded = |len: usize| [b"{}".to_vec(), vec![b' '; len - 2]].concat();
-    assert!(ClientData::parse(&padded(MAX_CLIENT_DATA_JSON)).is_ok());
+    assert_eq!(
+        ClientData::parse(&padded(MAX_CLIENT_DATA_JSON)).map(drop),
+        Ok(())
+    );
     let past = ClientData::parse(&padded(MAX_CLIENT_DATA_JSON + 1));
     assert_eq!(past.err().map(|e| e.kind()), Some(ErrorKind::TooLarge));
 }

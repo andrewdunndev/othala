@@ -1004,7 +1004,13 @@ mod tests {
                 Key::Public(k) => meta.check_sig(public_info(&k), alg, VERIFY),
                 Key::Private(k) => meta.check_sig(private_info(&k), alg, VERIFY),
             });
-            assert_eq!(outcome.is_ok(), case.expect.ok, "{}", case.jwk.text());
+            testkit::vectors::assert_verdict(
+                &outcome,
+                case.expect.ok,
+                case.expect.kind.as_deref(),
+                |e| e.kind(),
+                case.jwk.text(),
+            );
             if case.id == "eddsa-x25519-key" {
                 assert_eq!(
                     parse(case.jwk.text().as_bytes()).err().map(|e| e.kind()),
@@ -1020,12 +1026,6 @@ mod tests {
                     Some(ErrorKind::AlgMismatch),
                     "{}",
                     case.id
-                );
-            }
-            if let Some(named) = &case.expect.kind {
-                assert_eq!(
-                    outcome.err().map(|e| format!("{:?}", e.kind())).as_ref(),
-                    Some(named)
                 );
             }
             Outcome::Checked
@@ -1372,7 +1372,12 @@ mod tests {
             serde_json::from_str::<Kid>("\"a\"").ok(),
             Kid::new("a").ok()
         );
-        assert!(serde_json::from_str::<Kid>("\"\"").is_err());
+        assert_eq!(
+            serde_json::from_str::<Kid>("\"\"")
+                .err()
+                .map(|e| format!("{e}")),
+            Some("input is not well-formed; reject it, it cannot be repaired".into())
+        );
         let json = serde_json::to_string(&Kid::new("a").ok());
         assert_eq!(json.ok().as_deref(), Some("\"a\""));
     }

@@ -52,15 +52,13 @@ fn claims_cases() {
             .and_then(|key| key.verify_key::<jose::Hs256>())
             .and_then(|key| Jwt::parse(&case.jwt)?.verify(&key))
             .and_then(|jwt| jwt.claims(&policy?, UnixTime::new(case.now)));
-        assert_eq!(outcome.is_ok(), case.expect.ok, "{}", case.id);
-        if let Some(named) = &case.expect.kind {
-            assert_eq!(
-                outcome.err().map(|e| format!("{:?}", e.kind())).as_ref(),
-                Some(named),
-                "{}",
-                case.id
-            );
-        }
+        testkit::vectors::assert_verdict(
+            &outcome,
+            case.expect.ok,
+            case.expect.kind.as_deref(),
+            |e| e.kind(),
+            &case.id,
+        );
         Outcome::Checked
     });
     assert_eq!((tally.total(), tally.checked()), (23, 23));

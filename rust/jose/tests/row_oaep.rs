@@ -104,24 +104,22 @@ fn row(file: Vector, total: usize, checked: usize) {
                 &mut draws,
             ),
         });
+        // a token that does not parse is refused whole; one that parses is refused by the decryption
+        let refusal = if parse(compact, &wire).map(drop) == Ok(()) {
+            ErrorKind::Decrypt
+        } else {
+            ErrorKind::Malformed
+        };
         assert_eq!(
-            outcome.is_ok(),
-            case.expect.ok,
-            "{} {:?}",
-            case.id,
-            outcome.as_ref().err().map(|e| e.kind())
+            outcome.as_ref().err().map(|e| e.kind()),
+            (!case.expect.ok).then_some(refusal),
+            "{}",
+            case.id
         );
         if let Some(want) = &case.expect.plaintext {
             assert_eq!(
                 outcome.ok().map(|p| b64url_encode(&p)).as_ref(),
                 Some(want),
-                "{}",
-                case.id
-            );
-        } else if parse(compact, &wire).is_ok() {
-            assert_eq!(
-                outcome.err().map(|e| e.kind()),
-                Some(ErrorKind::Decrypt),
                 "{}",
                 case.id
             );
@@ -216,5 +214,5 @@ fn oaep_round_trip() {
         }
         Ok(())
     });
-    assert!(outcome.is_ok(), "{outcome:?}");
+    assert_eq!(outcome, Ok(()));
 }

@@ -1056,7 +1056,7 @@ mod tests {
     fn the_deadline_is_exclusive() -> Result<(), Error> {
         let mut fx = Fx::new()?;
         fx.now = DEADLINE - 1;
-        assert!(fx.run()?.result.is_ok());
+        assert_eq!(fx.run()?.result.map(drop), Ok(()));
         Ok(())
     }
 
@@ -1073,8 +1073,9 @@ mod tests {
     fn users_are_matched_by_the_allow_mode() -> Result<(), Error> {
         let mut fx = Fx::new()?;
         fx.handle = None;
-        assert!(
-            fx.run()?.result.is_ok(),
+        assert_eq!(
+            fx.run()?.result.map(drop),
+            Ok(()),
             "a user handle is optional when the user is named"
         );
         fx.ceremony.user = None;
@@ -1084,7 +1085,7 @@ mod tests {
             "discoverable needs the handle"
         );
         fx.handle = Some(USER.to_vec());
-        assert!(fx.run()?.result.is_ok());
+        assert_eq!(fx.run()?.result.map(drop), Ok(()));
         fx.handle = Some(b"other".to_vec());
         assert_eq!(fx.refused()?.0, ErrorKind::UserHandleMismatch);
         fx.handle = Some(USER.to_vec());
@@ -1097,7 +1098,7 @@ mod tests {
     fn an_allow_list_admits_its_members() -> Result<(), Error> {
         let mut fx = Fx::new()?;
         fx.ceremony.allowed = vec![sha256(b"other"), sha256(ID)];
-        assert!(fx.run()?.result.is_ok());
+        assert_eq!(fx.run()?.result.map(drop), Ok(()));
         Ok(())
     }
 
@@ -1146,7 +1147,11 @@ mod tests {
         let mut fx = Fx::new()?;
         fx.rp.origins.push(Origin::parse("https://second.example")?);
         fx.origin = "https://second.example".into();
-        assert!(fx.run()?.result.is_ok(), "any configured origin matches");
+        assert_eq!(
+            fx.run()?.result.map(drop),
+            Ok(()),
+            "any configured origin matches"
+        );
         Ok(())
     }
 
@@ -1217,10 +1222,10 @@ mod tests {
             Backup::MultiDevice(BackupState::NotBackedUp)
         );
         fx.ceremony.options.user_verification = Requirement::Required;
-        assert!(fx.run()?.result.is_ok());
+        assert_eq!(fx.run()?.result.map(drop), Ok(()));
         fx.rp.unsolicited = UnsolicitedExtensions::Ignore;
         fx.extensions = true;
-        assert!(fx.run()?.result.is_ok());
+        assert_eq!(fx.run()?.result.map(drop), Ok(()));
         Ok(())
     }
 
@@ -1765,8 +1770,9 @@ mod tests {
             .options
             .clone()
             .mediation(Mediation::Conditional);
-        assert!(
-            fx.run()?.result.is_ok(),
+        assert_eq!(
+            fx.run()?.result.map(drop),
+            Ok(()),
             "a conditional registration needs no UP"
         );
         let mut fx = Reg::new()?;
@@ -1793,11 +1799,11 @@ mod tests {
             .clone()
             .algorithm(crate::cose::CoseAlgorithm::Rs256)
             .algorithm(crate::cose::CoseAlgorithm::Es256);
-        assert!(fx.run()?.result.is_ok());
+        assert_eq!(fx.run()?.result.map(drop), Ok(()));
         let mut fx = Reg::new()?;
         fx.cross = r#","crossOrigin":true"#.into();
         fx.rp.cross_origin = CrossOrigin::AnyTop;
-        assert!(fx.run()?.result.is_ok());
+        assert_eq!(fx.run()?.result.map(drop), Ok(()));
         Ok(())
     }
 
@@ -1807,7 +1813,7 @@ mod tests {
         fx.extensions = true;
         assert_eq!(fx.refused()?, (ErrorKind::Extension, at(28)));
         fx.rp.unsolicited = UnsolicitedExtensions::Ignore;
-        assert!(fx.run()?.result.is_ok());
+        assert_eq!(fx.run()?.result.map(drop), Ok(()));
         Ok(())
     }
 
@@ -1891,7 +1897,7 @@ mod tests {
                 .map(|(_, e)| e)
         };
         let options = fx.ceremony.options.clone();
-        assert!(start(MAX_LISTED_CREDENTIALS, &options).is_ok());
+        assert_eq!(start(MAX_LISTED_CREDENTIALS, &options).map(drop), Ok(()));
         assert_eq!(
             start(MAX_LISTED_CREDENTIALS + 1, &options)
                 .err()
@@ -1908,8 +1914,9 @@ mod tests {
             return Err(bad(()));
         };
         let room = MAX_RECORD - record.encode()?.len();
-        assert!(
-            start(0, &sized(room)).is_ok(),
+        assert_eq!(
+            start(0, &sized(room)).map(drop),
+            Ok(()),
             "a row of exactly MAX_RECORD"
         );
         assert_eq!(
@@ -1935,7 +1942,7 @@ mod tests {
     fn every_effect_is_one_transaction_of_at_most_two_guards_and_two_writes() -> Result<(), Error> {
         let fx = Fx::new()?;
         let ok = fx.run()?;
-        assert!(ok.result.is_ok());
+        assert_eq!(ok.result.map(drop), Ok(()));
         assert_eq!(
             ok.shape,
             (2, 2),
@@ -1944,7 +1951,10 @@ mod tests {
         let mut late = Fx::new()?;
         late.now = DEADLINE;
         let refused = late.run()?;
-        assert!(refused.result.is_err());
+        assert_eq!(
+            refused.result.err().map(|e| e.kind()),
+            Some(ErrorKind::Expired)
+        );
         assert_eq!(
             refused.shape,
             (1, 1),
@@ -1952,7 +1962,7 @@ mod tests {
         );
         let reg = Reg::new()?;
         let ok = reg.run()?;
-        assert!(ok.result.is_ok());
+        assert_eq!(ok.result.map(drop), Ok(()));
         assert_eq!(
             ok.shape,
             (2, 2),
@@ -1961,7 +1971,10 @@ mod tests {
         let mut wrong = Reg::new()?;
         wrong.kind = "webauthn.get".into();
         let refused = wrong.run()?;
-        assert!(refused.result.is_err());
+        assert_eq!(
+            refused.result.err().map(|e| e.kind()),
+            Some(ErrorKind::Type)
+        );
         assert_eq!(refused.shape, (1, 1));
         let user = UserHandle::from_stored(USER)?;
         let (_, start) = fx.rp.start_authentication(
