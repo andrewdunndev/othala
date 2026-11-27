@@ -284,7 +284,7 @@ Each bound is a named `pub const` at the crate root; each is checked before anyt
 ## Runtime: errors, names, limits
 - R61 Each bound in Bounds holds with `TooLarge` before parsing, for input that is also malformed: vec:jose-derived/limits.json, row:limits.
 - R62 No parser, decoder, verifier or decrypter panics on any input: fuzz:jws_parse, fuzz:jwt_claims, fuzz:jwe_parse and fuzz:jwk_decode, their corpora replayed by `tests/fuzz_corpus.rs`.
-- R63 `Error` displays its kind only, never input, key or claim bytes: unit:error::display_names_kind_only.
+- R63 `Error` displays one fixed sentence per `ErrorKind`, naming the caller's next action and holding no input, key or claim bytes; the sentences are pairwise distinct: unit:error::each_kind_reads_distinctly.
 - R64 `Debug` of every key type, `SecretJwk`, `Plaintext`, `Payload`, `Compact` and `Unsigned` prints no key, plaintext, payload or token byte (`alg`, `kid` and lengths only), and of `Jws`, `Jwt`, `Jwe` and `VerifiedJwt` only their `kid`s: unit:key::debug_redacted, unit:sign::debug_redacted, unit:jwk::decode::debug_redacted and unit:jwe::envelope::debug_redacted, the hex, base64url and decimal of the secret absent.
 - R65 `SigningAlg`, `JweAlg` and `JweEnc` parse exactly their registry names, case-sensitively, and `name` round-trips through `Serialize` and `Deserialize`; `none`, `RSA1_5`, `PBES2-HS256+A128KW`, `ES256K`, `Ed25519` and `DEF` are `UnsupportedAlg`: unit:jws::header::names, unit:jwe::envelope::names.
 
@@ -327,6 +327,7 @@ These are the types `oidc-provider` takes from jose rather than defining its own
 - NC4 `finish` checks only the signature's length: a signature by the wrong key yields a token that fails verification downstream.
 - NC5 A JWS `Payload` is authenticated bytes, not validated content.
 - NC6 The timing of RFC 7516 11.4 is not measured (NC2); AES key-wrap failures return `Decrypt` without a substituted CEK, since a symmetric unwrap is no padding oracle.
+- NC7 `Error` has no source chain by design: a cause would be an oracle (R53, R54), so `Error::source` is `None` and the kind is all a caller gets.
 
 ## RFC 8725 section 3
 - P3.1 Algorithm verification, the key's type picking the algorithm and the header only compared: T8, T9, T11, R4, R16, R21, R52.

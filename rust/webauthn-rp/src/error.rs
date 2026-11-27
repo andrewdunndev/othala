@@ -1,7 +1,10 @@
 //! The one error type: a kind plus the ceremony step that raised it (R145, R146).
+//!
+//! `Display` is for operators and logs, never for the client: a host shows the client one refusal for every ceremony
+//! failure (O10).
 use core::fmt;
 
-/// The crate's one error type. `Display` names the kind and the spec step, never input bytes.
+/// The crate's one error type. `Display` says what failed, at which spec step, and what to do next, never input bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Error {
     kind: ErrorKind,
@@ -68,6 +71,62 @@ pub enum ErrorKind {
     Corrupt,
 }
 
+/// Lists every kind once more with its fixed text, and from that list builds `ALL` and the text lookups. A kind
+/// missing here fails to compile (the matches below are exhaustive), and so does a name that is not a kind.
+macro_rules! kind_texts {
+    ($($name:ident => $what:literal, $action:literal,)*) => {
+        impl ErrorKind {
+            /// Every kind, for the table test.
+            #[cfg(test)]
+            const ALL: &'static [Self] = &[$(Self::$name),*];
+
+            /// What failed, with no input bytes.
+            const fn what(self) -> &'static str {
+                match self {
+                    $(Self::$name => $what,)*
+                }
+            }
+
+            /// The caller's next action.
+            const fn action(self) -> &'static str {
+                match self {
+                    $(Self::$name => $action,)*
+                }
+            }
+        }
+    };
+}
+
+kind_texts! {
+    Malformed => "input is not well-formed", "reject the request, it cannot be repaired",
+    TooLarge => "input exceeds a size bound", "reject the request",
+    Type => "client data type is not this ceremony's", "reject the response and restart the ceremony",
+    ChallengeMismatch => "challenge is not this ceremony's", "reject the response and restart the ceremony",
+    OriginMismatch => "origin is not one of the relying party's", "reject the response or add the origin to the relying party",
+    CrossOriginDenied => "cross-origin use is not allowed", "reject the response or allow it on the relying party",
+    TopOriginDenied => "top origin is not allowed", "reject the response or allow it on the relying party",
+    RpIdHash => "RP ID hash does not match", "check that the relying party's id is the one the client used",
+    UserNotPresent => "user presence is not asserted", "reject the response and ask the user to retry",
+    UserNotVerified => "user verification is required but not asserted", "reject the response and ask the user to retry with verification",
+    BackupStateWithoutEligibility => "backup state is set without backup eligibility", "reject the authenticator data as invalid",
+    BackupEligibilityChanged => "backup eligibility differs from the stored credential's", "reject the response",
+    Algorithm => "credential algorithm was not offered or is not supported", "offer it or reject the credential",
+    UnknownFormat => "attestation format is not supported", "reject the credential or request attestation none",
+    FormatDisabled => "attestation format's feature is off", "enable the feature or reject the credential",
+    AttestationInvalid => "attestation does not verify", "reject the credential",
+    Untrusted => "attestation is not trusted", "reject the credential or change the trust policy",
+    CredentialIdInvalid => "credential id is too long or differs from the raw id", "reject the credential",
+    NotAllowed => "credential is not in the allow list", "reject the response",
+    CredentialMismatch => "credential id is not the stored credential's", "look up the stored credential by the response's id",
+    UserHandleMismatch => "user handle is missing or names another user", "reject the response",
+    BrowserMismatch => "browser binding differs from the one the ceremony started with", "reject the response and restart the ceremony",
+    Signature => "signature does not verify", "reject the response",
+    CounterRegressed => "signature counter did not advance", "treat the credential as possibly cloned or change the counter policy",
+    Extension => "extension was not requested or contradicts the request", "reject the response",
+    Expired => "ceremony has expired", "restart the ceremony",
+    Corrupt => "stored record does not decode", "discard the record and restart the ceremony",
+}
+
 /// A ceremony step of L3 section 7, by its number in the Recommendation.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -103,12 +162,13 @@ impl Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.kind)?;
+        f.write_str(self.kind.what())?;
         match self.step {
-            Some(SpecStep::Registration(n)) => write!(f, " at registration step {n}"),
-            Some(SpecStep::Authentication(n)) => write!(f, " at authentication step {n}"),
-            None => Ok(()),
+            Some(SpecStep::Registration(n)) => write!(f, " at registration step {n}")?,
+            Some(SpecStep::Authentication(n)) => write!(f, " at authentication step {n}")?,
+            None => {}
         }
+        write!(f, "; {}", self.kind.action())
     }
 }
 
@@ -116,9 +176,109 @@ impl core::error::Error for Error {}
 
 #[cfg(test)]
 mod tests {
+    use alloc::collections::BTreeSet;
     use alloc::format;
 
     use super::{Error, ErrorKind, SpecStep};
+
+    /// The exact text of every kind without a step. The match has no `_` arm, so a new kind fails to compile here;
+    /// `ErrorKind::ALL` comes from the `kind_texts!` list, whose exhaustive lookups refuse a kind the list leaves out, so none
+    /// escapes the loop below.
+    fn expected(kind: ErrorKind) -> &'static str {
+        match kind {
+            ErrorKind::Malformed => {
+                "input is not well-formed; reject the request, it cannot be repaired"
+            }
+            ErrorKind::TooLarge => "input exceeds a size bound; reject the request",
+            ErrorKind::Type => {
+                "client data type is not this ceremony's; reject the response and restart the ceremony"
+            }
+            ErrorKind::ChallengeMismatch => {
+                "challenge is not this ceremony's; reject the response and restart the ceremony"
+            }
+            ErrorKind::OriginMismatch => {
+                "origin is not one of the relying party's; reject the response or add the origin to the relying party"
+            }
+            ErrorKind::CrossOriginDenied => {
+                "cross-origin use is not allowed; reject the response or allow it on the relying party"
+            }
+            ErrorKind::TopOriginDenied => {
+                "top origin is not allowed; reject the response or allow it on the relying party"
+            }
+            ErrorKind::RpIdHash => {
+                "RP ID hash does not match; check that the relying party's id is the one the client used"
+            }
+            ErrorKind::UserNotPresent => {
+                "user presence is not asserted; reject the response and ask the user to retry"
+            }
+            ErrorKind::UserNotVerified => {
+                "user verification is required but not asserted; reject the response and ask the user to retry with verification"
+            }
+            ErrorKind::BackupStateWithoutEligibility => {
+                "backup state is set without backup eligibility; reject the authenticator data as invalid"
+            }
+            ErrorKind::BackupEligibilityChanged => {
+                "backup eligibility differs from the stored credential's; reject the response"
+            }
+            ErrorKind::Algorithm => {
+                "credential algorithm was not offered or is not supported; offer it or reject the credential"
+            }
+            ErrorKind::UnknownFormat => {
+                "attestation format is not supported; reject the credential or request attestation none"
+            }
+            ErrorKind::FormatDisabled => {
+                "attestation format's feature is off; enable the feature or reject the credential"
+            }
+            ErrorKind::AttestationInvalid => "attestation does not verify; reject the credential",
+            ErrorKind::Untrusted => {
+                "attestation is not trusted; reject the credential or change the trust policy"
+            }
+            ErrorKind::CredentialIdInvalid => {
+                "credential id is too long or differs from the raw id; reject the credential"
+            }
+            ErrorKind::NotAllowed => "credential is not in the allow list; reject the response",
+            ErrorKind::CredentialMismatch => {
+                "credential id is not the stored credential's; look up the stored credential by the response's id"
+            }
+            ErrorKind::UserHandleMismatch => {
+                "user handle is missing or names another user; reject the response"
+            }
+            ErrorKind::BrowserMismatch => {
+                "browser binding differs from the one the ceremony started with; reject the response and restart the ceremony"
+            }
+            ErrorKind::Signature => "signature does not verify; reject the response",
+            ErrorKind::CounterRegressed => {
+                "signature counter did not advance; treat the credential as possibly cloned or change the counter policy"
+            }
+            ErrorKind::Extension => {
+                "extension was not requested or contradicts the request; reject the response"
+            }
+            ErrorKind::Expired => "ceremony has expired; restart the ceremony",
+            ErrorKind::Corrupt => {
+                "stored record does not decode; discard the record and restart the ceremony"
+            }
+        }
+    }
+
+    #[test]
+    fn each_kind_reads_distinctly() {
+        for &kind in ErrorKind::ALL {
+            let text = expected(kind);
+            assert_eq!(format!("{}", Error::new(kind)), text);
+            // fixed prose: no quoting, bracketing or digits that could carry input or a Debug form
+            assert!(
+                text.chars()
+                    .all(|c| c.is_ascii_alphabetic() || " ;,'_-".contains(c)),
+                "{kind:?}: {text}"
+            );
+            assert!(!text.contains(&format!("{kind:?}")));
+        }
+        let texts: BTreeSet<_> = ErrorKind::ALL
+            .iter()
+            .map(|&k| format!("{}", Error::new(k)))
+            .collect();
+        assert_eq!(texts.len(), ErrorKind::ALL.len());
+    }
 
     #[test]
     fn display_names_kind_and_step() {
@@ -126,14 +286,17 @@ mod tests {
             kind: ErrorKind::Type,
             step,
         };
-        assert_eq!(format!("{}", Error::new(ErrorKind::Type)), "Type");
+        assert_eq!(
+            format!("{}", Error::new(ErrorKind::Type)),
+            "client data type is not this ceremony's; reject the response and restart the ceremony"
+        );
         assert_eq!(
             format!("{}", at(Some(SpecStep::Registration(9)))),
-            "Type at registration step 9"
+            "client data type is not this ceremony's at registration step 9; reject the response and restart the ceremony"
         );
         assert_eq!(
             format!("{}", at(Some(SpecStep::Authentication(10)))),
-            "Type at authentication step 10"
+            "client data type is not this ceremony's at authentication step 10; reject the response and restart the ceremony"
         );
         assert_eq!(
             at(Some(SpecStep::Authentication(3))).spec_step(),
