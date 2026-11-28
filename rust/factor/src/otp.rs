@@ -407,6 +407,8 @@ mod rfc4226 {
             0xda, 0x8e, 0x94, 0x5b, 0x55, 0x5a,
         ];
         assert_eq!(truncate(&tag), Some(0x50ef_7f19));
+        // the top bit of the word is dropped
+        assert_eq!(truncate(&[0xf0; 4]), Some(0x70f0_f0f0));
     }
 
     // a tag too short for its own offset makes no code, so the verifier finds no hit rather than a code of zeros
@@ -416,7 +418,6 @@ mod rfc4226 {
         assert_eq!(truncate(&[0, 0, 0]), None);
         assert_eq!(truncate(&[0x0f; 18]), None);
         assert_eq!(truncate(&[0x0f; 19]), Some(0x0f0f_0f0f));
-        assert_eq!(truncate(&[0xf0; 4]), Some(0x70f0_f0f0));
     }
 
     #[test]

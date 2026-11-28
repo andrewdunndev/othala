@@ -229,6 +229,7 @@ method RecoveryCount::new const fn(codes: u8) -> Result<Self, Error>
 method Throttle::check fn(self: &Self, attempts: Option<Row<&Attempts>>, now: UnixTime) -> Result<Permit, Closed>
 method Throttle::new const fn(policy: Backoff) -> Self
 method Throttle::reset fn(attempts: Row<&Attempts>, e: &mut impl Entropy) -> Effect
+method Throttle::unlimited const fn() -> Self
 method Totp::confirm fn(self: &Self, code: &OtpCode, now: UnixTime, last: Option<Row<&TotpStep>>, e: &mut impl Entropy) -> Result<Effect, Rejected>
 method Totp::new const fn(key: OtpKey, alg: OtpAlg, digits: Digits, period: Period, skew: Skew) -> Self
 method Totp::verify fn(self: &Self, permit: Permit, code: &OtpCode, last: Option<Row<&TotpStep>>, e: &mut impl Entropy) -> Result<Pending<Result<OtpMatch, Rejected>>, Error>
