@@ -44,37 +44,35 @@ pub(crate) enum CoseKey {
 }
 
 impl CoseKey {
-    /// Reads a COSE_Key map; unknown labels are ignored, a defined label of the wrong type is `Malformed`.
+    /// Reads a COSE_Key map: `kty` and `alg` first (RFC 9052 7.1), a pair not built is `Algorithm`, and only then the labels `kty` defines (RFC 9053 7.1); unknown labels are ignored, a defined label of the wrong type is `Malformed`.
     pub(crate) fn parse(value: &Value<'_>) -> Result<Self, Error> {
         let Value::Map(entries) = value else {
             return Err(malformed());
         };
-        let (mut kty, mut alg, mut crv, mut x, mut y) = (None, None, None, None, None);
-        for (label, v) in entries {
-            match label {
-                Value::Unsigned(1) => kty = Some(integer(v)?),
-                Value::Unsigned(3) => alg = Some(integer(v)?),
-                Value::Negative(0) => crv = Some(integer(v)?),
-                Value::Negative(1) => x = Some(bytes(v)?),
-                Value::Negative(2) => y = Some(bytes(v)?),
-                _ => {}
-            }
+        let kty = integer(member(entries, &Value::Unsigned(1)).ok_or_else(malformed)?)?;
+        let alg = integer(member(entries, &Value::Unsigned(3)).ok_or_else(malformed)?)?;
+        if (kty, alg) != (2, -7) {
+            return Err(Error::new(ErrorKind::Algorithm));
         }
-        match (kty.ok_or_else(malformed)?, alg.ok_or_else(malformed)?) {
-            (2, -7) => {
-                let (Some(1), Some(x), Some(y)) = (crv, x, y) else {
-                    return Err(malformed());
-                };
-                let x: [u8; 32] = x.try_into().map_err(|_| malformed())?;
-                let y: [u8; 32] = y.try_into().map_err(|_| malformed())?;
-                let point = Sec1Point::from_affine_coordinates(&x.into(), &y.into(), false);
-                if AffinePoint::from_sec1_point(&point).into_option().is_some() {
-                    Ok(Self::Es256 { x, y })
-                } else {
-                    Err(malformed())
-                }
-            }
-            _ => Err(Error::new(ErrorKind::Algorithm)),
+        let crv = member(entries, &Value::Negative(0))
+            .map(integer)
+            .transpose()?;
+        let x = member(entries, &Value::Negative(1))
+            .map(bytes)
+            .transpose()?;
+        let y = member(entries, &Value::Negative(2))
+            .map(bytes)
+            .transpose()?;
+        let (Some(1), Some(x), Some(y)) = (crv, x, y) else {
+            return Err(malformed());
+        };
+        let x: [u8; 32] = x.try_into().map_err(|_| malformed())?;
+        let y: [u8; 32] = y.try_into().map_err(|_| malformed())?;
+        let point = Sec1Point::from_affine_coordinates(&x.into(), &y.into(), false);
+        if AffinePoint::from_sec1_point(&point).into_option().is_some() {
+            Ok(Self::Es256 { x, y })
+        } else {
+            Err(malformed())
         }
     }
 }
@@ -107,6 +105,13 @@ impl CoseKey {
 
 const fn malformed() -> Error {
     Error::new(ErrorKind::Malformed)
+}
+
+fn member<'e, 'a>(
+    entries: &'e [(Value<'a>, Value<'a>)],
+    label: &Value<'a>,
+) -> Option<&'e Value<'a>> {
+    entries.iter().find(|(l, _)| l == label).map(|(_, v)| v)
 }
 
 fn integer(value: &Value<'_>) -> Result<i128, Error> {
@@ -202,6 +207,34 @@ mod tests {
         assert_eq!(kind(key(&x, &off_curve, 6)), malformed);
         assert_eq!(kind(key(&x, &y, 34)), Some(ErrorKind::Algorithm));
         Ok(())
+    }
+
+    #[test]
+    fn labels_are_read_per_kty() {
+        let modulus = [0xab; 256];
+        let rsa = |alg: u64| {
+            vec![
+                (Value::Unsigned(1), Value::Unsigned(3)),
+                (Value::Unsigned(3), Value::Negative(alg)),
+                (Value::Negative(0), Value::Bytes(&modulus)),
+                (Value::Negative(1), Value::Bytes(&[1, 0, 1])),
+            ]
+        };
+        assert_eq!(kind(rsa(256)), Some(ErrorKind::Algorithm), "RS256");
+        assert_eq!(kind(rsa(6)), Some(ErrorKind::Algorithm), "ES256 on RSA");
+        let okp = vec![
+            (Value::Unsigned(1), Value::Unsigned(1)),
+            (Value::Unsigned(3), Value::Negative(7)),
+            (Value::Negative(0), Value::Unsigned(6)),
+            (Value::Negative(1), Value::Bytes(&[7; 32])),
+        ];
+        assert_eq!(kind(okp), Some(ErrorKind::Algorithm), "EdDSA");
+        let es384 = vec![
+            (Value::Unsigned(1), Value::Unsigned(2)),
+            (Value::Unsigned(3), Value::Negative(34)),
+            (Value::Negative(0), Value::Text("P-384")),
+        ];
+        assert_eq!(kind(es384), Some(ErrorKind::Algorithm), "ES384");
     }
 
     #[test]

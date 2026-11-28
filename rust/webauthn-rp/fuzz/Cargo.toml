@@ -1,0 +1,44 @@
+[package]
+name = "webauthn-rp-fuzz"
+version = "0.0.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+webauthn-rp = { path = ".." }
+
+[[bin]]
+name = "attestation_object"
+path = "fuzz_targets/attestation_object.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "authenticator_data"
+path = "fuzz_targets/authenticator_data.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "client_data"
+path = "fuzz_targets/client_data.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "record"
+path = "fuzz_targets/record.rs"
+test = false
+doc = false
+bench = false
+
+# its own workspace, so the root's `members = ["*"]` never reaches it
+[workspace]
