@@ -1,1 +1,1 @@
-{ "doc": true, "mutants": { "floor": 23 } }
+{ "doc": true, "mutants": { "floor": 23, "tests": ["store", "testkit", "base"] } }
