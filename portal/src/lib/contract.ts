@@ -9,6 +9,23 @@ export const JSONNET = 'kratos/hooks/recovery-gate.jsonnet';
 /** One parse for rendered and given Ory YAML, so both read merge keys alike. */
 export const parseOryYaml = (text: string): unknown => parse(text, { merge: true, logLevel: 'error' });
 
+const UNIT_MS = { s: 1000, m: 60_000, h: 3_600_000 } as const;
+const durations = new Map<string, number>();
+
+/** A whole-number s/m/h duration from the shipped kratos.yml, read once per policy dir and key path; throws when absent or unparseable. */
+export function kratosDurationMs(keys: readonly string[], policyDir: string): number {
+  const id = `${policyDir}\0${keys.join('.')}`;
+  const hit = durations.get(id);
+  if (hit !== undefined) return hit;
+  let node: unknown = parseOryYaml(readFileSync(join(policyDir, 'kratos/kratos.yml'), 'utf8'));
+  for (const k of keys) node = (node as Record<string, unknown> | null | undefined)?.[k];
+  const m = /^(\d+)([smh])$/.exec(String(node));
+  if (!m) throw new Error(`kratos.yml ${keys.join('.')} is not a whole number of seconds, minutes or hours`);
+  const ms = Number(m[1]) * UNIT_MS[m[2] as keyof typeof UNIT_MS];
+  durations.set(id, ms);
+  return ms;
+}
+
 export type OryFiles = { kratos: string; hydra: string; identitySchema: string; jsonnet: string };
 
 const read = (path: string): string | null => {

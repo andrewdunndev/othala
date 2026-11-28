@@ -11,7 +11,6 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse, stringify } from 'yaml';
 import { checkOry } from '../src/lib/contract.ts';
-import { PRIVILEGED_WINDOW_MS } from '../src/lib/settings-view.ts';
 import { render, SECRETS } from '../src/lib/render.ts';
 import { ADMIN_POST } from '../src/server/listen.ts';
 
@@ -101,7 +100,7 @@ const KRATOS_PINS = [
   ['/identity/default_schema_id', (k) => (k.identity.default_schema_id = 'other'), 'schema_id, admin-api.ts'],
   ['/identity/schemas', (k) => (k.identity.schemas[0].id = 'other'), 'schema_id, admin-api.ts'],
   ['/identity/schemas', (k) => (k.identity.schemas[0].url = 'file:///etc/schema.json'), 'identity.schema.json, Containerfile'],
-  ['/selfservice/flows/settings/privileged_session_max_age', (k) => (k.selfservice.flows.settings.privileged_session_max_age = '1h'), 'PRIVILEGED_WINDOW_MS, settings-view.ts'],
+  ['/selfservice/flows/settings/privileged_session_max_age', (k) => (k.selfservice.flows.settings.privileged_session_max_age = '1h'), 'privilegedWindowMs, settings-view.ts'],
   ['/selfservice/flows/settings/after/passkey/hooks', (k) => (hook(k, 'settings', 'after', 'passkey').hooks[0].config.can_interrupt = true), 'handlePasskeyPrune, listen.ts: a failed prune must not block the save'],
   ['/selfservice/flows/settings/after/profile/hooks', (k) => (hook(k, 'settings', 'after', 'profile').hooks[1].config.can_interrupt = true), 'handleProfileSessions, listen.ts: best-effort'],
   ['/selfservice/flows/settings/after/webauthn/hooks', (k) => (hook(k, 'settings', 'after', 'webauthn').hooks[0].config.can_interrupt = false), 'handleSecondFactorGate, listen.ts: a gate refuses by interrupting'],
@@ -237,12 +236,6 @@ test('every ui_url, oauth2 and device page the contract names exists', () => {
   for (const [dir, names] of [['auth', auth], ['oauth2', oauth2], ['device', device]]) {
     for (const f of names) assert.ok(pages(dir).includes(f), `${dir}/${f}`);
   }
-});
-
-test('the pinned privileged window equals the portal constant', () => {
-  const schema = JSON.parse(readFileSync(join(root, 'contract/kratos.schema.json'), 'utf8'));
-  const age = schema.properties.selfservice.properties.flows.properties.settings.properties.privileged_session_max_age.const;
-  assert.equal(PRIVILEGED_WINDOW_MS, { s: 1e3, m: 6e4, h: 36e5 }[age.slice(-1)] * parseInt(age, 10));
 });
 
 test('each Ory secret list holds one or two entries', () => {
