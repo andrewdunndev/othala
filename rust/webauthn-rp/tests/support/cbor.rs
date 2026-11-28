@@ -6,6 +6,7 @@ use testkit::vectors::{Outcome, run};
 use crate::cbor::{Order, decode};
 use crate::cose::CoseKey;
 use crate::hex::hex;
+use crate::refusal::Refusal;
 use crate::{MAX_CBOR_DEPTH, MAX_CBOR_ITEMS};
 
 #[derive(Deserialize)]
@@ -20,7 +21,8 @@ struct Case {
 #[derive(Deserialize)]
 struct Expect {
     ok: bool,
-    kind: Option<String>,
+    #[serde(flatten)]
+    refusal: Refusal,
 }
 
 // the bound plus one: nested arrays, or one array of zeros
@@ -42,8 +44,10 @@ pub(crate) fn cases() {
         } else {
             assert_ne!(seen, None, "{}", c.id);
         }
-        if let Some(kind) = &c.expect.kind {
-            assert_eq!(seen.as_ref(), Some(kind), "{}", c.id);
+        if let Err(err) = &decoded {
+            c.expect
+                .refusal
+                .check(&c.id, None, err.kind(), err.spec_step());
         }
         if let (Ok(value), "cose-key-canonical") = (&decoded, c.id.as_str()) {
             assert!(matches!(CoseKey::parse(value), Ok(CoseKey::Es256 { .. })));

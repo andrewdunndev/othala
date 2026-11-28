@@ -58,6 +58,10 @@ pub(crate) struct Registration<'a> {
     pub(crate) attestation_object: &'a [u8],
     pub(crate) requirement: Requirement,
     pub(crate) algorithms: &'a [CoseAlgorithm],
+    /// The raw id the browser reports; the attested credential id when `None`.
+    pub(crate) raw_id: Option<&'a [u8]>,
+    /// The browser bindings the ceremony starts and finishes with; one fixed binding when `None`.
+    pub(crate) browsers: Option<(&'a BrowserBinding, &'a BrowserBinding)>,
 }
 
 pub(crate) struct Registering {
@@ -97,6 +101,7 @@ pub(crate) fn register(
 ) -> Result<Registering, &'static str> {
     let now = UnixTime::new(NOW);
     let mut ent = Fixed(r.challenge.to_vec(), testkit::seeded(1));
+    let fixed = binding();
     let user = UserHandle::from_stored(b"user-handle").map_err(|_| "handle")?;
     let entity = UserEntity::new(
         user,
@@ -108,16 +113,18 @@ pub(crate) fn register(
         RegistrationOptions::new(r.requirement, ResidentKey::Preferred, timeout),
         |o, a| o.algorithm(*a),
     );
+    let (started, finished) = r.browsers.unwrap_or((&fixed, &fixed));
     let (_, start) = rp
-        .start_registration(&entity, &[], &options, &binding(), now, &mut ent)
+        .start_registration(&entity, &[], &options, started, now, &mut ent)
         .map_err(|_| "start")?;
     store
         .apply(&start, now)
         .map_err(|_| "start")?
         .map_err(|_| "start")?;
-    let raw_id = attested_id(r.attestation_object);
+    let attested = attested_id(r.attestation_object);
+    let raw_id = r.raw_id.unwrap_or(&attested);
     let response =
-        match RegistrationResponse::new(&raw_id, r.client_data_json, r.attestation_object, &[]) {
+        match RegistrationResponse::new(raw_id, r.client_data_json, r.attestation_object, &[]) {
             Ok(response) => response,
             Err(result) => {
                 return Ok(Registering {
@@ -136,7 +143,7 @@ pub(crate) fn register(
         return Err("rows");
     };
     let state = RegistrationCeremony::from_row(row, |r| Some(r)).map_err(|_| "ceremony")?;
-    let verdict = rp.finish_registration(state, &response, &binding(), &Unknown, now, &mut ent);
+    let verdict = rp.finish_registration(state, &response, finished, &Unknown, now, &mut ent);
     let receipt = store
         .apply(verdict.effect(), now)
         .map_err(|_| "apply")?

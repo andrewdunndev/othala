@@ -42,7 +42,8 @@
    "raw_id": "7217953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
    "spec": "contract R17 and WebAuthn L3 13.1 (the outer id is unsigned; the attested credential id is the credential's id; CredentialIdInvalid)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "CredentialIdInvalid"
    }
   },
   {
@@ -61,7 +62,8 @@
    "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a348200",
    "spec": "contract R17 and WebAuthn L3 13.1 (the outer id is unsigned; the attested credential id is the credential's id; CredentialIdInvalid): raw id has one extra byte",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "CredentialIdInvalid"
    }
   },
   {
@@ -80,7 +82,8 @@
    "raw_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a34",
    "spec": "contract R17 and WebAuthn L3 13.1 (the outer id is unsigned; the attested credential id is the credential's id; CredentialIdInvalid): raw id is a prefix of the attested id",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "CredentialIdInvalid"
    }
   },
   {
@@ -99,7 +102,8 @@
    "raw_id": "",
    "spec": "contract R17 and WebAuthn L3 13.1 (the outer id is unsigned; the attested credential id is the credential's id; CredentialIdInvalid)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "CredentialIdInvalid"
    }
   },
   {
@@ -118,7 +122,8 @@
    "raw_id": "b843ec497b9f452b8867b92268ef95dac37c255dbf71eb2596aaeeaca0269f5d",
    "spec": "contract R17 and WebAuthn L3 13.1 (the outer id is unsigned; the attested credential id is the credential's id; CredentialIdInvalid)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "CredentialIdInvalid"
    }
   }
  ]

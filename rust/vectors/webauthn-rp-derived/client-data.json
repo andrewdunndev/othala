@@ -96,7 +96,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 10 \"C.type is the string webauthn.get\" (type MUST be webauthn.get)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Type",
+    "step": 10
    }
   },
   {
@@ -119,7 +121,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 10 \"C.type is the string webauthn.get\"",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Type",
+    "step": 10
    }
   },
   {
@@ -142,7 +146,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 10 \"C.type is the string webauthn.get\" (an exact string)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Type",
+    "step": 10
    }
   },
   {
@@ -165,7 +171,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 11 \"C.challenge equals the base64url encoding of pkOptions.challenge\"",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "ChallengeMismatch",
+    "step": 11
    }
   },
   {
@@ -188,7 +196,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 11 \"C.challenge equals the base64url encoding of pkOptions.challenge\" with 5.8.1 (base64url, no padding)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "ChallengeMismatch",
+    "step": 11
    }
   },
   {
@@ -211,7 +221,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 11 \"C.challenge equals the base64url encoding of pkOptions.challenge\"",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "ChallengeMismatch",
+    "step": 11
    }
   },
   {
@@ -234,7 +246,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 11 \"C.challenge equals the base64url encoding of pkOptions.challenge\"",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "ChallengeMismatch",
+    "step": 11
    }
   },
   {
@@ -257,7 +271,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 12 \"C.origin is an origin expected by the Relying Party\"",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "OriginMismatch",
+    "step": 12
    }
   },
   {
@@ -280,7 +296,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 12 and 13.4.9 \"C.origin is an origin expected by the Relying Party\" (an origin, compared exactly)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "OriginMismatch",
+    "step": 12
    }
   },
   {
@@ -303,7 +321,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 12 and 13.4.9 \"C.origin is an origin expected by the Relying Party\"",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "OriginMismatch",
+    "step": 12
    }
   },
   {
@@ -326,7 +346,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 12 \"C.origin is an origin expected by the Relying Party\"",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "OriginMismatch",
+    "step": 12
    }
   },
   {
@@ -349,7 +371,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 12 \"C.origin is an origin expected by the Relying Party\" (subdomains are not expected unless listed)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "OriginMismatch",
+    "step": 12
    }
   },
   {
@@ -372,7 +396,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 13 \"If C.crossOrigin is present and set to true\" with the contract (cross-origin is deny-by-default)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "CrossOriginDenied",
+    "step": 13
    }
   },
   {
@@ -428,7 +454,9 @@
    },
    "spec": "WebAuthn L3 7.2 step 14 \"Verify that the value of C.topOrigin matches the origin of a page that the Relying Party expects to be sub-framed within\"",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "TopOriginDenied",
+    "step": 14
    }
   },
   {
@@ -449,9 +477,11 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 5.8.1 (topOrigin only when crossOrigin is true) with the contract",
+   "spec": "WebAuthn L3 7.2 step 14 \"If C.topOrigin is present\" with 5.8.1 (topOrigin only when crossOrigin is true) and the contract",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "TopOriginDenied",
+    "step": 14
    }
   },
   {
@@ -474,7 +504,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 9 \"be the result of running an implementation-specific JSON parser on JSONtext\"",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 9
    }
   }
  ]
