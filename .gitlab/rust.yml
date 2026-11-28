@@ -1,6 +1,6 @@
 # check-rust: `just gate-rust` (the part of `just gate` that needs no node), on the
 # catalog's ci-rust image; the MSRV and pinned-nightly toolchains and cargo-deny are
-# added at job start. `just gate-slow` runs on a schedule and on main.
+# added at job start. `just gate-slow` runs on a schedule only.
 .rust:
   stage: verify
   image: registry.gitlab.com/dunn.dev/pipeline/ci-rust:4.16.1@sha256:3ff8f71ade7e88629d3d1e24a7e6479b30c4d78dadac97ca6a9a4379c4a15ff4
