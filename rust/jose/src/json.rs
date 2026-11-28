@@ -145,6 +145,30 @@ pub(crate) fn scan(json: &[u8]) -> Result<(), Error> {
     .map_err(|_| why.get().into())
 }
 
+/// A `T` read from a JSON object only: serde's struct-from-array form is refused, so an array never fills the members
+/// of an all-optional struct with defaults.
+pub(crate) struct Object<T>(pub(crate) T);
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Object<T> {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct Map<T>(core::marker::PhantomData<T>);
+
+        impl<'de, T: Deserialize<'de>> Visitor<'de> for Map<T> {
+            type Value = Object<T>;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("an object")
+            }
+
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Object<T>, A::Error> {
+                T::deserialize(serde::de::value::MapAccessDeserializer::new(map)).map(Object)
+            }
+        }
+
+        d.deserialize_map(Map(core::marker::PhantomData))
+    }
+}
+
 /// A member that must hold a `T` when it is named: JSON `null` is an ill-typed member, never an absent one.
 pub(crate) fn named<'de, T: Deserialize<'de>, D: Deserializer<'de>>(
     d: D,

@@ -240,9 +240,8 @@ mod tests {
         assert_eq!(kind(&general(&sig(""), "")), None);
         let nulls = [
             flat(r#","header":null"#),
-            format!(
-                r#"{{"payload":"AA","protected":null,"header":{{"alg":"HS256"}},"signature":"AQ"}}"#
-            ),
+            r#"{"payload":"AA","protected":null,"header":{"alg":"HS256"},"signature":"AQ"}"#
+                .to_string(),
             format!(r#"{{"payload":"AA","protected":"{H}","signature":null}}"#),
             format!(r#"{{"payload":null,"protected":"{H}","signature":"AQ"}}"#),
             format!(r#"{{"payload":"AA","signatures":null,"protected":"{H}","signature":"AQ"}}"#),

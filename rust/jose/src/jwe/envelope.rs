@@ -16,7 +16,7 @@ use serde::de::IgnoredAny;
 use serde_json::value::RawValue;
 
 use crate::crit::refuse_crit;
-use crate::json::{Capped, named, scan};
+use crate::json::{Capped, Object, named, scan};
 use crate::jwk::decode::{Key, parse};
 use crate::jwk::thumbprint::members;
 use crate::key::{Private, Public};
@@ -402,7 +402,7 @@ struct Document<'a> {
     //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
     //# recipients The "recipients" member value MUST be an array of JSON objects.
     #[serde(default, deserialize_with = "named")]
-    recipients: Option<Capped<Entry<'a>>>,
+    recipients: Option<Capped<Object<Entry<'a>>>>,
     #[serde(default, deserialize_with = "named")]
     aad: Option<&'a str>,
     iv: &'a str,
@@ -455,7 +455,7 @@ impl<'a> Jwe<'a> {
             //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.2
             //# The "recipients" member MUST NOT be present when using this syntax.
             Some(entries) if document.header.is_none() && document.encrypted_key.is_none() => {
-                entries.0
+                entries.0.into_iter().map(|Object(entry)| entry).collect()
             }
             None => vec![Entry {
                 header: document.header,
