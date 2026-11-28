@@ -4,7 +4,7 @@
   "targets": {
     "wasm32-unknown-unknown": ["--no-default-features"]
   },
-  "mutants": { "floor": 1, "tests": ["oidc-provider"] },
+  "mutants": { "floor": 99, "tests": ["oidc-provider"] },
   "vectors": ["rfc7515"],
   "allow": ["bytes", "http", "itoa"]
 }
