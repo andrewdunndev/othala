@@ -82,6 +82,19 @@ impl<'a> Jws<'a> {
         let name = A::ALG.name();
         let mut named = false;
         for signature in &self.signatures {
+            //= https://www.rfc-editor.org/rfc/rfc7515#section-5.2
+            //# Validate the JWS Signature against the JWS Signing Input ASCII(BASE64URL(UTF8(JWS
+            //# Protected Header)) || '.' || BASE64URL(JWS Payload)) in the manner defined for the
+            //# algorithm being used, which MUST be accurately represented by the value of the "alg"
+            //# (algorithm) Header Parameter, which MUST be present.
+            //= https://www.rfc-editor.org/rfc/rfc7515#section-5.3
+            //# These comparison rules MUST be used for all JSON string comparisons except in cases
+            //# where the definition of the member explicitly calls out that a different comparison
+            //# rule is to be used for that member value.
+            //= https://www.rfc-editor.org/rfc/rfc7515#section-10.6
+            //# When using such libraries, as part of the algorithm validation performed,
+            //# implementations MUST ensure that the algorithm information encoded in the signature
+            //# corresponds to that specified with the "alg" Header Parameter.
             if signature.header.alg.as_deref() != Some(name) {
                 continue;
             }
@@ -94,6 +107,11 @@ impl<'a> Jws<'a> {
                 return Ok((payload, signature.header.clone()));
             }
         }
+        //= https://www.rfc-editor.org/rfc/rfc7515#section-5.2
+        //# However, in all cases, at least one JWS Signature value MUST successfully validate, or
+        //# the JWS MUST be considered invalid.
+        //= https://www.rfc-editor.org/rfc/rfc7515#section-5.2
+        //# If none of the validations in step 9 succeeded, then the JWS MUST be considered invalid.
         Err(if named {
             ErrorKind::BadSignature
         } else {
@@ -175,6 +193,9 @@ mod tests {
         Jws::parse(&token(header)).err().map(|e| e.kind())
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.4
+    //= type=test
+    //# Its value MUST be a case-sensitive string.
     #[test]
     fn crit_kinds() {
         assert_eq!(

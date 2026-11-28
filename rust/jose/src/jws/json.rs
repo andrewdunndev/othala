@@ -18,6 +18,23 @@ struct Entry<'a> {
     signature: &'a str,
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
+//# payload The "payload" member MUST be present and contain the value BASE64URL(JWS Payload).
+//= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
+//# signatures The "signatures" member value MUST be an array of JSON objects.
+//= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
+//# signature The "signature" member MUST be present and contain the value BASE64URL(JWS Signature).
+//= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
+//# Additional members can be present in both the JSON objects defined above; if not understood by
+//# implementations encountering them, they MUST be ignored.
+//= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
+//= type=todo
+//= reason=no test parses a JSON serialization without its payload member
+//# payload The "payload" member MUST be present and contain the value BASE64URL(JWS Payload).
+//= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
+//= type=todo
+//= reason=no test parses a signatures member that is not an array of objects
+//# signatures The "signatures" member value MUST be an array of JSON objects.
 #[derive(Deserialize)]
 struct Document<'a> {
     payload: &'a str,
@@ -35,6 +52,8 @@ impl<'a> Jws<'a> {
         scan(json)?;
         let document: Document<'a> =
             serde_json::from_slice(json).map_err(|_| ErrorKind::Malformed)?;
+        //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.2
+        //# The "signatures" member MUST NOT be present when using this syntax.
         let entries = match (document.signatures, document.signature) {
             (Some(entries), None) if document.protected.is_none() && document.header.is_none() => {
                 entries.0
@@ -79,6 +98,13 @@ impl<'a> Jws<'a> {
 }
 
 impl Compact {
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
+    //# protected The "protected" member MUST be present and contain the value BASE64URL(UTF8(JWS
+    //# Protected Header)) when the JWS Protected Header value is non-empty; otherwise, it MUST be
+    //# absent.
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
+    //# header The "header" member MUST be present and contain the value JWS Unprotected Header when
+    //# the JWS Unprotected Header value is non-empty; otherwise, it MUST be absent.
     /// The flattened JSON serialization of this token: a JWS as `payload`, `protected`, `signature`; a JWE as
     /// `protected`, `encrypted_key` (when not empty), `iv`, `ciphertext`, `tag`.
     pub fn flattened(&self) -> String {
@@ -161,6 +187,10 @@ mod tests {
         assert_eq!(kind(&sole), off.then_some(ErrorKind::UnsupportedAlg));
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
+    //= type=test
+    //# Additional members can be present in both the JSON objects defined above; if not understood
+    //# by implementations encountering them, they MUST be ignored.
     #[test]
     fn signatures_beside_flattened_members_are_malformed() {
         let sig = format!(r#"{{"protected":"{H}","signature":"AQ"}}"#);
@@ -176,6 +206,15 @@ mod tests {
         assert_eq!(kind(&with(r#""x":1"#)), None);
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
+    //= type=test
+    //# protected The "protected" member MUST be present and contain the value BASE64URL(UTF8(JWS
+    //# Protected Header)) when the JWS Protected Header value is non-empty; otherwise, it MUST be
+    //# absent.
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
+    //= type=test
+    //# header The "header" member MUST be present and contain the value JWS Unprotected Header when
+    //# the JWS Unprotected Header value is non-empty; otherwise, it MUST be absent.
     #[test]
     fn serializations() {
         let one = token(H, "AA", "AQ");
@@ -215,6 +254,25 @@ mod tests {
         assert_eq!(kinds(&many), Some(ErrorKind::TooLarge));
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-5.2
+    //= type=test
+    //# When using the JWS JSON Serialization, this restriction includes that the same Header
+    //# Parameter name also MUST NOT occur in distinct JSON object values that together comprise the
+    //# JOSE Header.
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
+    //= type=test
+    //# The Header Parameter names in the two locations MUST be disjoint.
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.11
+    //= type=test
+    //# When used, this Header Parameter MUST be integrity protected; therefore, it MUST occur only
+    //# within the JWS Protected Header.
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.2
+    //= type=test
+    //# The "signatures" member MUST NOT be present when using this syntax.
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
+    //= type=test
+    //# signature The "signature" member MUST be present and contain the value BASE64URL(JWS
+    //# Signature).
     #[test]
     fn parsing() {
         let entry = format!(r#"{{"protected":"{H}","signature":"AQ"}}"#);

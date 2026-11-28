@@ -38,6 +38,53 @@ struct Case {
     expect: Expect,
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7519#section-4
+//= type=test
+//# The Claim Names within a JWT Claims Set MUST be unique; JWT parsers MUST either reject JWTs with
+//# duplicate Claim Names or use a JSON parser that returns only the lexically last duplicate member
+//# name, as specified in Section 15.12 ("The JSON Object") of ECMAScript 5.1 [ECMAScript].
+//= https://www.rfc-editor.org/rfc/rfc7519#section-7.2
+//= type=test
+//# If any of the listed steps fail, then the JWT MUST be rejected -- that is, treated by the
+//# application as an invalid input.
+//= https://www.rfc-editor.org/rfc/rfc7519#section-7.3
+//= type=test
+//# These comparison rules MUST be used for all JSON string comparisons except in cases where the
+//# definition of the member explicitly calls out that a different comparison rule is to be used for
+//# that member value.
+//= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.3
+//= type=test
+//# Each principal intended to process the JWT MUST identify itself with a value in the audience
+//# claim.
+//= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.3
+//= type=test
+//# If the principal processing the claim does not identify itself with a value in the "aud" claim
+//# when this claim is present, then the JWT MUST be rejected.
+//= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.4
+//= type=test
+//# The "exp" (expiration time) claim identifies the expiration time on or after which the JWT MUST
+//# NOT be accepted for processing.
+//= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.4
+//= type=test
+//# The processing of the "exp" claim requires that the current date/time MUST be before the
+//# expiration date/time listed in the "exp" claim.
+//= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.4
+//= type=test
+//# Its value MUST be a number containing a NumericDate value.
+//= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.5
+//= type=test
+//# The "nbf" (not before) claim identifies the time before which the JWT MUST NOT be accepted for
+//# processing.
+//= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.5
+//= type=test
+//# The processing of the "nbf" claim requires that the current date/time MUST be after or equal to
+//# the not-before date/time listed in the "nbf" claim.
+//= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.5
+//= type=test
+//# Its value MUST be a number containing a NumericDate value.
+//= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.6
+//= type=test
+//# Its value MUST be a number containing a NumericDate value.
 #[test]
 fn claims_cases() {
     let tally = run::<Case>(vector!("jose-derived/claims.json"), 25, |case| {

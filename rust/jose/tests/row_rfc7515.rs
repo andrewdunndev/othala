@@ -41,6 +41,24 @@ const REFUSALS: &[(&str, &str)] = &[
     ("alg-mismatch-es256-key-wrong-alg", "AlgMismatch"),
 ];
 
+//= https://www.rfc-editor.org/rfc/rfc7515#section-5.2
+//= type=test
+//# Validate the JWS Signature against the JWS Signing Input ASCII(BASE64URL(UTF8(JWS Protected
+//# Header)) || '.' || BASE64URL(JWS Payload)) in the manner defined for the algorithm being used,
+//# which MUST be accurately represented by the value of the "alg" (algorithm) Header Parameter,
+//# which MUST be present.
+//= https://www.rfc-editor.org/rfc/rfc7515#section-10.6
+//= type=test
+//# When using such libraries, as part of the algorithm validation performed, implementations MUST
+//# ensure that the algorithm information encoded in the signature corresponds to that specified
+//# with the "alg" Header Parameter.
+//= https://www.rfc-editor.org/rfc/rfc7515#section-5.2
+//= type=test
+//# However, in all cases, at least one JWS Signature value MUST successfully validate, or the JWS
+//# MUST be considered invalid.
+//= https://www.rfc-editor.org/rfc/rfc7515#section-5.2
+//= type=test
+//# If none of the validations in step 9 succeeded, then the JWS MUST be considered invalid.
 #[test]
 fn rfc7515_appendix_a() {
     let tally = run::<Case>(vector!("rfc7515/jws.json"), 19, |case| {

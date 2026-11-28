@@ -79,6 +79,11 @@ pub trait Enc: crate::jwe::envelope::sealed::Enc {
     const ENC: JweEnc;
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7519#section-8
+//= type=exception
+//= reason=HS256 is implemented; none is non-goal N1 (RFC 8725 3.2)
+//# Of the signature and MAC algorithms specified in JSON Web Algorithms [JWA], only HMAC SHA-256
+//# ("HS256") and "none" MUST be implemented by conforming JWT implementations.
 /// A JWS `alg` value this crate implements (RFC 7518 section 3.1, RFC 8037 section 3.1); `none` has no variant.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -111,6 +116,14 @@ pub enum SigningAlg {
     EdDsa,
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7519#section-8
+//= type=exception
+//= reason=A128KW, A256KW, A128CBC-HS256, A256CBC-HS512 are implemented; RSA1_5 is non-goal N2
+//# If an implementation provides encryption capabilities, of the encryption algorithms specified in
+//# [JWA], only RSAES-PKCS1-v1_5 with 2048-bit keys ("RSA1_5"), AES Key Wrap with 128- and 256-bit
+//# keys ("A128KW" and "A256KW"), and the composite authenticated encryption algorithm using AES-CBC
+//# and HMAC SHA-2 ("A128CBC-HS256" and "A256CBC-HS512") MUST be implemented by conforming
+//# implementations.
 /// A JWE `alg` value this crate implements (RFC 7518 section 4.1); `RSA1_5` and `PBES2-*` have no variant.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
