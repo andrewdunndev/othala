@@ -339,6 +339,9 @@ check-portal:
 # the just-built image is validated, not :latest.
 e2e:
   stage: e2e
+  # One browser e2e at a time on the shared runner; e2e-upgrade inherits this
+  # through `extends: e2e`.
+  resource_group: e2e
   # Real runner labels selecting the QEMU executor; a fork needs both. The first
   # names one machine, so it is a project CI/CD variable with no default:
   # tags: ignores ${VAR:-fallback} and a literal would put a host name here.
