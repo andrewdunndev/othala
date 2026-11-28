@@ -15,7 +15,7 @@ gate-rust: (tool-pins "jq") lock queue fmt lint canary twins test doc wasm thumb
 # the pinned nightly, which CI installs in .rust's before_script
 nightly := "nightly-2026-11-24"
 
-# the slow gates, run on a schedule and on main: the per-crate mutation floors, the scoreboard they feed, the features-off jose run and the fuzz targets; `just gate-slow <crate> <k>/<n>` runs shard k of n (cargo-mutants' own, k from 0) of one crate's mutants and, in shard 0, the rest of its share but the fuzz targets (a named crate skips them; only the bare `gate-slow` runs them all), which CI runs as one job per crate with `fuzz/` (the jobs `slow-plan` lists): a shard proves 0 missed and 0 timed out and at least one caught, and the gates.json floor is held by the unsharded runs, which is `just gate-slow` with no argument and the pre-merge `mutants-changed`
+# the slow gates, run on a schedule only: the per-crate mutation floors, the scoreboard they feed, the features-off jose run and the fuzz targets; `just gate-slow <crate> <k>/<n>` runs shard k of n (cargo-mutants' own, k from 0) of one crate's mutants and, in shard 0, the rest of its share but the fuzz targets (a named crate skips them; only the bare `gate-slow` runs them all), which CI runs as one job per crate with `fuzz/` (the jobs `slow-plan` lists): a shard proves 0 missed and 0 timed out and at least one caught, and the gates.json floor is held by the unsharded runs, which is `just gate-slow` with no argument and the pre-merge `mutants-changed`
 gate-slow crate="" shard="": (tool-pins)
     #!/usr/bin/env bash
     set -euo pipefail
@@ -53,6 +53,7 @@ slow-plan:
     declare -A shards=([jose]=8)
     echo "include: [{local: .gitlab/rust.yml}]"
     echo "stages: [verify]"
+    echo "default: {tags: [anvil]}"
     just slow-units | while read -r c; do
         n=${shards[$c]:-1}
         for ((k = 0; k < n; k++)); do
