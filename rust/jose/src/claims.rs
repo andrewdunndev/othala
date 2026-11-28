@@ -258,9 +258,6 @@ enum Audiences {
     Many(Vec<String>),
 }
 
-//= https://www.rfc-editor.org/rfc/rfc7519#section-4
-//# However, in the absence of such requirements, all claims that are not understood by
-//# implementations MUST be ignored.
 //= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.2
 //= type=exception
 //= reason=assigning sub values is the issuer's; jose reads no sub

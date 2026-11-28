@@ -60,11 +60,6 @@ fn distinct<'a>(kids: impl Iterator<Item = &'a Kid>) -> Result<(), Error> {
 }
 
 //= https://www.rfc-editor.org/rfc/rfc7517#section-5
-//= type=todo
-//= reason=no test decodes a JWK Set with a member it does not know
-//# Additional members can be present in the JWK Set; if not understood by implementations
-//# encountering them, they MUST be ignored.
-//= https://www.rfc-editor.org/rfc/rfc7517#section-5
 //# Additional members can be present in the JWK Set; if not understood by implementations
 //# encountering them, they MUST be ignored.
 //= https://www.rfc-editor.org/rfc/rfc7517#section-5

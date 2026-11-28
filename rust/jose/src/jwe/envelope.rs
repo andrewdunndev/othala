@@ -334,11 +334,6 @@ fn merge(
     //# At least one of the "header", "protected", and "unprotected" members MUST be present so that
     //# "alg" and "enc" Header Parameter values are conveyed for each recipient computation.
     //= https://www.rfc-editor.org/rfc/rfc7516#section-3.2
-    //= type=todo
-    //= reason=no test parses a JWE JSON serialization that holds none of the three headers
-    //# In the JWE JSON Serialization, one or more of the JWE Protected Header, JWE Shared
-    //# Unprotected Header, and JWE Per-Recipient Unprotected Header MUST be present.
-    //= https://www.rfc-editor.org/rfc/rfc7516#section-3.2
     //# In the JWE JSON Serialization, one or more of the JWE Protected Header, JWE Shared
     //# Unprotected Header, and JWE Per-Recipient Unprotected Header MUST be present.
     let alg = alg.ok_or_else(malformed)?;
@@ -382,11 +377,6 @@ struct Entry<'a> {
 }
 
 //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
-//= type=todo
-//= reason=no test parses a JWE JSON serialization with a member it does not know
-//# Additional members can be present in both the JSON objects defined above; if not understood by
-//# implementations encountering them, they MUST be ignored.
-//= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
 //# Additional members can be present in both the JSON objects defined above; if not understood by
 //# implementations encountering them, they MUST be ignored.
 #[derive(Deserialize)]
@@ -397,7 +387,7 @@ struct Document<'a> {
     encrypted_key: Option<&'a str>,
     //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
     //= type=todo
-    //= reason=no test parses a recipients member that is not an array of objects
+    //= reason=a recipients member of null is read as absent, so it is not refused as a non-array; every other non-array shape is Malformed, tested
     //# recipients The "recipients" member value MUST be an array of JSON objects.
     //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
     //# recipients The "recipients" member value MUST be an array of JSON objects.

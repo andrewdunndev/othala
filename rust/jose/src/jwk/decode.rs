@@ -89,21 +89,12 @@ fn malformed() -> Error {
 }
 
 //= https://www.rfc-editor.org/rfc/rfc7517#section-4
-//= type=todo
-//= reason=no test decodes a JWK with a member it does not know
-//# Additional members can be present in the JWK; if not understood by implementations encountering
-//# them, they MUST be ignored.
-//= https://www.rfc-editor.org/rfc/rfc7517#section-4
 //# Additional members can be present in the JWK; if not understood by implementations encountering
 //# them, they MUST be ignored.
 /// The public members read as `Cow` so an escaped value decodes (RFC 8259 7); the secret ones stay borrowed, so an
 /// escaped one is refused and no unwiped copy of a secret is made.
 #[derive(Deserialize)]
 struct Raw<'a> {
-    //= https://www.rfc-editor.org/rfc/rfc7517#section-4.1
-    //= type=todo
-    //= reason=no test decodes a JWK without kty
-    //# This member MUST be present in a JWK.
     //= https://www.rfc-editor.org/rfc/rfc7517#section-4.1
     //# This member MUST be present in a JWK.
     #[serde(borrow)]
@@ -350,12 +341,6 @@ pub(crate) fn parse(json: &[u8]) -> Result<(Meta, Key), Error> {
     parse_filtered(json, false)?.ok_or_else(malformed)
 }
 
-//= https://www.rfc-editor.org/rfc/rfc7517#section-4
-//= type=todo
-//= reason=no test decodes a single JWK that names a member twice; a set holding one is tested at set level
-//# The member names within a JWK MUST be unique; JWK parsers MUST either reject JWKs with duplicate
-//# member names or use a JSON parser that returns only the lexically last duplicate member name, as
-//# specified in Section 15.12 (The JSON Object) of ECMAScript 5.1 [ECMAScript].
 //= https://www.rfc-editor.org/rfc/rfc7517#section-4
 //# The member names within a JWK MUST be unique; JWK parsers MUST either reject JWKs with duplicate
 //# member names or use a JSON parser that returns only the lexically last duplicate member name, as
@@ -867,15 +852,18 @@ mod tests {
                 |e| e.kind(),
                 jwk.text(),
             );
-            if case.id == "eddsa-x25519-key" {
+            // a kind decode itself produces is produced by decode alone, never by binding after it
+            if let Err(e) = &decoded {
                 assert_eq!(
-                    parse(jwk.text().as_bytes()).err().map(|e| e.kind()),
-                    Some(ErrorKind::UnsupportedAlg)
+                    Some(format!("{:?}", e.kind())).as_deref(),
+                    kind,
+                    "{}",
+                    case.id
                 );
             }
             Outcome::Checked
         });
-        assert_eq!((tally.total(), tally.checked()), (40, 26));
+        assert_eq!((tally.total(), tally.checked()), (42, 27));
     }
 
     //= https://www.rfc-editor.org/rfc/rfc7518#section-6.3.2.7

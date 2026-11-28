@@ -167,3 +167,54 @@ fn ecdh_round_trip() {
     assert_eq!(outcome, Ok(()));
     let _ = Dir;
 }
+
+#[derive(Deserialize, PartialEq, Debug)]
+struct Epk {
+    kty: String,
+    crv: String,
+    x: String,
+    y: String,
+}
+
+#[derive(Deserialize)]
+struct Head {
+    epk: Option<Epk>,
+}
+
+/// The `epk` member of a compact JWE's protected header.
+fn epk_of(token: &str) -> Option<Epk> {
+    let header = b64url_decode(token.split('.').next()?).ok()?;
+    serde_json::from_slice::<Head>(&header).ok()?.epk
+}
+
+//= https://www.rfc-editor.org/rfc/rfc7518#section-4.6
+//= type=test
+//# A new ephemeral public key value MUST be generated for each key agreement operation.
+#[test]
+fn each_agreement_draws_a_new_ephemeral_key() {
+    let mut recipient = None;
+    let tally = run::<Keys>(vector!("rfc7518/appendix-c.json"), 1, |keys| {
+        if keys.id == "c-recipient" {
+            recipient = Jwk::decode(keys.public_jwk.text().as_bytes()).ok();
+        }
+        Outcome::Checked
+    });
+    assert_eq!(tally.checked(), tally.total());
+    let made = recipient.and_then(|r| r.encrypt_key::<EcdhEs>().ok());
+    assert_eq!(made.as_ref().map(|_| ()), Some(()));
+    let Some(encrypt) = made else { return };
+    let wrap_key = |e: &mut Counter| {
+        encrypt
+            .encrypt::<A128Gcm>(b"x", e)
+            .ok()
+            .and_then(|t| epk_of(t.as_str()))
+    };
+    // one source of entropy, advancing: two operations give two keys
+    let mut running = Counter(3);
+    let (first, second) = (wrap_key(&mut running), wrap_key(&mut running));
+    assert!(first.is_some() && second.is_some());
+    assert_ne!(first, second);
+    // the key is the entropy's: the same entropy again gives the same key, a different one a different key
+    assert_eq!(wrap_key(&mut Counter(3)), first);
+    assert_ne!(wrap_key(&mut Counter(4)), first);
+}
