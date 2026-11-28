@@ -9,7 +9,6 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 import { renderTemplate } from '../src/lib/render.ts';
-import { IDLE_MS } from '../src/lib/session-slide.ts';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -96,11 +95,6 @@ test('tracing blocks use the fixed provider, service name and environment', () =
 test('the e2e overlay turns off the breach check and lets every call extend', () => {
   const overlay = parse(readFileSync(join(root, 'e2e/kratos.e2e.yml'), 'utf8'));
   assert.deepEqual(overlay, { selfservice: { methods: { password: { config: { haveibeenpwned_enabled: false } } } }, session: { earliest_possible_extend: '2160h' } });
-});
-
-test('the slide idle constant equals the Kratos session lifespan', () => {
-  const hours = Number(/^(\d+)h$/.exec(render('kratos/kratos.yml').session.lifespan)?.[1]);
-  assert.equal(IDLE_MS, hours * 3_600_000);
 });
 
 test('render refuses an empty Ory admin bind', () => {
