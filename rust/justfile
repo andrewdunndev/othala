@@ -97,6 +97,7 @@ canary:
 
 test:
     cargo test --workspace --all-features
+    cargo test -p jose --no-default-features --lib
 
 doc:
     #!/usr/bin/env bash
