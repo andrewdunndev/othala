@@ -71,12 +71,12 @@ pub struct Leeway(pub(crate) u64);
 
 //= https://www.rfc-editor.org/rfc/rfc7515#section-2
 //= type=exception
-//= reason=iss and aud are compared exactly with the host's value, never parsed as a URI
+//= reason=design choice: iss and aud are compared exactly with the host's, never parsed as URIs
 //# StringOrURI A JSON string value, with the additional requirement that while arbitrary string
 //# values MAY be used, any value containing a ":" character MUST be a URI [RFC3986].
 //= https://www.rfc-editor.org/rfc/rfc7519#section-2
 //= type=exception
-//= reason=iss and aud are compared exactly with the host's value, never parsed as a URI
+//= reason=design choice: iss and aud are compared exactly with the host's, never parsed as URIs
 //# StringOrURI A JSON string value, with the additional requirement that while arbitrary string
 //# values MAY be used, any value containing a ":" character MUST be a URI [RFC3986].
 fn name(text: &str) -> Result<String, Error> {
@@ -402,6 +402,11 @@ pub(crate) fn check<K: TokenKind>(
                 return Err(ErrorKind::Audience.into());
             }
         }
+        //= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.3
+        //= type=deviation
+        //= reason=R32 and O9: a read-back policy names no audience, so a foreign aud passes
+        //# If the principal processing the claim does not identify itself with a value in the "aud"
+        //# claim when this claim is present, then the JWT MUST be rejected.
         (Claim::Good(_), None) => {}
     }
     let (now, leeway) = (i128::from(now.secs()), i128::from(policy.leeway.0));

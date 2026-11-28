@@ -31,11 +31,16 @@
 // carries at least one proof token: a ref or pending ref as above, or a backticked `just <recipe>` naming a justfile recipe. A bare `api`
 // is no proof, and naming another claim is no proof.
 // Spec citations: in any crate's src/ or tests/, a block of `//= https://www.rfc-editor.org/rfc/rfcN#section-X`, optional `//= type=`
-// (implementation, the default; test; exception; todo) and `//= reason=` lines, then `//#` lines quoting one requirement sentence of
+// (implementation, the default; test; exception; todo; deviation) and `//= reason=` lines, then `//#` lines quoting one requirement sentence of
 // rust/spec/rfcN.json (spec/extract.mjs) whole, whitespace collapsed; a quote of anything else fails. An implementation lives under src/, a
-// test sits directly above a `#[test]` fn that is not `#[ignore]`d, and an exception or todo carries a reason of three or more words.
+// test sits directly above a `#[test]` fn with no `ignore` in its attributes (`cfg_attr` included), an implementation or deviation
+// directly above a line of code, an exception or todo carries a reason of three or more words, and a deviation's reason names the
+// CONTRACT.md row that states it. A deviation sits beside the implementation and test of the sentence it bends, and is counted like a todo.
+// Several citations of one type for one sentence are allowed.
 // spec:rfcN resolves when every requirement of rfcN is implemented and tested, an exception (and nothing else), or a todo (counted);
-// spec:rfcN#X when every requirement of section X is implemented and tested or an exception.
+// spec:rfcN#X when every requirement of section X is implemented and tested or an exception, with no todo or deviation.
+// Known limits of spec citations: a test is checked for its place, not its body, so an empty or unrelated test passes; which
+// assertion proves a sentence is held by review.
 // Known limits: a claim or a floor split across two lines is not seen; the legend is the first `Checks:` block only; a pending reason is
 // checked for shape, not sense.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -252,7 +257,9 @@ function specOf(rust, n) {
     return cache.get(k);
 }
 const SPEC_URL = /^https:\/\/www\.rfc-editor\.org\/rfc\/rfc(\d+)#section-([0-9A-Z]+(?:\.\d+)*)$/;
-const TYPES = new Set(['implementation', 'test', 'exception', 'todo']);
+const TYPES = new Set(['implementation', 'test', 'exception', 'todo', 'deviation']);
+// the claim and ledger ids a crate's CONTRACT.md defines, which a deviation's reason must name
+const rowIds = (c) => new Set(isFile(join(c.dir, 'CONTRACT.md')) ? [...read(join(c.dir, 'CONTRACT.md')).matchAll(/^- ((?:NC|N|P|O|R|T|B)\d+(?:\.\d+)*[a-z]?)[ :]/gm)].map((m) => m[1]) : []);
 const short = (t) => `"${t.length > 70 ? `${t.slice(0, 67)}...` : t}"`;
 // the annotation blocks in a crate's src/ and tests/: `//= <url>`, then `//= type=..` and `//= reason=..`, then `//#` quote lines
 function annotations(c) {
@@ -298,7 +305,9 @@ function annotations(c) {
             else if (!x.text) errors.push(`${at}: no \`//#\` quote`);
             else if (!reqs.some((r) => r.section === u[2])) errors.push(`${at}: rfc${u[1]} section ${u[2]} holds no requirement sentence`);
             else if (!reqs.some((r) => r.section === u[2] && r.text === x.text)) errors.push(`${at}: ${short(x.text)} is not a requirement sentence of rfc${u[1]} section ${u[2]}`);
-            else if (x.type === 'implementation' && !rel.startsWith(`${c.dir.slice(c.rust.length + 1)}/src/`)) errors.push(`${at}: an implementation annotation lives under src/`);
+            else if (x.type === 'deviation' && !(x.meta.reason ?? '').split(/[\s,;:()]+/).some((w) => rowIds(c).has(w))) errors.push(`${at}: type=deviation needs reason= naming a row of ${c.dir.slice(c.rust.length + 1)}/CONTRACT.md that states it`);
+            else if ((x.type === 'implementation' || x.type === 'deviation') && !rel.startsWith(`${c.dir.slice(c.rust.length + 1)}/src/`)) errors.push(`${at}: an ${x.type} annotation lives under src/`);
+            else if ((x.type === 'implementation' || x.type === 'deviation') && !codeFollows(lines, x.end)) errors.push(`${at}: an ${x.type} annotation sits directly above the code it cites, not a blank line or a closing brace`);
             else if (x.type === 'test' && !testFollows(lines, x.end)) errors.push(`${at}: a test annotation sits directly above a #[test] fn that is not #[ignore]d`);
             else {
                 x.rfc = u[1];
@@ -319,7 +328,15 @@ function testFollows(lines, from) {
         const l = lines[i].trim();
         if (l.startsWith('//')) continue;
         if (l.startsWith('#[')) attrs.push(l);
-        else return /^(?:pub\s+)?(?:async\s+)?fn\s+\w+/.test(l) && attrs.some((a) => ATTR.test(a)) && !attrs.some((a) => /#\[\s*ignore\b/.test(a));
+        else return /^(?:pub\s+)?(?:async\s+)?fn\s+\w+/.test(l) && attrs.some((a) => ATTR.test(a)) && !attrs.some((a) => /\bignore\b/.test(a));
+    }
+    return false;
+}
+// after a block: comments and attributes, then a line of code that is not a closing brace
+function codeFollows(lines, from) {
+    for (let i = from; i < lines.length; i++) {
+        const l = lines[i].trim();
+        if (!l.startsWith('//') && !l.startsWith('#[')) return l !== '' && !/^[})\]]/.test(l);
     }
     return false;
 }
@@ -330,10 +347,11 @@ function traced(c, n, s) {
     const scope = reqs.filter((r) => s === undefined || r.section === s);
     if (!scope.length) return { reason: `rfc${n} section ${s} holds no requirement sentence` };
     const all = annotations(c).found.filter((x) => x.rfc === n);
-    const out = { bad: [], todo: [], count: scope.length };
+    const out = { bad: [], todo: [], deviation: [], count: scope.length };
     for (const r of scope) {
         const kinds = new Set(all.filter((x) => x.section === r.section && x.text === r.text).map((x) => x.type));
         const what = `rfc${n} ${r.section} ${short(r.text)}`;
+        if (kinds.has('deviation')) out.deviation.push(what);
         if (kinds.has('exception') && kinds.size > 1) out.bad.push(`${what}: an exception and ${[...kinds].filter((t) => t !== 'exception').join(' and ')} both cite it`);
         else if (kinds.has('implementation') && kinds.has('test')) {
             if (kinds.has('todo')) out.bad.push(`${what}: implemented and tested, drop its todo`);
@@ -343,6 +361,7 @@ function traced(c, n, s) {
     return out;
 }
 const todos = new Map();
+const deviations = new Map();
 
 // each resolver returns 'ok' or the reason the ref is dangling
 const resolvers = {
@@ -409,8 +428,11 @@ const resolvers = {
         if (!m) return `spec:${v} is not rfcN or rfcN#section`;
         const t = traced(c, m[1], m[2]);
         if (t.reason) return t.reason;
-        if (m[2] !== undefined && t.todo.length) t.bad.push(...t.todo.map((x) => `${x}: still a todo, so no claim can cite its section`));
-        else for (const x of t.todo) todos.set(`${c.dir} ${x}`, `${c.dir.slice(c.rust.length + 1)} ${x}`);
+        if (m[2] !== undefined && t.todo.length + t.deviation.length) t.bad.push(...[...t.todo, ...t.deviation].map((x) => `${x}: still a todo or a deviation, so no claim can cite its section as met`));
+        else {
+            for (const x of t.todo) todos.set(`${c.dir} ${x}`, `todo ${c.dir.slice(c.rust.length + 1)} ${x}`);
+            for (const x of t.deviation) deviations.set(`${c.dir} ${x}`, `deviation ${c.dir.slice(c.rust.length + 1)} ${x}`);
+        }
         return t.bad.length ? `${t.bad.length} of ${t.count} requirements unmapped:\n    ${t.bad.join('\n    ')}` : 'ok';
     },
     gate: (c, v) => (isFile(join(c.rust, 'justfile')) && new RegExp(`^${esc(v)}(\\s[^:=\\n]*)?:(?!=)`, 'm').test(read(join(c.rust, 'justfile'))) ? 'ok' : `no just recipe ${v}`),
@@ -435,7 +457,8 @@ const NAME = '(?:[A-Za-z0-9_./*#:-]|\\{[^}\\s]*\\})+';
 function check(rust) {
     cache.clear();
     todos.clear();
-    const out = { failures: [], resolved: 0, pending: [], contracts: 0, todo: todos };
+    deviations.clear();
+    const out = { failures: [], resolved: 0, pending: [], contracts: 0, todo: todos, deviation: deviations };
     const crates = readdirSync(rust).filter((d) => isFile(join(rust, d, 'Cargo.toml')));
     // every spec citation in any crate quotes a requirement sentence of its pinned RFC, whether or not a contract cites the spec
     for (const d of crates) out.failures.push(...annotations({ dir: join(rust, d), rust }).errors);
@@ -555,9 +578,9 @@ function check(rust) {
 function report(rust) {
     const r = check(rust);
     for (const f of r.failures) console.log(f);
-    console.log(`claims: ${r.contracts} contracts, ${r.resolved} refs resolved, ${r.pending.length} pending, ${r.todo.size} spec todos, ${r.failures.length} failures`);
+    console.log(`claims: ${r.contracts} contracts, ${r.resolved} refs resolved, ${r.pending.length} pending, ${r.todo.size} spec todos, ${r.deviation.size} spec deviations, ${r.failures.length} failures`);
     for (const p of r.pending) console.log(`  pending ${p}`);
-    for (const t of r.todo.values()) console.log(`  todo ${t}`);
+    for (const t of [...r.todo.values(), ...r.deviation.values()]) console.log(`  ${t}`);
     return r.failures.length ? 1 : 0;
 }
 

@@ -4,6 +4,9 @@
 // MUST, MUST NOT, REQUIRED, SHALL or SHALL NOT in capitals; the one BCP 14 boilerplate sentence that lists the key words is not one.
 // Page footers and headers are dropped, a paragraph's lines are joined with one space (a line ending in a letter and `-` joins with none), and a
 // sentence ends at a `.` followed by whitespace and a capital, a quote or `(`. claims.mjs compares citations with these sentences.
+// Out of scope for the pilot: a sentence holding only SHOULD, SHOULD NOT or RECOMMENDED (9 in RFC 7515, 9 in RFC 7519 by this
+// splitter); one that also holds an in-scope word is kept (RFC 7515 10.13). A keyword in quotes counts: RFC 7515 4 (designated
+// "MUST be understood") and 10.12 (the "SHOULD" treated as a "MUST") are requirements on the implementation.
 // Licence of this script: MIT OR Apache-2.0.
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';

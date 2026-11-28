@@ -78,7 +78,7 @@ Checks:
 
 ## Runtime: JWT claims
 - R31 `iss` must equal the policy's issuer (`Issuer`) and be present (`MissingClaim`) (8725 3.8): vec:jose-derived/claims.json#iss-wrong, #iss-missing, row:claims.
-- R32 `aud`, a string or an array of strings, must contain the policy's audience (`Audience`) and be present (`MissingClaim`) (8725 3.9); under `Policy::read_back` it must be present and well typed and is not compared: vec:jose-derived/claims.json#aud-wrong, #aud-array-without, #aud-missing, #aud-array-contains, row:claims.
+- R32 `aud`, a string or an array of strings, must contain the policy's audience (`Audience`) and be present (`MissingClaim`) (8725 3.9); under `Policy::read_back` it must be present and well typed and is not compared, a deviation from RFC 7519 4.1.3 for a token the verifier issued itself (an `id_token_hint` names its client, not the issuer), so the consumer checks that the `aud` it reads names a client it issued to (O9): unit:claims::read_back_policy, vec:jose-derived/claims.json#aud-wrong, #aud-array-without, #aud-missing, #aud-array-contains, row:claims.
 - R33 `typ` is read from the protected header and compared case-insensitively with an `application/` prefix removed; `Typ::Explicit` requires it equal (`Type`, absent included); `Typ::Generic` accepts it absent or equal to `JWT` and refuses any other (8725 3.11, 3.12): vec:jose-derived/claims.json#typ-wrong, #typ-missing, #typ-application-prefix, row:claims.
 - R34 Under `Expiry::Required` `exp` absent is `MissingClaim` and `exp` at or before `now - leeway` is `Expired`; under `Expiry::Unchecked` (read-back only, T7) a past `exp` passes: vec:jose-derived/claims.json#exp-missing, #exp-past, #exp-at-leeway-edge, #exp-inside-leeway, #exp-fractional, row:claims.
 - R35 `nbf` or `iat` after `now + leeway` is `NotYetValid`; at the edge it passes: vec:jose-derived/claims.json#nbf-past-leeway, #nbf-at-leeway-edge, #iat-future-past-leeway, row:claims.
@@ -120,7 +120,7 @@ Checks:
 - R65 `SigningAlg`, `JweAlg` and `JweEnc` parse exactly their registry names, case-sensitively, and `name` round-trips through `Serialize` and `Deserialize`; `none`, `RSA1_5`, `PBES2-HS256+A128KW`, `ES256K`, `Ed25519` and `DEF` are `UnsupportedAlg`: unit:jws::header::names, unit:jwe::envelope::names, vec:rfc7516/jwe.json#a2-rsa1_5-a128cbc-hs256-must-refuse, row:rfc7516.
 
 ## Runtime: spec trace
-- R66 Every requirement sentence of RFC 7515 and RFC 7519 is implemented and tested, an exception with its reason, or a counted todo: spec:rfc7515 spec:rfc7519.
+- R66 Every requirement sentence of RFC 7515 and RFC 7519 (MUST, MUST NOT, REQUIRED, SHALL, SHALL NOT; `spec/extract.mjs` says what is kept) is implemented and tested, an exception with its reason, or a counted todo, and a deviation beside an implementation names the row that states it (R32): spec:rfc7515 spec:rfc7519. Known limit: a test citation is checked for its place above a live `#[test]` fn, not for its body.
 
 ## Obligation
 - O1 The `Entropy` given to `encrypt`, `decrypt_blinded` and `sign_blinded` never repeats a draw, since a repeated GCM IV under one key loses confidentiality and integrity: the host's.
@@ -131,7 +131,7 @@ Checks:
 - O6 A `dir` or A*GCMKW key used with random 96-bit IVs is limited to 2^32 messages (NIST SP 800-38D 8.3), and rotating it is the host's.
 - O7 One key, one purpose: a host that must keep signing and key agreement apart on one EC key, or HMAC and key wrap on one `oct` key, publishes `use` or `key_ops` (R20).
 - O8 An HMAC or `oct` key carries the entropy its length implies: the host's, since R13 checks only the length.
-- O9 A `ReadBack` kind is implemented only for tokens the verifier itself issued, and read back only under its own key (O2): the kind's author.
+- O9 A `ReadBack` kind is implemented only for tokens the verifier itself issued, and read back only under its own key (O2), and its consumer checks that the `aud` read back names a client it issued to (R32): the kind's author.
 - O10 `rsa-sign` and `rsa-decrypt` are enabled only where an RSA private key is required, accepting the Marvin residual risk (NC2): the host's.
 - O11 HS keys, `oct` JWK material and content-encryption keys are `base::SecretBytes`, never jose-owned buffers, and are read (`expose`) only in `src/sig/hmac.rs`, `src/jwk/decode.rs` (decoding into the curve and rsa types), `src/jwk/thumbprint.rs` (an `oct` key's `k`), `src/jwe/envelope.rs` (a `Plaintext`'s bytes), `src/jwe/kw.rs`, `src/jwe/content.rs`, `src/jwe/ecdh.rs` and `src/jwe/oaep.rs`; private EC, Ed25519 and RSA keys live in their crates' own types, so `src/sig/{ecdsa,ecdsa_p521,eddsa,rsa_sign}.rs` read none. Held by gate:lint, gate:canary and gate:own under ruling R-j once base-expose lands: jose then enables `base/expose` and declares these modules as `expose` in `gates.json` (a dependency of the first item that calls `expose`, jose-07).
 - O12 A key set fetched from a remote `jwks_uri` is decoded with `JwkSet::decode_public`, never `decode` (R26b): the host's, and every consumer's, `oidc-provider` among them.
