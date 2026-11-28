@@ -117,6 +117,16 @@ export function freshnessVerdict(
   return prompt.includes('none') ? 'login_required' : 'refresh';
 }
 
+/** OIDC prompt=none forbids any UI: the browser must get an error at the redirect_uri. Device grants never carry it. */
+export function promptIsNone(requestUrl: string | undefined): boolean {
+  if (!requestUrl || isDeviceRequest(requestUrl)) return false;
+  try {
+    return (new URL(requestUrl).searchParams.get('prompt') ?? '').split(' ').includes('none');
+  } catch {
+    return false;
+  }
+}
+
 function loginBounce(challenge: string, query = ''): Response {
   return redirect(`${LOGIN_UI_BASE}?${query}return_to=${encodeURIComponent(buildLoginReturnTo(challenge))}`);
 }
@@ -154,11 +164,13 @@ async function rejectConsent(
   description: string,
   onFail: () => Response,
   deviceReason?: string,
+  error = 'access_denied',
+  status_code = 403,
 ): Promise<Response> {
   try {
     const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
       consentChallenge: challenge,
-      rejectOAuth2Request: { error: 'access_denied', error_description: description, status_code: 403 },
+      rejectOAuth2Request: { error, error_description: description, status_code },
     });
     return landing(redirect_to, deviceReason);
   } catch (err) {
@@ -183,6 +195,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
   }
 
   const clientId = login.client?.client_id ?? '';
+  const silent = promptIsNone(login.request_url);
 
   let session: Session | null;
   try {
@@ -203,7 +216,9 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     }
     return redirect(login.request_url);
   }
-  if (!session?.active || !session.identity) return loginBounce(challenge);
+  if (!session?.active || !session.identity) {
+    return silent ? rejectLogin(d, challenge, 'login_required', 400) : loginBounce(challenge);
+  }
   const subject = session.identity.id;
   const acr = session.authenticator_assurance_level ?? undefined;
 
@@ -228,6 +243,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
   if (freshness === 'refresh') return loginBounce(challenge, device ? 'refresh=true&aal=aal2&' : 'refresh=true&');
 
   // The opt-out skips the step-up verdict, never the device grant's aal2.
+  if ('stepUp' in access && silent) return rejectLogin(d, challenge, 'login_required', 400);
   if ('stepUp' in access || (device && acr !== 'aal2')) return loginBounce(challenge, 'aal=aal2&');
 
   // A sign-in to an app counts as use, and remember_for follows the extended expiry.
@@ -251,6 +267,8 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
   }
 }
 
+const CONSENT_REMEMBER_SECONDS = 86400;
+
 export async function acceptConsentRequest(
   challenge: string,
   consent: OAuth2ConsentRequest,
@@ -260,14 +278,16 @@ export async function acceptConsentRequest(
 ): Promise<Response> {
   const manifest = d.manifest(clientId);
   const idTokenClaims = composeIDTokenClaims(identity, manifest, consent.requested_scope ?? []);
+  const remembered = !!manifest?.skipConsent && !isDeviceRequest(consent.request_url);
   try {
     const { redirect_to } = await d.oauth2.acceptOAuth2ConsentRequest({
       consentChallenge: challenge,
       acceptOAuth2ConsentRequest: {
         grant_scope: consent.requested_scope,
         grant_access_token_audience: consent.requested_access_token_audience,
-        // Not remembered, so every authorize passes the gate again.
-        remember: false,
+        // Remembered only so prompt=none can skip the grant screen; the login and consent gates still run on every authorize.
+        remember: remembered,
+        remember_for: remembered ? CONSENT_REMEMBER_SECONDS : undefined,
         session: {
           id_token: idTokenClaims,
           access_token: {},
@@ -325,11 +345,21 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
       upstream('getSession', err);
       return upstreamError();
     }
-    if (!session?.active || !session.identity) return rejectConsent(d, challenge, 'no active session', upstreamError);
-    if (session.identity.id !== consent.subject) return rejectConsent(d, challenge, 'session subject mismatch', upstreamError);
+    const silent = promptIsNone(consent.request_url);
+    const err = silent ? 'login_required' : 'access_denied';
+    const status = silent ? 400 : 403;
+    if (!session?.active || !session.identity) {
+      return rejectConsent(d, challenge, 'no active session', upstreamError, undefined, err, status);
+    }
+    if (session.identity.id !== consent.subject) {
+      return rejectConsent(d, challenge, 'session subject mismatch', upstreamError, undefined, err, status);
+    }
     return acceptConsentRequest(challenge, consent, identity!, d, clientId);
   }
 
+  if (promptIsNone(consent.request_url)) {
+    return rejectConsent(d, challenge, 'consent_required', upstreamError, undefined, 'consent_required', 400);
+  }
   return consentScreen(challenge);
 }
 

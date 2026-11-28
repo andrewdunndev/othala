@@ -1,364 +1,37 @@
 # webauthn-rp contract
 
 One claim per line, each naming the check that proves it. Tags follow the claims ledger: *Type* (the program does not compile), *Runtime* (a check returns an error or a value), *Obligation* (the host's or the consumer's, proven against every `Store` or in the consumer's contract), *Build*, *Non-goal* (named, with its reason).
-This file supersedes the webauthn-rp block of architecture section 2, which shows the pre-contract signatures; the amendments it records are listed under Amendments.
+This file supersedes the webauthn-rp block of architecture section 2; the amendments it records are listed under Amendments.
 Step numbers are those of https://www.w3.org/TR/2026/REC-webauthn-3-20260825/ (the dated HTML whose SHA-256 `vectors/SOURCES.toml` records), as its ordered lists number them; `Error::spec_step` returns the same number as a `SpecStep`.
 
 Checks:
 - `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code given) and the compiling twin `tests/ui/pass/x.rs` one line and one token away (`just twins`); `just ledger` runs with every feature on, pins the case count, requires every `ui:` name here to be a case on disk and the reverse, and each `.stderr` to open with its code. A case marked *illustrates* is a named guess: it shows one plausible spelling fails, so an `api:` or `api-absent:` ref is the real check of that claim.
 - `api:<Item>` is an item path the committed `public-api.txt` declares (`Type::method`, or a bare top-level name; impl and attr lines declare none) and `api-absent:<Item>` one it does not declare (a bare name matches no path's last segment; `Type::b` needs `Type` declared); `api-pending:<Item>` names an item not declared yet. The snapshot is rustdoc JSON on the pinned nightly through the workspace `api.jq` (`just api`).
-- `row:f` is `tests/row_f.rs`, one file per vector family, run as one `primitives/rows.json` row; it reads its family through the one `testkit` vector runner (total and checked floor asserted). Families: `w3c_none`, `w3c_packed`, `w3c_attestation_root`, `w3c_tpm`, `w3c_android_key`, `w3c_apple`, `w3c_fido_u2f`, `w3c_prf` read `vectors/w3c-webauthn-3/<name>.json`; `exam_spike` reads `w3c-webauthn-3/exam-spike/assertion-none-es256.json`; `android_key_attestation` reads the four committed `android-key-attestation` chains; `derived` reads `vectors/webauthn-rp-derived/`; `roundtrip` drives the virtual authenticator; `race` runs the `testkit` snapshot-race harness over `store::MemStore`.
-- `w3c:f#s` is section `s` of `vectors/w3c-webauthn-3/f`. `oracle:f#c` is case `c` of `vectors/webauthn-rp-derived/f`, the oracle lane's family (ruling R-b); `oracle:f` alone is the whole file. `oracle-pending:f` names a family file the oracle lane has not pushed; its claim is pending until it lands, and no case is written here.
-- `prop:t` is a proptest in `tests/props.rs` (fixed seed; the one property so far, the record round trip, runs inside `src/record.rs` as `unit:record::record_round_trip`); `fuzz-pending:t` names the fuzz target `t`: no queue item yet, and libFuzzer needs a clang this zone lacks, so the claim is pending until the target and its corpus land under `fuzz/`; `mutants:m` is `cargo mutants` over `src/m.rs` (`src/attestation/x.rs` for `attestation::x`), every mutant caught or listed with a reason in `mutants.toml`; `unit:m::t` is a test in `src/m.rs`; `unit-pending:m::t` names a test of behaviour not built yet (trust dispatch, unassigned): pending, with no queue item yet; `gate-pending:x (reason)` names a `just x` recipe not written yet.
+- `row:f` is `tests/row_f.rs` holding at least one test, one file per vector family, run as one `primitives/rows.json` row; it reads its family through the one `testkit` vector runner (total and checked floor asserted). Families: `w3c_none`, `w3c_packed`, `w3c_attestation_root`, `w3c_tpm`, `w3c_android_key`, `w3c_apple`, `w3c_fido_u2f`, `w3c_prf` read `vectors/w3c-webauthn-3/<name>.json`; `exam_spike` reads `w3c-webauthn-3/exam-spike/assertion-none-es256.json`; `android_key_attestation` reads the four committed `android-key-attestation` chains; `derived` reads `vectors/webauthn-rp-derived/`; `roundtrip` drives the virtual authenticator; `race` runs the `testkit` snapshot-race harness over `store::MemStore`. `row-pending:f (reason)` is a row whose file exists and holds no test yet: its family is planned, not built.
+- `w3c:f#s` is section `s` of `vectors/w3c-webauthn-3/f`. `oracle:f#c` is case `c` of `vectors/webauthn-rp-derived/f`, the oracle lane's family (ruling R-b); `oracle:f` alone is the whole file. Either resolves only when a string literal under `tests/` names the file, so a vector no test reads proves nothing. `w3c-pending:f#s (reason)` and `oracle-pending:f (reason)` name a vector file that no test reads yet, or that the oracle lane has not pushed; the claim is pending until a test reads it.
+- `prop:t` is a proptest in `tests/props.rs` (fixed seed; the one property so far, the record round trip, runs inside `src/record.rs` as `unit:record::record_round_trip`); `fuzz-pending:t` names the fuzz target `t`: no queue item yet, and libFuzzer needs a clang this zone lacks, so the claim is pending until the target and its corpus land under `fuzz/`; `mutants:m` is `cargo mutants` over `src/m.rs` (`src/attestation/x.rs` for `attestation::x`), which holds at least one `fn`, every mutant caught or listed with a reason in `mutants.toml`; `mutants-pending:m (reason)` is a module that holds no `fn` yet; `unit:m::t` is a test in `src/m.rs`; `unit-pending:m::t` names a test of behaviour not built yet (trust dispatch, unassigned): pending, with no queue item yet; `gate-pending:x (reason)` names a `just x` recipe not written yet.
 - `it:f` is `tests/f.rs`; `it:f::t` is the test `t` in it.
 
-Stages: the types, traits, constants, module layout and the bodies of items webauthn-02 to webauthn-07 (CBOR, COSE ES256, client data, authenticator data, the record codec, authentication, `none` registration, the virtual-authenticator round trip and the races) are in `src/`. Every public function and trait impl is stated under Signatures, verbatim. The attestation formats other than `none`, trust dispatch, extensions and JSON shapes are not built: their types exist with `#[expect(dead_code)]` naming the item that first reads them, and the `row:` files for them hold no test, so those rows read red (`running 0 tests`) until built.
+Stages: webauthn-02 to webauthn-07 are built (CBOR, COSE ES256, client data, authenticator data, the record codec, authentication, `none` registration, the virtual-authenticator round trip and the races). Everything else declared is unbuilt and listed under Planned. A built check whose only cited proof is a vector file no test reads yet is pending as well, not proven.
 
-## Signatures
-Functions and trait impls, by the file and item that land them. `BrowserBinding` is `base::BrowserBinding` (ruling R-d), a newtype built from `&Secret<32>` that lands as a base item; every signature naming it waits on that item.
-
-### `src/error.rs` (webauthn-02)
-```rust
-impl Error {
-    /// What failed.
-    pub fn kind(&self) -> ErrorKind;
-    /// The L3 7.1 or 7.2 step that failed, when the failure is a ceremony step.
-    pub fn spec_step(&self) -> Option<SpecStep>;
-}
-impl fmt::Display for Error { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
-impl core::error::Error for Error {}
-```
-### `src/policy.rs` (webauthn-03)
-```rust
-impl RpId {
-    /// Parse an RP ID; anything but a lowercase ASCII domain is `Malformed`, past `MAX_RP_ID` is `TooLarge`.
-    pub fn parse(text: &str) -> Result<Self, Error>;
-    /// The RP ID as text.
-    pub fn as_str(&self) -> &str;
-}
-impl Origin {
-    /// Parse an origin in the form a client serializes it; any other spelling is `Malformed`.
-    pub fn parse(text: &str) -> Result<Self, Error>;
-    /// The origin as text.
-    pub fn as_str(&self) -> &str;
-}
-impl RelyingParty {
-    /// Start from the RP ID, its display name, its first origin and the counter policy.
-    pub fn builder(id: RpId, name: DisplayName, origin: Origin, counter: CounterPolicy) -> RelyingPartyBuilder;
-    /// The RP ID every ceremony hashes.
-    pub fn id(&self) -> &RpId;
-}
-impl RelyingPartyBuilder {
-    /// Accept one more origin.
-    pub fn origin(self, origin: Origin) -> Self;
-    /// Set the cross-origin policy; the default is `CrossOrigin::Deny`.
-    pub fn cross_origin(self, policy: CrossOrigin) -> Self;
-    /// Set the unsolicited-extension policy; the default is `UnsolicitedExtensions::Reject`.
-    pub fn unsolicited(self, policy: UnsolicitedExtensions) -> Self;
-    /// Set the attestation trust policy; the default is `TrustPolicy::AcceptUntrusted`, since most ceremonies convey no attestation, and a `TrustDecision::Denied` fails under either.
-    pub fn trust(self, policy: TrustPolicy) -> Self;
-    /// Set the android-key list policy; the default is `KeyEnforcement::TrustedEnvironment`.
-    pub fn android_key(self, policy: KeyEnforcement) -> Self;
-    /// Finish; a repeated origin is `Malformed`, more than `MAX_ORIGINS` is `TooLarge`.
-    pub fn build(self) -> Result<RelyingParty, Error>;
-}
-impl fmt::Debug for RelyingParty { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
-impl fmt::Debug for RelyingPartyBuilder { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
-```
-### `src/options.rs` (webauthn-04 and webauthn-05)
-```rust
-impl UserHandle {
-    /// Draw a new handle: 32 bytes of `Entropy`.
-    pub fn generate(e: &mut impl Entropy) -> Self;
-    /// Read a handle back from storage; empty is `Malformed`, longer than `MAX_USER_HANDLE` is `TooLarge`.
-    pub fn from_stored(bytes: &[u8]) -> Result<Self, Error>;
-    /// The handle's bytes.
-    pub fn as_bytes(&self) -> &[u8];
-}
-impl UserName {
-    /// Parse a user name.
-    pub fn parse(text: &str) -> Result<Self, Error>;
-    /// The name as text.
-    pub fn as_str(&self) -> &str;
-}
-impl DisplayName {
-    /// Parse a display name.
-    pub fn parse(text: &str) -> Result<Self, Error>;
-    /// The name as text.
-    pub fn as_str(&self) -> &str;
-}
-impl UserEntity {
-    /// Name the user.
-    pub fn new(handle: UserHandle, name: UserName, display_name: DisplayName) -> Self;
-    /// The user's handle.
-    pub fn handle(&self) -> &UserHandle;
-}
-impl fmt::Debug for UserName { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
-impl fmt::Debug for DisplayName { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
-impl fmt::Debug for UserEntity { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
-impl fmt::Debug for CreationOptions { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
-impl Transport {
-    /// The L3 5.8.4 name.
-    pub fn as_str(&self) -> &'static str;
-    /// Read a name back; any other text is `Malformed`.
-    pub fn parse(text: &str) -> Result<Self, Error>;
-}
-impl CredentialDescriptor {
-    /// Name a credential and the transports it was registered with; a repeated transport is kept once.
-    pub fn new(id: CredentialId, transports: &[Transport]) -> Self;
-    /// The credential id.
-    pub fn id(&self) -> &CredentialId;
-    /// The transports, without repeats.
-    pub fn transports(&self) -> &[Transport];
-}
-impl Timeout {
-    /// Zero is `Malformed`, past `MAX_TIMEOUT_SECS` is `TooLarge`.
-    pub fn from_secs(secs: u32) -> Result<Self, Error>;
-    /// The timeout in seconds.
-    pub fn secs(&self) -> u32;
-}
-impl RegistrationOptions {
-    /// User verification and resident key are always chosen by the caller.
-    pub fn new(user_verification: Requirement, resident_key: ResidentKey, timeout: Timeout) -> Self;
-    /// Offer one more algorithm, in preference order; with none offered, ES256, EdDSA, ES384 and RS256.
-    pub fn algorithm(self, alg: CoseAlgorithm) -> Self;
-    /// Ask for an authenticator attachment.
-    pub fn attachment(self, attachment: Attachment) -> Self;
-    /// Set the attestation conveyance preference; the default is `Conveyance::None`.
-    pub fn attestation(self, conveyance: Conveyance) -> Self;
-    /// Prefer one more attestation format (`attestationFormats`), in order.
-    pub fn attestation_format(self, format: Format) -> Self;
-    /// Add a user-agent hint, in order.
-    pub fn hint(self, hint: Hint) -> Self;
-    /// Set the mediation the client will be called with.
-    pub fn mediation(self, mediation: Mediation) -> Self;
-}
-impl AuthenticationOptions {
-    /// User verification is always chosen by the caller.
-    pub fn new(user_verification: Requirement, timeout: Timeout) -> Self;
-    /// Add a user-agent hint, in order.
-    pub fn hint(self, hint: Hint) -> Self;
-}
-```
-### `src/record.rs` (webauthn-04)
-```rust
-impl CredentialId {
-    /// Empty is `Malformed`, longer than `MAX_CREDENTIAL_ID` is `TooLarge`.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error>;
-    /// The id's bytes.
-    pub fn as_bytes(&self) -> &[u8];
-}
-impl Aaguid {
-    /// From its 16 bytes.
-    pub fn from_bytes(bytes: [u8; 16]) -> Self;
-    /// Its 16 bytes.
-    pub fn as_bytes(&self) -> &[u8; 16];
-}
-impl StoreKey for Key { fn scope(&self) -> Scope; }
-impl Record {
-    /// The row's bytes, version-tagged.
-    pub fn encode(&self) -> Result<Vec<u8>, Error>;
-    /// Read a row back; an unknown version or shape is `Corrupt`, past `MAX_RECORD` is `TooLarge`.
-    pub fn decode(bytes: &[u8]) -> Result<Self, Error>;
-}
-impl RegistrationCeremony {
-    /// Narrow a consumer's row to this ceremony, keeping its version; any other record is `Corrupt`.
-    pub fn from_row<R>(row: &Row<R>, record: impl FnOnce(&R) -> Option<&Record>) -> Result<Row<Self>, Error>;
-}
-impl AuthenticationCeremony {
-    /// Narrow a consumer's row to this ceremony, keeping its version; any other record is `Corrupt`.
-    pub fn from_row<R>(row: &Row<R>, record: impl FnOnce(&R) -> Option<&Record>) -> Result<Row<Self>, Error>;
-}
-impl Credential {
-    /// Narrow a consumer's row to this credential, keeping its version; any other record is `Corrupt`.
-    pub fn from_row<R>(row: &Row<R>, record: impl FnOnce(&R) -> Option<&Record>) -> Result<Row<Self>, Error>;
-    /// The credential id.
-    pub fn id(&self) -> &CredentialId;
-    /// The user the credential was registered for.
-    pub fn user(&self) -> &UserHandle;
-    /// The id with its transports, for an allow or exclude list.
-    pub fn descriptor(&self) -> CredentialDescriptor;
-    /// The credential public key's algorithm.
-    pub fn algorithm(&self) -> CoseAlgorithm;
-    /// The last accepted signature counter.
-    pub fn sign_count(&self) -> u32;
-    /// Backup eligibility and the last seen backup state.
-    pub fn backup(&self) -> Backup;
-    /// `uvInitialized`: set by a user-verified registration or by `RelyingParty::confirm_user_verification`.
-    pub fn uv_initialized(&self) -> UserVerification;
-    /// The transports the client reported at registration.
-    pub fn transports(&self) -> &[Transport];
-    /// The AAGUID the authenticator reported: the model only when `attestation().trust()` is `Anchored`, else self-asserted.
-    pub fn aaguid(&self) -> Aaguid;
-    /// How the registration was attested.
-    pub fn attestation(&self) -> &Attestation;
-}
-```
-### `src/response.rs` (webauthn-04 and webauthn-05)
-```rust
-impl RegistrationResponse {
-    /// Parse the raw parts; each is bounded, a raw id that is not the attested credential id is `CredentialIdInvalid`, an unknown transport name is dropped, and client extension results arrive only through the `serde` shape.
-    pub fn new(raw_id: &[u8], client_data_json: &[u8], attestation_object: &[u8], transports: &[Transport]) -> Result<Self, Error>;
-    /// The ceremony key the response names, `Key::Ceremony` of the challenge's SHA-256, for the host to load.
-    pub fn locate(&self) -> Key;
-    /// The new credential's id, from the attested credential data.
-    pub fn id(&self) -> &CredentialId;
-}
-impl AuthenticationResponse {
-    /// Parse the raw parts; each is bounded, an empty user handle reads as absent, and client extension results arrive only through the `serde` shape.
-    pub fn new(raw_id: &[u8], client_data_json: &[u8], authenticator_data: &[u8], signature: &[u8], user_handle: Option<&[u8]>) -> Result<Self, Error>;
-    /// The rows the host loads before finishing; no I/O.
-    pub fn locate(&self) -> Lookup;
-}
-impl fmt::Debug for RegistrationResponse { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
-impl fmt::Debug for AuthenticationResponse { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
-impl Lookup {
-    /// The ceremony row: `Key::Ceremony` of the challenge's SHA-256.
-    pub fn ceremony(&self) -> &Key;
-    /// The credential row: `Key::Credential` of the raw id.
-    pub fn credential(&self) -> &Key;
-    /// The user handle the response carries, if any.
-    pub fn user(&self) -> Option<&UserHandle>;
-}
-```
-### `src/verify.rs` (start and finish of authentication with webauthn-04, of registration with webauthn-05)
-```rust
-impl RelyingParty {
-    /// L3 7.1 step 1, bound to the starting browser: options for the client, and the effect that creates the ceremony row under its challenge's digest, expiring at its deadline; an over-long list or salt is `TooLarge`.
-    pub fn start_registration(&self, user: &UserEntity, exclude: &[CredentialDescriptor], opts: &RegistrationOptions, browser: &BrowserBinding, now: UnixTime, e: &mut impl Entropy) -> Result<(CreationOptions, Effect), Error>;
-    /// L3 7.2 step 1, bound to the starting browser: options for the client, and the effect that creates the ceremony row.
-    pub fn start_authentication(&self, allow: Allow<'_>, opts: &AuthenticationOptions, browser: &BrowserBinding, now: UnixTime, e: &mut impl Entropy) -> Result<(RequestOptions, Effect), Error>;
-    /// L3 7.1 steps 5-29, in the browser the ceremony started in. Every failure, expiry included, is inside the verdict; the effect always deletes the seen ceremony row, and on `Ok` also reserves the credential id.
-    pub fn finish_registration(&self, state: Row<RegistrationCeremony>, response: &RegistrationResponse, browser: &BrowserBinding, trust: &dyn TrustSource, now: UnixTime, e: &mut impl Entropy) -> Verdict<Registered>;
-    /// L3 7.2 steps 5-24, in the browser the ceremony started in. Every failure is inside the verdict; the effect always deletes the seen ceremony row, and on `Ok` also updates the seen credential row.
-    pub fn finish_authentication(&self, state: Row<AuthenticationCeremony>, stored: Row<Credential>, response: &AuthenticationResponse, browser: &BrowserBinding, now: UnixTime, e: &mut impl Entropy) -> Verdict<Assertion>;
-    /// Raise the credential's `uvInitialized`, the step L3 7.2 step 24 says to skip unless an extra factor authorized it: an `update` of the seen row (O11).
-    pub fn confirm_user_verification(&self, stored: &Row<Credential>, e: &mut impl Entropy) -> Effect;
-}
-impl Registered {
-    /// The credential record the effect reserves.
-    pub fn credential(&self) -> &Credential;
-    /// Whether the registration was user-verified; this becomes `uvInitialized`.
-    pub fn user_verification(&self) -> UserVerification;
-}
-impl Assertion {
-    /// The credential that signed.
-    pub fn credential_id(&self) -> &CredentialId;
-    /// The credential's user.
-    pub fn user(&self) -> &UserHandle;
-    /// The UV flag read against the credential's `uvInitialized`.
-    pub fn user_verification(&self) -> AssertionVerification;
-    /// Backup eligibility and the current backup state.
-    pub fn backup(&self) -> Backup;
-    /// What the signature counter did.
-    pub fn counter(&self) -> Counter;
-}
-```
-### `src/trust.rs` (webauthn-05; `impl TrustAnchor` with webauthn-09)
-```rust
-impl Attestation {
-    /// The statement format.
-    pub fn format(&self) -> Format;
-    /// The attestation type.
-    pub fn kind(&self) -> AttestationType;
-    /// Whether it chained to an anchor.
-    pub fn trust(&self) -> Trust;
-    /// The SHA-256 of each `x5c` certificate, leaf first; empty for none and self.
-    pub fn chain(&self) -> &[Digest];
-    /// The SHA-256 of the anchor the chain met, when `Anchored`.
-    pub fn anchor(&self) -> Option<&Digest>;
-}
-impl TrustQuery<'_> {
-    /// The statement format.
-    pub fn format(&self) -> Format;
-    /// The AAGUID from the attested credential data, not yet authenticated.
-    pub fn aaguid(&self) -> Aaguid;
-    /// The SHA-256 of each `x5c` certificate, leaf first, for a revocation or deny list.
-    pub fn chain(&self) -> &[Digest];
-}
-impl TrustAnchor {
-    /// Parse one DER certificate; past `MAX_CERTIFICATE` is `TooLarge`, anything but one certificate is `Malformed`.
-    pub fn from_der(der: &[u8]) -> Result<Self, Error>;
-    /// The SHA-256 of the certificate's DER, as `Attestation::anchor` reports it.
-    pub fn digest(&self) -> Digest;
-}
-```
-`TrustSource::decide(&self, query: &TrustQuery<'_>) -> TrustDecision<'_>` is a trait method, declared in `src/trust.rs` now.
-### `src/extensions.rs` (webauthn-14)
-```rust
-impl AppId {
-    /// Parse an AppID; anything but an `https` URL of at most `MAX_APP_ID` bytes is `Malformed` or `TooLarge`.
-    pub fn parse(text: &str) -> Result<Self, Error>;
-    /// The AppID as text.
-    pub fn as_str(&self) -> &str;
-}
-impl PrfEval {
-    /// Evaluate one salt.
-    pub fn new(first: &[u8]) -> Self;
-    /// Evaluate a second salt as well.
-    pub fn second(self, second: &[u8]) -> Self;
-}
-impl PrfOutputs {
-    /// The output for the first salt.
-    pub fn first(&self) -> &Secret<32>;
-    /// The output for the second salt, when one was given.
-    pub fn second(&self) -> Option<&Secret<32>>;
-}
-impl RegistrationOptions {
-    /// Request `credProps`.
-    pub fn cred_props(self) -> Self;
-    /// Request `prf`.
-    pub fn prf(self, prf: PrfRequest) -> Self;
-    /// Request `largeBlob` support.
-    pub fn large_blob(self, support: LargeBlobRequest) -> Self;
-    /// Request `appidExclude`.
-    pub fn app_id_exclude(self, app_id: AppId) -> Self;
-}
-impl AuthenticationOptions {
-    /// Request `appid`.
-    pub fn app_id(self, app_id: AppId) -> Self;
-    /// Request `prf` with salts for any credential.
-    pub fn prf(self, eval: PrfEval) -> Self;
-    /// Request `prf` with salts for one listed credential (`evalByCredential`).
-    pub fn prf_for(self, credential: CredentialId, eval: PrfEval) -> Self;
-    /// Request a `largeBlob` read or write.
-    pub fn large_blob(self, op: LargeBlobOp) -> Self;
-}
-impl Registered {
-    /// `credProps.rk`.
-    pub fn discoverability(&self) -> Discoverability;
-    /// The `prf` output.
-    pub fn prf(&self) -> &PrfResult;
-    /// The `largeBlob` output.
-    pub fn large_blob(&self) -> LargeBlobSupport;
-}
-impl Assertion {
-    /// Whether the `appid` hash was used.
-    pub fn app_id(&self) -> AppIdUsed;
-    /// The `prf` output.
-    pub fn prf(&self) -> &PrfResult;
-    /// The `largeBlob` output.
-    pub fn large_blob(&self) -> &LargeBlobOutcome;
-}
-```
-### `src/json.rs` (webauthn-15; the serde impls under feature `serde`)
-```rust
-impl RelyingParty {
-    /// The document to serve at `/.well-known/webauthn` (L3 5.11).
-    pub fn related_origins(&self) -> RelatedOrigins;
-    /// The options for one of the client's signal methods (L3 5.1.10).
-    pub fn signal(&self, signal: Signal) -> SignalOptions;
-}
-impl fmt::Debug for Signal { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
-impl fmt::Debug for SignalOptions { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result; }
-impl Serialize for CreationOptions { fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error>; }
-impl Serialize for RequestOptions { fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error>; }
-impl Serialize for SignalOptions { fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error>; }
-impl Serialize for RelatedOrigins { fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error>; }
-impl<'de> Deserialize<'de> for RegistrationResponse { fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error>; }
-impl<'de> Deserialize<'de> for AuthenticationResponse { fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error>; }
-```
-Private modules with no public function: `cbor`, `cose` (webauthn-02; `cose` gains ES384, EdDSA and RS256 with webauthn-08), `client_data` (webauthn-03), `authdata` (webauthn-04), `attestation` (dispatch and `none` with webauthn-05), `attestation::packed` (self with webauthn-08, full with webauthn-09), `attestation::chain` (webauthn-09), `attestation::tpm` (webauthn-10), `attestation::android_key` (webauthn-11), `attestation::apple` (webauthn-12), `attestation::fido_u2f` (webauthn-13).
+## Planned
+Declared and not built. The built surface is `public-api.txt` alone (generated, `just api`); this section holds only what it does not declare yet, by the item that builds it. In `src/` an unbuilt public item opens its doc with `Unbuilt:`, and an unbuilt private one carries `#[expect(dead_code)]` naming the item that first reads it, which the compiler retires once it is read. A claim about planned behaviour proves itself only by `-pending:` refs, and its `row:` file holds no test until built. `BrowserBinding` is `base::BrowserBinding` (ruling R-d).
+- Attestation formats `packed` (webauthn-08 self, webauthn-09 full), `tpm` (webauthn-10), `android-key` (webauthn-11), `apple` (webauthn-12), `fido-u2f` (webauthn-13): each is a cargo feature, off by default, gating a module that holds no procedure yet, so only `none` is dispatched (R47); the chain walk `attestation::chain` lands with webauthn-09.
+- Trust dispatch (webauthn-09): `TrustSource` is declared and taken by `finish_registration`, which never asks it yet (R49, R57). Signatures:
+  - `impl TrustAnchor { pub fn from_der(der: &[u8]) -> Result<Self, Error>; pub fn digest(&self) -> Digest; }`
+- Extensions (webauthn-14, `src/extensions.rs`; the types exist, and no public function takes or returns them yet). Signatures:
+  - `impl AppId { pub fn parse(text: &str) -> Result<Self, Error>; pub fn as_str(&self) -> &str; }`
+  - `impl PrfEval { pub fn new(first: &[u8]) -> Self; pub fn second(self, second: &[u8]) -> Self; }`
+  - `impl PrfOutputs { pub fn first(&self) -> &Secret<32>; pub fn second(&self) -> Option<&Secret<32>>; }`
+  - `impl RegistrationOptions { pub fn cred_props(self) -> Self; pub fn prf(self, prf: PrfRequest) -> Self; pub fn large_blob(self, support: LargeBlobRequest) -> Self; pub fn app_id_exclude(self, app_id: AppId) -> Self; }`
+  - `impl AuthenticationOptions { pub fn app_id(self, app_id: AppId) -> Self; pub fn prf(self, eval: PrfEval) -> Self; pub fn prf_for(self, credential: CredentialId, eval: PrfEval) -> Self; pub fn large_blob(self, op: LargeBlobOp) -> Self; }`
+  - `impl Registered { pub fn discoverability(&self) -> Discoverability; pub fn prf(&self) -> &PrfResult; pub fn large_blob(&self) -> LargeBlobSupport; }`
+  - `impl Assertion { pub fn app_id(&self) -> AppIdUsed; pub fn prf(&self) -> &PrfResult; pub fn large_blob(&self) -> &LargeBlobOutcome; }`
+- JSON shapes, related origins and signals (webauthn-15, `src/json.rs`, the serde impls under feature `serde`). Signatures:
+  - `impl RelyingParty { pub fn related_origins(&self) -> RelatedOrigins; pub fn signal(&self, signal: Signal) -> SignalOptions; }`
+  - `impl fmt::Debug for Signal`, `impl fmt::Debug for SignalOptions`
+  - `impl Serialize for CreationOptions`, `RequestOptions`, `SignalOptions` and `RelatedOrigins`
+  - `impl<'de> Deserialize<'de> for RegistrationResponse` and `AuthenticationResponse`
 
 ## Files per item
 Each later item edits its own files and row file; where it must touch another item's file, the line says where and why.
@@ -368,10 +41,10 @@ Each later item edits its own files and row file; where it must touch another it
 - webauthn-05: `attestation/mod.rs`, `trust.rs`, and the registration halves of `response.rs`, `verify.rs` and `options.rs`, which webauthn-04 opened (the brief pairs 04 and 05 on these files, so they run in sequence); row:w3c_none, row:derived (registration).
 - webauthn-06: row:roundtrip only (the virtual authenticator lives in the test, on the signing dev-dependencies).
 - webauthn-07: row:race only.
-- webauthn-08: `attestation/packed.rs` (self); it also adds ES384, EdDSA and RS256 to `cose.rs` (webauthn-02's) and one dispatch arm to `attestation/mod.rs` (webauthn-05's), because a format is reachable only through the dispatch and stub arms are forbidden (R-a); row:w3c_packed.
-- webauthn-09: `attestation/chain.rs`, `attestation/packed.rs` (full); it also adds `impl TrustAnchor` to `trust.rs` (webauthn-05's), because `chain.rs` compiles only under a certificate format and `TrustAnchor::from_der` stays in the API under every feature set (N20); row:w3c_attestation_root, row:w3c_packed.
+- webauthn-08: `attestation/packed.rs` (self); it also adds ES384, EdDSA and RS256 to `cose.rs` (webauthn-02's) and one dispatch arm to `attestation/mod.rs` (webauthn-05's), because a format is reachable only through the dispatch and stub arms are forbidden (R-a); row-pending:w3c_packed (the row file holds no test yet).
+- webauthn-09: `attestation/chain.rs`, `attestation/packed.rs` (full); it also adds `impl TrustAnchor` to `trust.rs` (webauthn-05's), because `chain.rs` compiles only under a certificate format and `TrustAnchor::from_der` stays in the API under every feature set (N20); row-pending:w3c_attestation_root (the row file holds no test yet), row-pending:w3c_packed (the row file holds no test yet).
 - webauthn-10 to webauthn-13: each its format file plus one dispatch arm in `attestation/mod.rs`, as webauthn-08; rows w3c_tpm; w3c_android_key and android_key_attestation; w3c_apple; w3c_fido_u2f. With the arms in one `match`, these four can run in parallel only if each arm is its own line and a conflict is rebased, never hand-merged.
-- webauthn-14: `extensions.rs` (the setters, accessors and output processing are inherent impls there); it also adds the calls at L3 7.1 step 28 and 7.2 step 23 and the PRF and large-blob bounds of R31 and R61 in `verify.rs` (webauthn-04's and webauthn-05's), since those steps sit inside the finishes; row:w3c_prf.
+- webauthn-14: `extensions.rs` (the setters, accessors and output processing are inherent impls there); it also adds the calls at L3 7.1 step 28 and 7.2 step 23 and the PRF and large-blob bounds of R31 and R61 in `verify.rs` (webauthn-04's and webauthn-05's), since those steps sit inside the finishes; row-pending:w3c_prf (the row file holds no test yet).
 - webauthn-15: `json.rs` (the deserializers build responses through the byte constructors, then fill `extensions::ClientOutputs`).
 - row:derived is shared by 02 to 05, one test function per oracle file, so those four items add disjoint functions to one file.
 
@@ -399,138 +72,138 @@ Each later item edits its own files and row file; where it must touch another it
 - T11 BS without BE is unrepresentable: `Backup::SingleDevice` carries no `BackupState`: ui:backup_single_device (E0618), api:Backup::SingleDevice.
 - T12 No development defaults: `RelyingParty` has no `Default` and is built only from an `RpId`, a `DisplayName`, an `Origin` and a `CounterPolicy`; the one stated default that admits more, `TrustPolicy::AcceptUntrusted`, is named in the builder's doc: api:RelyingParty::builder (the real check), ui:relying_party_default (E0599) illustrates.
 - T13 User verification and resident key are always the caller's choice: neither options type has `Default`, and both `new` take the `Requirement`: api:RegistrationOptions::new api:AuthenticationOptions::new (the real check), ui:registration_options_default (E0599) and ui:authentication_options_default (E0599) illustrate.
-- T14 PRF results are `base::Secret<32>`, so never printed, cloned, serialized or compared with `==` (base T1, T3, T5, T7): api-pending:PrfOutputs::first (specified under Signatures, not declared yet), api-pending:PrfOutputs::second (specified under Signatures, not declared yet); the case `prf_output_display` lands with webauthn-14.
+- T14 PRF results are `base::Secret<32>`, so never printed, cloned, serialized or compared with `==` (base T1, T3, T5, T7): api-pending:PrfOutputs::first (listed under Planned, not declared yet), api-pending:PrfOutputs::second (listed under Planned, not declared yet); the case `prf_output_display` lands with webauthn-14.
 - T15 X.509, DER, SPKI and OID types never appear in the public API; a trust anchor is opaque: `just api` (no match for `\bder::|x509_cert|\bspki|const_oid` in `public-api.txt`), ui:trust_anchor_certificate (E0599) illustrates.
 - T16 Every public enum is `#[non_exhaustive]`: ui:error_kind_exhaustive (E0004), `just api` (one `attr ... non_exhaustive` per enum).
 - T17 No `bool` parameter, field or accessor (rule 5.4): `just api` (no `bool` token in `public-api.txt`).
 - T18 One finish per direction: discoverable and identified authentication differ only in `Allow`, never in the finish called: api:Allow.
 - T19 Store keys hold the challenge's `Digest` and a bounded `CredentialId`, never the challenge: api:Key::Ceremony api:Key::Credential (`Key` variants).
 - T20 User verification (`Requirement`) and resident key (`ResidentKey`) are distinct types, so the two `RegistrationOptions::new` arguments cannot swap: api:Requirement api:ResidentKey api:RegistrationOptions::new; the case `registration_options_swap` lands with webauthn-05.
-- T21 A `largeBlob` request is one `LargeBlobOp`, so a ceremony cannot ask to read and write: api:LargeBlobOp, api-pending:AuthenticationOptions::large_blob (specified under Signatures, not declared yet).
+- T21 A `largeBlob` request is one `LargeBlobOp`, so a ceremony cannot ask to read and write: api:LargeBlobOp, api-pending:AuthenticationOptions::large_blob (listed under Planned, not declared yet).
 
 ## Runtime: bounds and parsers (rule 5.7)
-- R1 Each input bound is a public constant, and input past it is `TooLarge`; an empty value where one is required is `Malformed`: `MAX_CREDENTIAL_ID` 1023, `MAX_USER_HANDLE` 64, `MAX_NAME` 256, `MAX_RP_ID` 253, `MAX_CLIENT_DATA_JSON` 16,384, `MAX_CLIENT_DATA_DEPTH` 8, `MAX_ATTESTATION_OBJECT` 65,536, `MAX_AUTHENTICATOR_DATA` 16,384, `MAX_SIGNATURE` 1,024, `MAX_CBOR_DEPTH` 16, `MAX_CBOR_ITEMS` 1,024, `MAX_X5C` 8, `MAX_CERTIFICATE` 8,192, `MAX_LISTED_CREDENTIALS` 64, `MAX_ORIGINS` 32, `MAX_APP_ID` 2,048, `MAX_PRF_SALT` 256, `MAX_LARGE_BLOB` 65,536, `MAX_RECORD` 8,192, `MAX_TIMEOUT_SECS` 600, `MAX_RSA_BITS` 4,096: api:MAX_CREDENTIAL_ID api:MAX_USER_HANDLE api:MAX_NAME api:MAX_RP_ID api:MAX_CLIENT_DATA_JSON api:MAX_CLIENT_DATA_DEPTH api:MAX_ATTESTATION_OBJECT api:MAX_AUTHENTICATOR_DATA api:MAX_SIGNATURE api:MAX_CBOR_DEPTH api:MAX_CBOR_ITEMS api:MAX_CERTIFICATE api:MAX_LISTED_CREDENTIALS api:MAX_ORIGINS api:MAX_APP_ID api:MAX_PRF_SALT api:MAX_LARGE_BLOB api:MAX_RECORD api:MAX_TIMEOUT_SECS api:MAX_RSA_BITS (the values); row:derived over oracle:cbor.json#depth-bound and #item-bound (`webauthn_rp::MAX_CBOR_DEPTH` and `webauthn_rp::MAX_CBOR_ITEMS` plus one, `TooLarge`) and oracle:registration.json#credential-id-1024; the other bounds, `MAX_CLIENT_DATA_DEPTH` among them: oracle:limits.json.
+- R1 Each input bound is a public constant, and input past it is `TooLarge`; an empty value where one is required is `Malformed`: `MAX_CREDENTIAL_ID` 1023, `MAX_USER_HANDLE` 64, `MAX_NAME` 256, `MAX_RP_ID` 253, `MAX_CLIENT_DATA_JSON` 16,384, `MAX_CLIENT_DATA_DEPTH` 8, `MAX_ATTESTATION_OBJECT` 65,536, `MAX_AUTHENTICATOR_DATA` 16,384, `MAX_SIGNATURE` 1,024, `MAX_CBOR_DEPTH` 16, `MAX_CBOR_ITEMS` 1,024, `MAX_X5C` 8, `MAX_CERTIFICATE` 8,192, `MAX_LISTED_CREDENTIALS` 64, `MAX_ORIGINS` 32, `MAX_APP_ID` 2,048, `MAX_PRF_SALT` 256, `MAX_LARGE_BLOB` 65,536, `MAX_RECORD` 8,192, `MAX_TIMEOUT_SECS` 600, `MAX_RSA_BITS` 4,096: api:MAX_CREDENTIAL_ID api:MAX_USER_HANDLE api:MAX_NAME api:MAX_RP_ID api:MAX_CLIENT_DATA_JSON api:MAX_CLIENT_DATA_DEPTH api:MAX_ATTESTATION_OBJECT api:MAX_AUTHENTICATOR_DATA api:MAX_SIGNATURE api:MAX_CBOR_DEPTH api:MAX_CBOR_ITEMS api:MAX_CERTIFICATE api:MAX_LISTED_CREDENTIALS api:MAX_ORIGINS api:MAX_APP_ID api:MAX_PRF_SALT api:MAX_LARGE_BLOB api:MAX_RECORD api:MAX_TIMEOUT_SECS api:MAX_RSA_BITS (the values); row:derived over oracle:cbor.json#depth-bound and #item-bound (`webauthn_rp::MAX_CBOR_DEPTH` and `webauthn_rp::MAX_CBOR_ITEMS` plus one, `TooLarge`) and oracle:registration.json#credential-id-1024; the other bounds, `MAX_CLIENT_DATA_DEPTH` among them: oracle-pending:limits.json (no test reads this file yet). `MAX_APP_ID`, `MAX_PRF_SALT`, `MAX_LARGE_BLOB`, `MAX_X5C` and `MAX_CERTIFICATE` guard planned paths (extensions, the chain walk, `TrustAnchor::from_der`): declared, with nothing yet to bound.
 - R2 The CBOR reader is strict: definite lengths only, shortest-form heads and lengths, no tags, no floats, no simple values but `false`, `true` and `null`, map keys unique and in CTAP2 canonical order (shorter encoding first, then bytewise), text strings valid UTF-8, no reserved additional information, nothing after the top item; any of these is `Malformed`: row:derived over oracle:cbor.json (19 `cbor_decode` cases), fuzz-pending:attestation_object (no queue item yet: fuzz targets), mutants:cbor.
 - R3 A declared CBOR or DER length is compared with the remaining input before anything is copied or allocated for it: row:derived over oracle:cbor.json#truncated-bytes and #huge-declared-length, unit:cbor::declared_length_past_input, fuzz-pending:attestation_object (no queue item yet: fuzz targets), fuzz-pending:authenticator_data (no queue item yet: fuzz targets).
 - R4 Authenticator data: at least 37 bytes; AT set and attested credential data present in a registration, AT clear in an assertion; ED set exactly when an extensions map follows; nothing trailing: row:derived over oracle:authenticator-data.json#authdata-truncated, #authdata-at-flag-no-data, #authdata-ed-flag-no-data, #authdata-trailing-bytes and oracle:registration.json#at-clear (L3 7.1 step 13), fuzz-pending:authenticator_data (no queue item yet: fuzz targets), mutants:authdata.
-- R5 COSE keys: ES256 is kty 2, crv 1, 32-byte x and y on the curve; ES384 is kty 2, crv 2, 48-byte x and y on the curve; EdDSA is kty 1, crv 6, a 32-byte valid point; RS256 is kty 3 with n of `MIN_RSA_BITS` to `MAX_RSA_BITS` bits and e 65537; `alg` is present and fits `kty`; a defined label of the wrong type is `Malformed`, unknown labels are ignored: row:derived over oracle:cbor.json#cose-key-canonical, oracle:cose.json, mutants:cose.
-- R6 `clientDataJSON` is read by an own bounded reader of one RFC 8259 object: UTF-8 with one leading BOM stripped (7.1 step 5, 7.2 step 8), string escapes decoded, a duplicate member name `Malformed`, nesting past `MAX_CLIENT_DATA_DEPTH` `TooLarge`, `type`, `challenge`, `origin` and `topOrigin` strings, `crossOrigin` a boolean or absent, other members skipped: row:derived over oracle:client-data.json#client-data-not-json (7.2 step 9), #extra-member-ignored and #cross-origin-absent, oracle:limits.json (the depth bound), unit:client_data::nesting_and_size_are_bounded, fuzz-pending:client_data (no queue item yet: fuzz targets), mutants:client_data.
+- R5 COSE keys: ES256 is kty 2, crv 1, 32-byte x and y on the curve; `alg` is present and fits `kty`; a defined label of the wrong type is `Malformed`, unknown labels are ignored; any other `kty` and `alg` is `Algorithm`: row:derived over oracle:cbor.json#cose-key-canonical, unit:cose::es256_reads_and_refuses, mutants:cose. Planned, not built: ES384 (kty 2, crv 2, 48-byte x and y on the curve), EdDSA (kty 1, crv 6, a 32-byte valid point) and RS256 (kty 3, n of `MIN_RSA_BITS` to `MAX_RSA_BITS` bits, e 65537), which `CoseKey::parse` refuses today: oracle-pending:cose.json (planned with webauthn-08; no test reads this file yet).
+- R6 `clientDataJSON` is read by an own bounded reader of one RFC 8259 object: UTF-8 with one leading BOM stripped (7.1 step 5, 7.2 step 8), string escapes decoded, a duplicate member name `Malformed`, nesting past `MAX_CLIENT_DATA_DEPTH` `TooLarge`, `type`, `challenge`, `origin` and `topOrigin` strings, `crossOrigin` a boolean or absent, other members skipped: row:derived over oracle:client-data.json#client-data-not-json (7.2 step 9), #extra-member-ignored and #cross-origin-absent, oracle-pending:limits.json (the depth bound; no test reads this file yet), unit:client_data::nesting_and_size_are_bounded, fuzz-pending:client_data (no queue item yet: fuzz targets), mutants:client_data.
 - R7 `C.challenge` is canonical unpadded base64url (`base::b64url_decode`) of exactly 32 bytes, else `ChallengeMismatch`: row:derived over oracle:client-data.json#challenge-padded, #challenge-std-alphabet and #challenge-missing.
-- R8 `Origin::parse` accepts `https://` or, for host `localhost` only, `http://`, then a host of lowercase LDH labels (A-labels as written, never converted), then an optional decimal port that is not the scheme's default, and nothing after; or `android:apk-key-hash:` with 43 base64url symbols. Uppercase, an IP literal, a path, query, fragment, userinfo or any other scheme is `Malformed`: oracle:origins.json, mutants:policy.
-- R9 `RpId::parse` accepts lowercase LDH labels of at most `MAX_RP_ID` bytes in all, `localhost` included, and refuses a trailing dot, an IP literal or an empty label: oracle:origins.json, mutants:policy.
-- R10 `AppId::parse` accepts an `https` URL without fragment of at most `MAX_APP_ID` bytes, hashed as written: oracle:origins.json.
+- R8 `Origin::parse` accepts `https://` or, for host `localhost` only, `http://`, then a host of lowercase LDH labels (A-labels as written, never converted), then an optional decimal port that is not the scheme's default, and nothing after; or `android:apk-key-hash:` with 43 base64url symbols. Uppercase, an IP literal, a path, query, fragment, userinfo or any other scheme is `Malformed`: oracle-pending:origins.json (no test reads this file yet), mutants:policy.
+- R9 `RpId::parse` accepts lowercase LDH labels of at most `MAX_RP_ID` bytes in all, `localhost` included, and refuses a trailing dot, an IP literal or an empty label: oracle-pending:origins.json (no test reads this file yet), mutants:policy.
+- R10 `AppId::parse` accepts an `https` URL without fragment of at most `MAX_APP_ID` bytes, hashed as written: oracle-pending:origins.json (planned with webauthn-14: `AppId::parse` is unbuilt).
 - R11 `UserName` is non-empty and `DisplayName` may be empty; both are at most `MAX_NAME` bytes; `UserEntity::new` joins a handle and both names: unit:options::names_are_bounded_and_never_printed.
 - R12 `UserHandle::generate` draws exactly 32 bytes; `from_stored` takes 1 to 64 bytes: unit:options::user_handles_are_32_drawn_bytes_or_1_to_64_stored.
 - R13 `Timeout::from_secs` takes 1 to `MAX_TIMEOUT_SECS`; zero is `Malformed`: unit:options::timeouts_are_1_to_the_maximum.
 - R14 `Transport::as_str` is the L3 5.8.4 name and `Transport::parse` reads exactly those six names back; `CredentialDescriptor::new` keeps each transport once, in the order given: unit:options::transports_have_their_l3_names, unit:options::descriptors_keep_each_transport_once_in_order.
 - R15 `Record::encode` writes a version tag and `decode` reads it back to an equal record (`PartialEq`); `encode` is `TooLarge` if and only if a list is past 255 entries or the row is past `MAX_RECORD`, and every other row decodes back to itself, the setters keep each hint, algorithm and format once, and an unknown version, shape or non-canonical `cred_props` byte is `Corrupt`: unit:record::record_round_trip (every requirement, resident key, attachment, conveyance, mediation and user-verification value), unit:record::every_table_entry_encodes_as_its_index_and_decodes_back, fuzz-pending:record (no queue item yet: fuzz targets), mutants:record.
-- R16 `RegistrationResponse::new` and `AuthenticationResponse::new` parse everything they are given (client data, CBOR, authenticator data, statement shape) before any finish runs; an empty `userHandle` reads as absent: fuzz-pending:attestation_object (no queue item yet: fuzz targets), fuzz-pending:authenticator_data (no queue item yet: fuzz targets), oracle:authentication.json (empty user handle).
-- R17 A registration's raw id must equal the attested `credentialId` byte for byte, else `CredentialIdInvalid`; `Key::Credential`, `RegistrationResponse::id` and `Credential::id` are the attested id (L3 13.1: the outer id is unsigned): oracle:registration-ids.json.
-- R18 `TrustAnchor::from_der` takes exactly one DER certificate of at most `MAX_CERTIFICATE` bytes; `TrustAnchor::digest` is the SHA-256 of that DER: row:w3c_attestation_root over w3c:attestation-root.json#16.1, oracle:limits.json, fuzz-pending:trust_anchor (no queue item yet: fuzz targets).
+- R16 `RegistrationResponse::new` and `AuthenticationResponse::new` parse everything they are given (client data, CBOR, authenticator data, statement shape) before any finish runs; an empty `userHandle` reads as absent: fuzz-pending:attestation_object (no queue item yet: fuzz targets), fuzz-pending:authenticator_data (no queue item yet: fuzz targets), oracle-pending:authentication.json (empty user handle; no test reads this file yet), unit:response::parts_are_parsed_and_located.
+- R17 A registration's raw id must equal the attested `credentialId` byte for byte, else `CredentialIdInvalid`; `Key::Credential`, `RegistrationResponse::id` and `Credential::id` are the attested id (L3 13.1: the outer id is unsigned): oracle-pending:registration-ids.json (no test reads this file yet).
+- R18 `TrustAnchor::from_der` takes exactly one DER certificate of at most `MAX_CERTIFICATE` bytes; `TrustAnchor::digest` is the SHA-256 of that DER: row-pending:w3c_attestation_root (the row file holds no test yet) over w3c-pending:attestation-root.json#16.1 (no test reads this file yet), oracle-pending:limits.json (no test reads this file yet), fuzz-pending:trust_anchor (no queue item yet: fuzz targets).
 - R19 `RelyingPartyBuilder::build` refuses a repeated origin (`Malformed`) and more than `MAX_ORIGINS` origins and top origins together (`TooLarge`): unit:policy::the_builder_defaults_and_bounds.
 - R20 `RegistrationResponse::locate` is `Key::Ceremony` of SHA-256 of the decoded `C.challenge`; `AuthenticationResponse::locate` is a `Lookup` of that key, `Key::Credential` of the raw id and the user handle, if any; both do no I/O and cannot fail after `new`: unit:response::parts_are_parsed_and_located, unit:response::a_registration_is_parsed_and_located.
 - R21 `RegistrationCeremony::from_row`, `AuthenticationCeremony::from_row` and `Credential::from_row` narrow a consumer's row through its projection to this crate's `Record`, keeping the row's version; a projection that yields nothing, or another variant, is `Corrupt`: unit:record::rows_narrow_to_their_kind_and_keep_their_version, mutants:record.
 
 ## Runtime: registration (L3 7.1)
-- R30 Step 1: `start_registration` draws a 32-byte challenge from `Entropy` and emits it with `rp`, `user`, `pubKeyCredParams` (ES256, EdDSA, ES384, RS256 unless set), `timeout` in milliseconds, `excludeCredentials`, `authenticatorSelection`, `attestation`, `attestationFormats`, `hints` and `extensions`: oracle:options-json.json, unit:verify::start_registration_emits_the_row_and_the_options.
+- R30 Step 1: `start_registration` draws a 32-byte challenge from `Entropy` and emits it with `rp`, `user`, `pubKeyCredParams` (ES256 alone unless set; the others join with webauthn-08), `timeout` in milliseconds, `excludeCredentials`, `authenticatorSelection`, `attestation`, `attestationFormats`, `hints` and `extensions`: oracle-pending:options-json.json (no test reads this file yet), unit:verify::start_registration_emits_the_row_and_the_options, unit:verify::the_default_algorithms_are_es256_only.
 - R31 `start_registration` is `TooLarge` for an exclude list over `MAX_LISTED_CREDENTIALS` or a PRF salt over `MAX_PRF_SALT` or a ceremony row that `Record::encode` refuses past `MAX_RECORD`, and its effect is `Effect::created` of `Key::Ceremony(SHA-256(challenge))` with expiry at the deadline (`now` plus the timeout) and nothing else; the row keeps the browser binding: unit:verify::start_registration_emits_the_row_and_the_options, unit:verify::every_effect_is_one_transaction_of_at_most_two_guards_and_two_writes, mutants:verify.
-- R32 Steps 2 to 4 happen in the client; their outputs are the `RegistrationResponse` constructor's arguments, and client extension results arrive only through the `serde` response shape: R132, N5; api:RegistrationResponse::new (the constructor's arguments), oracle:response-json.json.
+- R32 Steps 2 to 4 happen in the client; their outputs are the `RegistrationResponse` constructor's arguments, and client extension results arrive only through the `serde` response shape: R132, N5; api:RegistrationResponse::new (the constructor's arguments), oracle-pending:response-json.json (no test reads this file yet).
 - R33 Every refusal below, `Expired` included, is the `Err` inside the returned `Verdict`, whose effect is the delete of the seen ceremony row alone: row:derived over oracle:registration.json (every refusal case asserts that effect), unit:verify::a_valid_registration_reserves_the_credential_and_deletes_the_ceremony, unit:verify::each_registration_check_names_its_kind_and_step. Under the current caps (id at most `MAX_CREDENTIAL_ID`, user handle `MAX_USER_HANDLE`, six transports, `MAX_X5C` certificate digests, the widest accepted key) a credential row never reaches `MAX_RECORD`: unit:record::the_widest_credential_row_fits_the_record_bound. `finish_registration` still checks the row with `Record::encode` and refuses `TooLarge` with the ceremony spent, as defense in depth against a later cap change; that check is not proven by a test.
 - R34 Step 7: `C.type` is `webauthn.create`, else `Type`: row:derived over oracle:registration.json#type-get.
 - R35 Step 8: SHA-256 of the decoded `C.challenge` equals the challenge digest the ceremony record holds, else `ChallengeMismatch`; so a row loaded under another key cannot finish this response: row:derived over oracle:registration.json#challenge-other, unit:verify::each_registration_check_names_its_kind_and_step.
 - R36 Step 9: `C.origin` equals a configured origin exactly, else `OriginMismatch`: row:derived over oracle:registration.json#origin-other.
 - R37 Step 10: `crossOrigin: true` is `CrossOriginDenied` under `CrossOrigin::Deny` and accepted under `AnyTop` or `Listed`: row:derived over oracle:registration.json#cross-origin-denied, row:w3c_none over w3c:none.json#16.4 (refused under the default, registered under `AnyTop`).
 - R38 Step 11: a present `topOrigin` is `TopOriginDenied` unless `crossOrigin` is true, under every policy (L3 5.8.1 sends it only then); with `crossOrigin: true` it is `TopOriginDenied` under `Deny`, accepted under `AnyTop`, and under `Listed` only when listed; `crossOrigin: true` without `topOrigin` is `TopOriginDenied` under `Listed`: row:derived over oracle:registration.json#top-origin-other and oracle:client-data.json#top-origin-without-cross-origin, row:w3c_none over w3c:none.json#16.5.
-- R39 Step 12: the client data hash is SHA-256 over `clientDataJSON` exactly as received: row:w3c_packed over w3c:packed.json (every attested signature covers it).
-- R40 Step 13: the attestation object is a CBOR map of exactly `fmt` (text), `attStmt` (map) and `authData` (bytes), else `Malformed`: row:derived over oracle:registration.json#at-clear, oracle:attestation-object.json.
+- R39 Step 12: the client data hash is SHA-256 over `clientDataJSON` exactly as received: row-pending:w3c_packed (the row file holds no test yet) over w3c-pending:packed.json (every attested signature covers it; no test reads this file yet).
+- R40 Step 13: the attestation object is a CBOR map of exactly `fmt` (text), `attStmt` (map) and `authData` (bytes), else `Malformed`: row:derived over oracle:registration.json#at-clear, oracle-pending:attestation-object.json (no test reads this file yet).
 - R41 Step 14: `rpIdHash` is SHA-256 of the RP ID, else `RpIdHash`: row:derived over oracle:registration.json#rp-id-hash-other.
 - R42 Step 15: UP must be set unless the options named `Mediation::Conditional`, else `UserNotPresent`: row:derived over oracle:registration.json#up-clear, unit:verify::registration_options_choose_flags_and_algorithms.
 - R43 Step 16: UV must be set when user verification is `Required`, else `UserNotVerified`; under `Preferred` a clear UV registers as `PresenceOnly`: row:derived over oracle:registration.json#uv-clear-required and #uv-clear-preferred.
 - R44 Step 17: BS without BE is `BackupStateWithoutEligibility`: row:derived over oracle:registration.json#bs-without-be.
 - R45 Steps 18 and 19: BE and BS are recorded as `Credential::backup` and the crate applies no other backup policy; BS without BE is refused at step 17 (R44), BE must equal the stored BE at authentication (R79), BS may change either way and is recorded on each `Ok` (R83), and anything beyond that is consumer policy: row:w3c_none over w3c:none.json#16.2 (UP, BE and BS set, UV clear).
-- R46 Step 20: the credential key's `alg` is one the options offered, else `Algorithm`: row:derived over oracle:registration.json#alg-not-requested, row:w3c_packed over w3c:packed.json#16.9 and #16.12 (ES512 and Ed448, never offered: `Algorithm`).
+- R46 Step 20: the credential key's `alg` is one the options offered, else `Algorithm`: row:derived over oracle:registration.json#alg-not-requested, row-pending:w3c_packed (the row file holds no test yet) over w3c-pending:packed.json#16.9 (no test reads this file yet) and #16.12 (ES512 and Ed448, never offered: `Algorithm`).
 - R47 Step 21: `fmt` matches one of the six identifiers byte for byte; any other is `UnknownFormat`, and one whose feature is off is `FormatDisabled`: row:derived over oracle:registration.json#fmt-unknown, unit:attestation::a_format_whose_feature_is_off_is_disabled_not_unknown, unit:attestation::a_listed_format_with_no_procedure_is_refused. Pending, no verification yet: `packed`, `tpm`, `android-key`, `apple` and `fido-u2f` are listed identifiers only when their procedures land (R90 to R99).
-- R48 Step 22: the statement verifies by its format's procedure (R90 to R99), else `AttestationInvalid`: row:w3c_none, row:w3c_packed, row:w3c_tpm, row:w3c_android_key, row:w3c_apple, row:w3c_fido_u2f.
+- R48 Step 22: the statement verifies by its format's procedure (R90 to R99), else `AttestationInvalid`: row:w3c_none, row-pending:w3c_packed (the row file holds no test yet), row-pending:w3c_tpm (the row file holds no test yet), row-pending:w3c_android_key (the row file holds no test yet), row-pending:w3c_apple (the row file holds no test yet), row-pending:w3c_fido_u2f (the row file holds no test yet).
 - R49 Step 23: the `TrustSource` is asked once for a statement with a trust path, with its format, the attested AAGUID and the `x5c` digests, and never for none or self: unit-pending:verify::trust_source_asked_once (trust dispatch, unassigned).
-- R50 Step 24: `TrustDecision::Denied` is `Untrusted` under every policy; otherwise under `TrustPolicy::AcceptUntrusted` every verified statement registers and `Attestation::trust` reports `Anchored` or `Unanchored`, and under `RequireTrusted` none, self and unanchored statements are `Untrusted`: row:w3c_packed over w3c:packed.json#16.7 (anchored to 16.1, unanchored on `Unknown`, `Untrusted` on `Denied`), row:w3c_none over w3c:none.json#16.2 (`Untrusted` under `RequireTrusted`).
+- R50 Step 24: `TrustDecision::Denied` is `Untrusted` under every policy; otherwise under `TrustPolicy::AcceptUntrusted` every verified statement registers and `Attestation::trust` reports `Anchored` or `Unanchored`, and under `RequireTrusted` none, self and unanchored statements are `Untrusted`: row-pending:w3c_packed (the row file holds no test yet) over w3c-pending:packed.json#16.7 (anchored to 16.1, unanchored on `Unknown`, `Untrusted` on `Denied`; no test reads this file yet), row:w3c_none over w3c:none.json#16.2 (`Untrusted` under `RequireTrusted`).
 - R51 Step 25: an attested credential id over `MAX_CREDENTIAL_ID` bytes is `CredentialIdInvalid` at step 25: row:derived over oracle:registration.json#credential-id-1023 (registers) and #credential-id-1024 (refused), row:w3c_none over w3c:none.json#16.6.
 - R52 Step 26: uniqueness is the effect's `Absent` guard on `Key::Credential` (O3); the crate reads no credential row to register: row:race, api:RelyingParty::finish_registration (`finish_registration` takes no credential row).
 - R53 Step 27: the credential record holds id, public key, `signCount`, `uvInitialized`, transports, BE, BS, the ceremony's user handle, the AAGUID and the `Attestation` (format, type, trust, the `x5c` digests and the anchor's): unit:record::credential_fields_are_readable, row:derived over oracle:registration.json#control-none-es256 (its expected credential id).
-- R54 Step 28: extension outputs are processed by R120 to R128: oracle:extensions.json, row:w3c_prf.
+- R54 Step 28: extension outputs are processed by R120 to R128: oracle-pending:extensions.json (no test reads this file yet), row-pending:w3c_prf (the row file holds no test yet).
 - R55 Step 29: on `Ok` the effect is the delete of the seen ceremony row plus `create` of the credential row (`Absent` plus put); its two keys are distinct, it has a guard, and its two guards and two writes are far under `MAX_EFFECT_SIZE`, so base's `Overlap`, `Empty` and `TooLarge` cannot arise: unit:verify::every_effect_is_one_transaction_of_at_most_two_guards_and_two_writes, unit:verify::a_valid_registration_reserves_the_credential_and_deletes_the_ceremony, mutants:verify.
 - R56 A registration finished at or after the ceremony's deadline (`now >= deadline`, as the store treats expiry) is `Expired`, decided from the record's deadline, never from store expiry: unit:verify::each_registration_check_names_its_kind_and_step (`now == deadline`), unit:verify::a_registration_past_its_deadline_is_expired, unit:verify::the_deadline_is_exclusive, row:race.
 - R57 The AAGUID authenticates the model only when `Attestation::trust` is `Anchored`; for none, self and unanchored statements it is what the client sent, and `Credential::aaguid` says so: api:Credential::aaguid (the doc), unit-pending:verify::aaguid_follows_trust (trust dispatch, unassigned).
-- R58 The finishing browser's binding equals the one `start_registration` stored, else `BrowserMismatch`, so a registration cannot be finished into another browser's session: oracle:browser-binding.json, mutants:verify.
+- R58 The finishing browser's binding equals the one `start_registration` stored, else `BrowserMismatch`, so a registration cannot be finished into another browser's session: oracle-pending:browser-binding.json (no test reads this file yet), mutants:verify, unit:verify::each_registration_check_names_its_kind_and_step.
 
 ## Runtime: authentication (L3 7.2)
-- R60 Step 1: `start_authentication` draws a 32-byte challenge and emits it with `rpId`, `allowCredentials` (the `Allow::User` list; empty for `Discoverable`), `userVerification`, `timeout`, `hints` and `extensions`: oracle:options-json.json.
+- R60 Step 1: `start_authentication` draws a 32-byte challenge and emits it with `rpId`, `allowCredentials` (the `Allow::User` list; empty for `Discoverable`), `userVerification`, `timeout`, `hints` and `extensions`: oracle-pending:options-json.json (no test reads this file yet).
 - R61 `start_authentication` is `TooLarge` for an allow list over `MAX_LISTED_CREDENTIALS`, a PRF salt over `MAX_PRF_SALT` or a large blob over `MAX_LARGE_BLOB`, or a ceremony row that `Record::encode` refuses past `MAX_RECORD` (the host could not decode it); its effect is `Effect::created` of the ceremony row with expiry at the deadline; the row keeps the challenge digest, the browser binding, the SHA-256 of each allowed id and the identified user's handle: unit:verify::start_authentication_emits_the_row_and_the_options, unit:verify::start_authentication_is_bounded, unit:verify::the_ceremony_row_holds_the_challenge_digest_and_never_the_challenge, unit:verify::the_registration_row_holds_the_challenge_digest_and_never_the_challenge.
 - R62 Steps 2 to 4 happen in the client, as R32; every refusal below is inside the `Verdict` with the delete alone, as R33: row:derived over oracle:client-data.json and oracle:authenticator-data.json (every refusal case), unit:verify::a_valid_assertion_updates_the_credential_and_deletes_the_ceremony, unit:verify::each_check_names_its_kind_and_step.
-- R63 The finishing browser's binding equals the one the ceremony started with, else `BrowserMismatch`, so a response finished from another browser fails (login CSRF): oracle:browser-binding.json, mutants:verify.
-- R64 Step 5: with a non-empty allow list the response's credential id must be listed, else `NotAllowed`: oracle:authentication.json.
-- R65 Step 6: the stored credential's id is the response's, else `CredentialMismatch`: oracle:authentication.json.
-- R66 Step 6: under `Allow::User` the stored credential's user is the identified user, else `UserHandleMismatch`: oracle:authentication.json.
-- R67 Step 6: under `Allow::User` a present `userHandle` equals the identified user, else `UserHandleMismatch`: oracle:authentication.json.
-- R68 Step 6: under `Allow::Discoverable` `userHandle` is present, else `UserHandleMismatch`: oracle:authentication.json.
-- R69 Step 6: under `Allow::Discoverable` `userHandle` equals the stored credential's user, else `UserHandleMismatch`: oracle:authentication.json, mutants:verify.
+- R63 The finishing browser's binding equals the one the ceremony started with, else `BrowserMismatch`, so a response finished from another browser fails (login CSRF): oracle-pending:browser-binding.json (no test reads this file yet), mutants:verify, unit:verify::each_check_names_its_kind_and_step, unit:verify::a_wrong_browser_fails_before_anything_else_is_read.
+- R64 Step 5: with a non-empty allow list the response's credential id must be listed, else `NotAllowed`: oracle-pending:authentication.json (no test reads this file yet), unit:verify::each_check_names_its_kind_and_step.
+- R65 Step 6: the stored credential's id is the response's, else `CredentialMismatch`: oracle-pending:authentication.json (no test reads this file yet), unit:verify::each_check_names_its_kind_and_step.
+- R66 Step 6: under `Allow::User` the stored credential's user is the identified user, else `UserHandleMismatch`: oracle-pending:authentication.json (no test reads this file yet), unit:verify::each_check_names_its_kind_and_step.
+- R67 Step 6: under `Allow::User` a present `userHandle` equals the identified user, else `UserHandleMismatch`: oracle-pending:authentication.json (no test reads this file yet), unit:verify::each_check_names_its_kind_and_step.
+- R68 Step 6: under `Allow::Discoverable` `userHandle` is present, else `UserHandleMismatch`: oracle-pending:authentication.json (no test reads this file yet), unit:verify::users_are_matched_by_the_allow_mode.
+- R69 Step 6: under `Allow::Discoverable` `userHandle` equals the stored credential's user, else `UserHandleMismatch`: oracle-pending:authentication.json (no test reads this file yet), mutants:verify, unit:verify::users_are_matched_by_the_allow_mode.
 - R70 Steps 7 to 9: client data is read as R6: row:derived over oracle:client-data.json#client-data-not-json.
 - R71 Step 10: `C.type` is `webauthn.get`, exactly, else `Type`: row:derived over oracle:client-data.json#type-create, #type-missing and #type-case.
 - R72 Step 11: challenge as R35: row:derived over oracle:client-data.json#challenge-other, unit:verify::each_check_names_its_kind_and_step.
 - R73 Step 12: origin as R36, compared exactly: row:derived over oracle:client-data.json#origin-other, #origin-trailing-slash, #origin-http, #origin-port and #origin-subdomain.
 - R74 Steps 13 and 14: cross-origin and top origin as R37 and R38: row:derived over oracle:client-data.json#cross-origin-denied, #cross-origin-allowed, #top-origin-other and #top-origin-without-cross-origin, row:w3c_none over w3c:none.json#16.4 and #16.5 (the authentication halves).
-- R75 Step 15: `rpIdHash` is SHA-256 of the RP ID, or of the AppID when `appid` was requested and the client reported it used, else `RpIdHash`: row:derived over oracle:authenticator-data.json#rp-id-hash-other and #rp-id-hash-of-origin, oracle:extensions.json (appid).
+- R75 Step 15: `rpIdHash` is SHA-256 of the RP ID, or of the AppID when `appid` was requested and the client reported it used, else `RpIdHash`: row:derived over oracle:authenticator-data.json#rp-id-hash-other and #rp-id-hash-of-origin, oracle-pending:extensions.json (appid; no test reads this file yet).
 - R76 Step 16: UP must be set, with no conditional exemption, else `UserNotPresent`: row:derived over oracle:authenticator-data.json#up-clear.
 - R77 Step 17: under `Required` the UV flag must be set, else `UserNotVerified`; nothing else is refused here. `Assertion::user_verification` reports `Verified` (UV set, `uvInitialized` true), `FirstUse` (UV set, `uvInitialized` false; not yet an authentication factor, L3 6.1) or `PresenceOnly`; what a host accepts as a factor is its policy (O11): row:derived over oracle:authenticator-data.json#uv-clear-required, #uv-clear-preferred and #uv-set-required, unit:verify::user_verification_and_backup_are_reported.
 - R78 Step 18: BS without BE is `BackupStateWithoutEligibility`: row:derived over oracle:authenticator-data.json#bs-without-be.
 - R79 Step 19: BE must equal the stored BE, else `BackupEligibilityChanged`; BS may change while BE is set: row:derived over oracle:authenticator-data.json#be-stored-clear-now-set, #be-stored-set-now-clear and #be-bs-set-eligible.
-- R80 Steps 20 and 21: the signature over authenticator data then SHA-256 of `clientDataJSON` verifies with the stored key: ES256 and ES384 as strict DER (high S accepted), EdDSA by strict Ed25519 verification, RS256 as PKCS#1 v1.5; anything else is `Signature`: row:exam_spike over `w3c-webauthn-3/exam-spike/assertion-none-es256.json`, row:w3c_none over w3c:none.json, unit:cose::es256_signatures_are_strict_der_and_the_algorithm_is_reported (ES256 strict DER). Pending, no test yet (row:w3c_packed has 0 tests): ES384, RS256 and EdDSA verification, which the oracle sections 16.8, 16.10 and 16.11 of the packed file will check. row:derived over oracle:client-data.json#control-valid, unit:verify::each_check_names_its_kind_and_step, mutants:verify.
+- R80 Steps 20 and 21: the signature over authenticator data then SHA-256 of `clientDataJSON` verifies with the stored key: ES256 as strict DER (high S accepted); a bad signature is `Signature`: row:exam_spike over `w3c-webauthn-3/exam-spike/assertion-none-es256.json`, row:w3c_none over w3c:none.json, unit:cose::es256_signatures_are_strict_der_and_the_algorithm_is_reported (ES256 strict DER), row:derived over oracle:client-data.json#control-valid, unit:verify::each_check_names_its_kind_and_step, mutants:verify. Planned with webauthn-08, not built: ES384 as strict DER, EdDSA by strict Ed25519 verification and RS256 as PKCS#1 v1.5, which `CoseKey::verify` refuses with `Algorithm` today; the packed oracle sections 16.8, 16.10 and 16.11 will check them: row-pending:w3c_packed (the row file holds no test yet).
 - R81 Step 22: both counts zero is `Counter::Unsupported`; a greater count is `Advanced` and stored; otherwise `CounterPolicy::Reject` is `CounterRegressed` and `Tolerate` reports `Regressed { stored, seen }` and keeps the stored count: row:derived over oracle:authenticator-data.json#counter-advanced, #counter-regressed, #counter-equal, #counter-zero-after-nonzero, #counter-both-zero and #counter-regressed-tolerate, unit:verify::counters_follow_the_policy, unit:verify::each_check_names_its_kind_and_step, mutants:verify.
-- R82 Step 23: extension outputs are processed by R120 to R128: oracle:extensions.json, row:w3c_prf.
+- R82 Step 23: extension outputs are processed by R120 to R128: oracle-pending:extensions.json (no test reads this file yet), row-pending:w3c_prf (the row file holds no test yet).
 - R83 Step 24: on `Ok` the effect is the delete of the seen ceremony row plus `update` of the seen credential row (new count unless regressed, current BS); `finish_authentication` never raises `uvInitialized`, which is the step's skip when no extra factor authorized it: unit:verify::a_valid_assertion_updates_the_credential_and_deletes_the_ceremony, unit:verify::user_verification_and_backup_are_reported, mutants:verify.
 - R84 `confirm_user_verification` is `Effect::updated` of the seen credential row with `uvInitialized` raised and nothing else changed: unit:verify::confirming_raises_uv_initialized_alone.
 - R85 An authentication finished at or after the deadline is `Expired`, as R56: unit:verify::each_check_names_its_kind_and_step (`now == deadline`), unit:verify::an_assertion_past_its_deadline_is_expired, unit:verify::the_deadline_is_exclusive.
 
 ## Runtime: attestation formats (L3 section 8), one cargo feature each
 - R90 `none` (8.7): `attStmt` is an empty map, else `Malformed`; type `None`: row:w3c_none over w3c:none.json#16.2, #16.4, #16.5 and #16.6, row:derived over oracle:registration.json#control-none-es256 and #none-with-statement.
-- R91 `packed` self (8.2): no `x5c`, `alg` equals the credential key's, and `sig` verifies with the credential key; type `SelfAttestation`: row:w3c_packed over w3c:packed.json#16.3, mutants:attestation::packed.
-- R92 `packed` full (8.2, 8.2.1, 8.2.2): `sig` verifies with the `x5c[0]` key under `alg`; that certificate is version 3, its subject has C, O, OU `Authenticator Attestation` and CN, basicConstraints CA is false, an AAGUID extension (1.3.6.1.4.1.45724.1.1.4), when present, is non-critical and equals the attested AAGUID, and a serial-number extension (1.3.6.1.4.1.45724.1.1.2), when present, is non-critical; type `Uncertain`, trust path `x5c`: row:w3c_packed over w3c:packed.json#16.7, #16.10 and #16.11, oracle:attestation.json (packed AAGUID and serial number), mutants:attestation::packed.
-- R93 `tpm` (8.3): `ver` is `2.0`; own bounded parsers read `pubArea` (TPMT_PUBLIC, RSA or ECC, nameAlg SHA-256 or SHA-1) and `certInfo` (TPMS_ATTEST); the `pubArea` key equals the credential key: row:w3c_tpm over w3c:tpm.json#16.13, oracle:attestation.json (pubArea), fuzz-pending:attestation_object (its tpm seeds, no target yet), mutants:attestation::tpm.
-- R94 `tpm` `certInfo` (8.3): magic TPM_GENERATED_VALUE, type TPM_ST_ATTEST_CERTIFY, `extraData` equal to the hash of authenticator data then client data hash under `alg`'s hash, and an attested name equal to nameAlg then the nameAlg hash of `pubArea`: row:w3c_tpm over w3c:tpm.json#16.13, oracle:attestation.json (certInfo), mutants:attestation::tpm.
-- R95 `tpm` signature and AIK certificate (8.3, 8.3.1): `sig` verifies over `certInfo` with the AIK certificate key under `alg` (RS256, RS1 with SHA-1, or ES256); the AIK certificate is version 3 with an empty subject, a SAN, EKU 2.23.133.8.3, basicConstraints CA false and a matching AAGUID extension when present; type `AttCa`: row:w3c_tpm over w3c:tpm.json#16.13, oracle:attestation.json (AIK, RS1), mutants:attestation::tpm.
-- R96 `android-key` (8.4): `sig` verifies with the leaf key, and the leaf key equals the credential key; type `Basic`: row:w3c_android_key over w3c:android-key.json#16.14, mutants:attestation::android_key.
-- R97 `android-key` key description (8.4.1, 1.3.6.1.4.1.11129.2.1.17), read by a tolerant header walk so later schema versions parse: `attestationChallenge` equals the client data hash, `allApplications` is absent from both lists, and origin GENERATED and purpose SIGN appear in `teeEnforced` (or either list under `KeyEnforcement::AnyList`): row:w3c_android_key over w3c:android-key.json#16.14, row:android_key_attestation (each committed leaf's key description parses), oracle:attestation.json (android-key lists), mutants:attestation::android_key.
-- R98 `apple` (8.8): SHA-256 of authenticator data then client data hash equals the nonce in extension 1.2.840.113635.100.8.2 of the leaf, and the leaf key equals the credential key; type `AnonCa`: row:w3c_apple over w3c:apple.json#16.15, mutants:attestation::apple.
-- R99 `fido-u2f` (8.6): `x5c` is one certificate with a P-256 key, the credential key is EC2 P-256, and `sig` verifies over 0x00, `rpIdHash`, client data hash, credential id and the uncompressed point; type `Uncertain`: row:w3c_fido_u2f over w3c:fido-u2f.json#16.16, mutants:attestation::fido_u2f.
+- R91 `packed` self (8.2): no `x5c`, `alg` equals the credential key's, and `sig` verifies with the credential key; type `SelfAttestation`: row-pending:w3c_packed (the row file holds no test yet) over w3c-pending:packed.json#16.3 (no test reads this file yet), mutants-pending:attestation::packed (the module holds no fn yet).
+- R92 `packed` full (8.2, 8.2.1, 8.2.2): `sig` verifies with the `x5c[0]` key under `alg`; that certificate is version 3, its subject has C, O, OU `Authenticator Attestation` and CN, basicConstraints CA is false, an AAGUID extension (1.3.6.1.4.1.45724.1.1.4), when present, is non-critical and equals the attested AAGUID, and a serial-number extension (1.3.6.1.4.1.45724.1.1.2), when present, is non-critical; type `Uncertain`, trust path `x5c`: row-pending:w3c_packed (the row file holds no test yet) over w3c-pending:packed.json#16.7 (no test reads this file yet), #16.10 and #16.11, oracle-pending:attestation.json (packed AAGUID and serial number; no test reads this file yet), mutants-pending:attestation::packed (the module holds no fn yet).
+- R93 `tpm` (8.3): `ver` is `2.0`; own bounded parsers read `pubArea` (TPMT_PUBLIC, RSA or ECC, nameAlg SHA-256 or SHA-1) and `certInfo` (TPMS_ATTEST); the `pubArea` key equals the credential key: row-pending:w3c_tpm (the row file holds no test yet) over w3c-pending:tpm.json#16.13 (no test reads this file yet), oracle-pending:attestation.json (pubArea; no test reads this file yet), fuzz-pending:attestation_object (its tpm seeds, no target yet), mutants-pending:attestation::tpm (the module holds no fn yet).
+- R94 `tpm` `certInfo` (8.3): magic TPM_GENERATED_VALUE, type TPM_ST_ATTEST_CERTIFY, `extraData` equal to the hash of authenticator data then client data hash under `alg`'s hash, and an attested name equal to nameAlg then the nameAlg hash of `pubArea`: row-pending:w3c_tpm (the row file holds no test yet) over w3c-pending:tpm.json#16.13 (no test reads this file yet), oracle-pending:attestation.json (certInfo; no test reads this file yet), mutants-pending:attestation::tpm (the module holds no fn yet).
+- R95 `tpm` signature and AIK certificate (8.3, 8.3.1): `sig` verifies over `certInfo` with the AIK certificate key under `alg` (RS256, RS1 with SHA-1, or ES256); the AIK certificate is version 3 with an empty subject, a SAN, EKU 2.23.133.8.3, basicConstraints CA false and a matching AAGUID extension when present; type `AttCa`: row-pending:w3c_tpm (the row file holds no test yet) over w3c-pending:tpm.json#16.13 (no test reads this file yet), oracle-pending:attestation.json (AIK, RS1; no test reads this file yet), mutants-pending:attestation::tpm (the module holds no fn yet).
+- R96 `android-key` (8.4): `sig` verifies with the leaf key, and the leaf key equals the credential key; type `Basic`: row-pending:w3c_android_key (the row file holds no test yet) over w3c-pending:android-key.json#16.14 (no test reads this file yet), mutants-pending:attestation::android_key (the module holds no fn yet).
+- R97 `android-key` key description (8.4.1, 1.3.6.1.4.1.11129.2.1.17), read by a tolerant header walk so later schema versions parse: `attestationChallenge` equals the client data hash, `allApplications` is absent from both lists, and origin GENERATED and purpose SIGN appear in `teeEnforced` (or either list under `KeyEnforcement::AnyList`): row-pending:w3c_android_key (the row file holds no test yet) over w3c-pending:android-key.json#16.14 (no test reads this file yet), row-pending:android_key_attestation (each committed leaf's key description parses; the row file holds no test yet), oracle-pending:attestation.json (android-key lists; no test reads this file yet), mutants-pending:attestation::android_key (the module holds no fn yet).
+- R98 `apple` (8.8): SHA-256 of authenticator data then client data hash equals the nonce in extension 1.2.840.113635.100.8.2 of the leaf, and the leaf key equals the credential key; type `AnonCa`: row-pending:w3c_apple (the row file holds no test yet) over w3c-pending:apple.json#16.15 (no test reads this file yet), mutants-pending:attestation::apple (the module holds no fn yet).
+- R99 `fido-u2f` (8.6): `x5c` is one certificate with a P-256 key, the credential key is EC2 P-256, and `sig` verifies over 0x00, `rpIdHash`, client data hash, credential id and the uncompressed point; type `Uncertain`: row-pending:w3c_fido_u2f (the row file holds no test yet) over w3c-pending:fido-u2f.json#16.16 (no test reads this file yet), mutants-pending:attestation::fido_u2f (the module holds no fn yet).
 - R100 Each format's module compiles only under its own feature, and `none` pulls in no X.509 crate: `just wasm` (each format feature alone, from `gates.json`), and the inverse-tree check that `none` alone has no `x509-cert` is a shared-recipe need, pending.
 
 ## Runtime: the attestation chain walk (own, over x509-cert; D6 ruling)
-- R110 The walk follows `x5c` in order, never builds a path, and stops at `MAX_X5C` certificates plus one anchor: oracle:chains.json (too long), oracle:limits.json (x5c).
-- R111 Each certificate's signature verifies under the next one's key, and the last under an anchor whose subject is its issuer, or the last is an anchor byte for byte; every anchor whose subject matches is tried, in the `TrustSource`'s order, before the walk reports `Unanchored`, so two anchors sharing a subject cannot hide each other: row:w3c_packed over w3c:packed.json#16.7 (to the 16.1 root), row:android_key_attestation (the four committed chains, each `Anchored` to its own root at the `now` the row pins inside every certificate's validity), oracle:chains.json (shared subject), mutants:attestation::chain.
-- R112 Issuer and subject chain by exact DER equality: oracle:chains.json (name mismatch).
-- R113 Every certificate above the leaf has basicConstraints CA true and a path length its depth respects, and keyCertSign when keyUsage is present: oracle:chains.json (not CA, path length, key usage).
-- R114 Every certificate's validity contains `now`, except the android-key leaf (N14); `now` is the finish's argument: row:android_key_attestation, oracle:chains.json (expired, not yet valid).
-- R115 The leaf may carry critical extensions the walk does not read (the TPM leaf's critical SAN and EKU: the reason the walk is own); on a CA certificate or an anchor, a critical extension other than basicConstraints, keyUsage, extKeyUsage and subjectAltName fails the walk: row:w3c_tpm over w3c:tpm.json#16.13 (its critical leaf extensions pass), oracle:chains.json (CA critical extension).
-- R116 Chain signatures verify as ecdsa-with-SHA256 or ecdsa-with-SHA384 on P-256 or P-384, or sha256, sha384 or sha512 with RSA of `MIN_RSA_BITS` to `MAX_RSA_BITS` bits: row:android_key_attestation (EC and RSA chains), oracle:chains.json (P-384 root), mutants:attestation::chain.
-- R117 Outcomes: a chain signed by an algorithm outside R116 is `Unanchored`; an internally valid chain that meets no anchor is `Unanchored`; every other failure of R110 to R115 is `AttestationInvalid`, never `Unanchored`: oracle:chains.json (each case states its outcome), mutants:attestation::chain.
+- R110 The walk follows `x5c` in order, never builds a path, and stops at `MAX_X5C` certificates plus one anchor: oracle-pending:chains.json (too long; no test reads this file yet), oracle-pending:limits.json (x5c; no test reads this file yet).
+- R111 Each certificate's signature verifies under the next one's key, and the last under an anchor whose subject is its issuer, or the last is an anchor byte for byte; every anchor whose subject matches is tried, in the `TrustSource`'s order, before the walk reports `Unanchored`, so two anchors sharing a subject cannot hide each other: row-pending:w3c_packed (the row file holds no test yet) over w3c-pending:packed.json#16.7 (to the 16.1 root; no test reads this file yet), row-pending:android_key_attestation (the four committed chains, each `Anchored` to its own root at the `now` the row pins inside every certificate's validity; the row file holds no test yet), oracle-pending:chains.json (shared subject; no test reads this file yet), mutants-pending:attestation::chain (the module holds no fn yet).
+- R112 Issuer and subject chain by exact DER equality: oracle-pending:chains.json (name mismatch; no test reads this file yet).
+- R113 Every certificate above the leaf has basicConstraints CA true and a path length its depth respects, and keyCertSign when keyUsage is present: oracle-pending:chains.json (not CA, path length, key usage; no test reads this file yet).
+- R114 Every certificate's validity contains `now`, except the android-key leaf (N14); `now` is the finish's argument: row-pending:android_key_attestation (the row file holds no test yet), oracle-pending:chains.json (expired, not yet valid; no test reads this file yet).
+- R115 The leaf may carry critical extensions the walk does not read (the TPM leaf's critical SAN and EKU: the reason the walk is own); on a CA certificate or an anchor, a critical extension other than basicConstraints, keyUsage, extKeyUsage and subjectAltName fails the walk: row-pending:w3c_tpm (the row file holds no test yet) over w3c-pending:tpm.json#16.13 (its critical leaf extensions pass; no test reads this file yet), oracle-pending:chains.json (CA critical extension; no test reads this file yet).
+- R116 Chain signatures verify as ecdsa-with-SHA256 or ecdsa-with-SHA384 on P-256 or P-384, or sha256, sha384 or sha512 with RSA of `MIN_RSA_BITS` to `MAX_RSA_BITS` bits: row-pending:android_key_attestation (EC and RSA chains; the row file holds no test yet), oracle-pending:chains.json (P-384 root; no test reads this file yet), mutants-pending:attestation::chain (the module holds no fn yet).
+- R117 Outcomes: a chain signed by an algorithm outside R116 is `Unanchored`; an internally valid chain that meets no anchor is `Unanchored`; every other failure of R110 to R115 is `AttestationInvalid`, never `Unanchored`: oracle-pending:chains.json (each case states its outcome; no test reads this file yet), mutants-pending:attestation::chain (the module holds no fn yet).
 
 ## Runtime: extensions (L3 10.1)
-- R120 `appid`: requested by `AuthenticationOptions::app_id`; `appid: true` selects the AppID hash for step 15; the output without the request is unsolicited (R128): oracle:extensions.json.
-- R121 `appidExclude`: emitted by `RegistrationOptions::app_id_exclude`; its output is read and ignored when requested: oracle:extensions.json, oracle:options-json.json.
-- R122 Every requested client output reads `NotRequested` without the request and `Unreported` when requested and absent (always without the `serde` response shape): `Discoverability`, `PrfResult`, `LargeBlobSupport` and `LargeBlobOutcome`: oracle:extensions.json.
-- R123 `credProps`: `rk` becomes `Discoverability::Discoverable` or `NonDiscoverable`: oracle:extensions.json.
-- R124 `prf` at registration: `Enable` emits `prf: {}`, `Eval` emits base64url `eval.first` and `eval.second`; `enabled` and results become `PrfResult`; results without `Eval`, or a second result without a second salt, are `Extension`; a result that is not 32 bytes is `Malformed`: row:w3c_prf over w3c:prf.json#16.17.1.1, oracle:extensions.json.
-- R125 `prf` at authentication: `eval` and `evalByCredential`, whose keys must be listed in `Allow::User` (else `start_authentication` is `Extension`); results as R124: row:w3c_prf over w3c:prf.json#16.17.1.1, oracle:extensions.json.
-- R126 `largeBlob` at registration: `support` emitted; `supported` becomes `LargeBlobSupport`: oracle:extensions.json.
-- R127 `largeBlob` at authentication: the one `LargeBlobOp`; `blob` only after `Read` and `written` only after `Write`, else `Extension`; a blob past `MAX_LARGE_BLOB` is `TooLarge`: oracle:extensions.json.
-- R128 An unrequested client or authenticator extension output is `Extension` under `UnsolicitedExtensions::Reject` (the default) and dropped under `Ignore`; authenticator outputs (the ED map) are a CBOR map with text keys, and this crate requests none, so each is unsolicited: oracle:extensions.json.
+- R120 `appid`: requested by `AuthenticationOptions::app_id`; `appid: true` selects the AppID hash for step 15; the output without the request is unsolicited (R128): oracle-pending:extensions.json (no test reads this file yet).
+- R121 `appidExclude`: emitted by `RegistrationOptions::app_id_exclude`; its output is read and ignored when requested: oracle-pending:extensions.json (no test reads this file yet), oracle-pending:options-json.json (no test reads this file yet).
+- R122 Every requested client output reads `NotRequested` without the request and `Unreported` when requested and absent (always without the `serde` response shape): `Discoverability`, `PrfResult`, `LargeBlobSupport` and `LargeBlobOutcome`: oracle-pending:extensions.json (no test reads this file yet).
+- R123 `credProps`: `rk` becomes `Discoverability::Discoverable` or `NonDiscoverable`: oracle-pending:extensions.json (no test reads this file yet).
+- R124 `prf` at registration: `Enable` emits `prf: {}`, `Eval` emits base64url `eval.first` and `eval.second`; `enabled` and results become `PrfResult`; results without `Eval`, or a second result without a second salt, are `Extension`; a result that is not 32 bytes is `Malformed`: row-pending:w3c_prf (the row file holds no test yet) over w3c-pending:prf.json#16.17.1.1 (no test reads this file yet), oracle-pending:extensions.json (no test reads this file yet).
+- R125 `prf` at authentication: `eval` and `evalByCredential`, whose keys must be listed in `Allow::User` (else `start_authentication` is `Extension`); results as R124: row-pending:w3c_prf (the row file holds no test yet) over w3c-pending:prf.json#16.17.1.1 (no test reads this file yet), oracle-pending:extensions.json (no test reads this file yet).
+- R126 `largeBlob` at registration: `support` emitted; `supported` becomes `LargeBlobSupport`: oracle-pending:extensions.json (no test reads this file yet).
+- R127 `largeBlob` at authentication: the one `LargeBlobOp`; `blob` only after `Read` and `written` only after `Write`, else `Extension`; a blob past `MAX_LARGE_BLOB` is `TooLarge`: oracle-pending:extensions.json (no test reads this file yet).
+- R128 An unrequested client or authenticator extension output is `Extension` under `UnsolicitedExtensions::Reject` (the default) and dropped under `Ignore`; authenticator outputs (the ED map) are a CBOR map with text keys, and this crate requests none, so each is unsolicited: oracle-pending:extensions.json (no test reads this file yet).
 
 ## Runtime: JSON shapes, related origins and signals (feature `serde`)
-- R130 `CreationOptions` serializes as `PublicKeyCredentialCreationOptionsJSON` (5.1.8): base64url for the challenge, user id, listed ids and PRF salts; absent members omitted; `requireResidentKey` true exactly when `residentKey` is required; `timeout` in milliseconds; hints and attestation formats in order, without repeats: oracle:options-json.json.
-- R131 `RequestOptions` serializes as `PublicKeyCredentialRequestOptionsJSON` (5.1.9): oracle:options-json.json.
-- R132 `RegistrationResponse` and `AuthenticationResponse` deserialize from `RegistrationResponseJSON` and `AuthenticationResponseJSON`: `id` equals base64url of `rawId`, `type` is `public-key`, base64url members canonical, `clientExtensionResults` typed per R120 to R127 with unknown members kept as unsolicited, other unknown members ignored; a refusal is `de::Error::custom` of this crate's `Error` `Display` (kind and step, never input), so `TooLarge` and `Malformed` stay apart: oracle:response-json.json.
+- R130 `CreationOptions` serializes as `PublicKeyCredentialCreationOptionsJSON` (5.1.8): base64url for the challenge, user id, listed ids and PRF salts; absent members omitted; `requireResidentKey` true exactly when `residentKey` is required; `timeout` in milliseconds; hints and attestation formats in order, without repeats: oracle-pending:options-json.json (no test reads this file yet).
+- R131 `RequestOptions` serializes as `PublicKeyCredentialRequestOptionsJSON` (5.1.9): oracle-pending:options-json.json (no test reads this file yet).
+- R132 `RegistrationResponse` and `AuthenticationResponse` deserialize from `RegistrationResponseJSON` and `AuthenticationResponseJSON`: `id` equals base64url of `rawId`, `type` is `public-key`, base64url members canonical, `clientExtensionResults` typed per R120 to R127 with unknown members kept as unsolicited, other unknown members ignored; a refusal is `de::Error::custom` of this crate's `Error` `Display` (kind and step, never input), so `TooLarge` and `Malformed` stay apart: oracle-pending:response-json.json (no test reads this file yet).
 - R133 Verification never needs `serde`: each format feature builds alone with `serde` off (`just wasm`); the section 16 and derived rows do not yet run with `--no-default-features --features none,packed,tpm,android-key,apple,fido-u2f` through the byte constructors, so that half is unproven: gate-pending:rows-serde-off (every rows.json command runs with --all-features).
-- R134 `related_origins` lists, in configuration order, every configured origin whose host is neither the RP ID nor under it, as `{"origins": [...]}` (5.11): oracle:options-json.json.
-- R135 `signal` fills in the RP ID and emits `{rpId, credentialId}`, `{rpId, userId, allAcceptedCredentialIds}` or `{rpId, userId, name, displayName}` (5.1.10.2 to 5.1.10.4): oracle:options-json.json.
+- R134 `related_origins` lists, in configuration order, every configured origin whose host is neither the RP ID nor under it, as `{"origins": [...]}` (5.11): oracle-pending:options-json.json (no test reads this file yet).
+- R135 `signal` fills in the RP ID and emits `{rpId, credentialId}`, `{rpId, userId, allAcceptedCredentialIds}` or `{rpId, userId, name, displayName}` (5.1.10.2 to 5.1.10.4): oracle-pending:options-json.json (no test reads this file yet).
 
 ## Runtime: keys, records, effects and errors
 - R140 `Key::scope` is `Scope::Global` for both kinds, so `base::Effect::lift` refuses any consumer key map that qualifies them (base R15): unit:record::keys_are_global, mutants:record.
@@ -570,7 +243,7 @@ Each later item edits its own files and row file; where it must touch another it
 - N2 Credential algorithms ES512, Ed448, PS256 and RS1, and the fully-specified -9, -19, -51 and -52: never offered, and `Algorithm` at step 20 (R46); ES512 needs p521, outside this crate's list.
 - N3 Chain signatures on P-521 keys: `Unanchored` (R117).
 - N4 Revocation fetching (CRL, OCSP, the Android status list) and FIDO MDS download: a `TrustSource` turns them into `TrustDecision::Denied` by AAGUID or by any `x5c` digest (`webauthn-mds`); nothing is fetched here.
-- N5 Client-side work: `getClientCapabilities` (5.1.7), the navigator calls of 7.1 and 7.2 steps 2 to 4, and the CTAP2 hmac-secret exchange (w3c:prf.json#16.17.1.2 counts as not applicable).
+- N5 Client-side work: `getClientCapabilities` (5.1.7), the navigator calls of 7.1 and 7.2 steps 2 to 4, and the CTAP2 hmac-secret exchange (section 16.17.1.2 of `w3c-webauthn-3/prf.json` counts as not applicable).
 - N6 Authenticator extensions of 10.2 and non-core extensions (credProtect, devicePubKey and the like): treated only as unsolicited outputs (R128).
 - N7 Passkey classes (6.2) as types: reported only through `Backup`.
 - N8 Registrable-domain arithmetic: the related-origins label limit (5.11) is the client's and needs a public suffix list; it is not computed.

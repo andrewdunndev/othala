@@ -6,6 +6,14 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 
+## [Unreleased]
+
+### Fixed
+
+- A `skip_consent` client's consent is remembered in Hydra for 86400 seconds, so a `prompt=none` authorize after an interactive sign-in (an app's silent onboarding check) is answered instead of failing with `consent_required`. The login and consent gates (access group, state, aal2, claims) still run on every authorize, and revoking a subject's sessions drops the remembered consent; clients that show the grant screen and device grants stay unremembered.
+
+- An OIDC `prompt=none` authorize no longer lands on a sign-in or consent page: when the portal would otherwise bounce the browser to the login UI (no live Kratos session, or a session that needs aal2 step-up) it rejects the Hydra login request with `login_required`, and a consent that would show the grant screen is rejected with `consent_required`, so an app's silent check gets an error at its `redirect_uri` instead of hanging on a page. A `skip_consent` consent with no live session or a different subject answers `login_required` rather than `access_denied` under `prompt=none`. Access denials, device grants and every request without `prompt=none` behave as before.
+
 ## [0.20.1] - 2026-11-24
 
 ### Fixed

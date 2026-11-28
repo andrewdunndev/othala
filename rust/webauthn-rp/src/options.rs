@@ -400,7 +400,8 @@ impl RegistrationOptions {
         }
     }
 
-    /// Offer one more algorithm, in preference order (a repeat is ignored); with none offered, ES256, EdDSA, ES384 and RS256.
+    /// Offer one more algorithm, in preference order (a repeat is ignored); with none offered, ES256 alone.
+    /// An `Unbuilt` algorithm passed here is still sent in `pubKeyCredParams`, and a credential of it is refused with `Algorithm` when `RegistrationResponse::new` parses it.
     pub fn algorithm(mut self, alg: CoseAlgorithm) -> Self {
         if !self.algorithms.contains(&alg) {
             self.algorithms.push(alg);

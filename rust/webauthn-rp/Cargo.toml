@@ -8,8 +8,9 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-default = ["none", "packed", "tpm", "android-key", "apple", "fido-u2f"]
+default = ["none"]
 none = []
+# Unbuilt: each gates a format module with no procedure yet, so these stay out of the default set
 packed = ["dep:x509-cert", "dep:der", "dep:spki", "dep:const-oid"]
 tpm = ["dep:x509-cert", "dep:der", "dep:spki", "dep:const-oid", "dep:sha1"]
 android-key = ["dep:x509-cert", "dep:der", "dep:spki", "dep:const-oid"]

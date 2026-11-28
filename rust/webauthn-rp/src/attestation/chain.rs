@@ -1,4 +1,4 @@
-//! The own attestation chain walk over x509-cert (R110 to R117); lands with webauthn-09.
+//! Unbuilt: The own attestation chain walk over x509-cert (R110 to R117); lands with webauthn-09.
 use base::Digest;
 
 /// How a chain walk that did not fail ended (R117).
