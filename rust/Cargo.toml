@@ -13,6 +13,7 @@ publish = false
 
 [workspace.dependencies]
 base = { path = "base", version = "0.0.0" }
+jose = { path = "jose", version = "0.0.0" }
 expose = { path = "expose", version = "0.0.0" }
 store = { path = "store", version = "0.0.0" }
 testkit = { path = "testkit", version = "0.0.0" }
@@ -25,6 +26,7 @@ serde = { version = "1", default-features = false }
 trybuild = "1.0.110"
 rand_chacha = { version = "0.10", default-features = false }
 serde_json = "1"
+http = "1"
 toml = { version = "1", default-features = false, features = ["std", "parse", "serde"] }
 rand = "0.10"
 getrandom = { version = "0.4", features = ["sys_rng"] }

@@ -1,0 +1,114 @@
+attr ErrorCode non_exhaustive
+attr ErrorKind non_exhaustive
+attr Route non_exhaustive
+constant MAX_BODY: usize = 16_384
+constant MAX_CODE_SECS: u64 = 600
+constant MAX_ISSUER: usize = 256
+constant MAX_KEYS: usize = 8
+constant MAX_TARGET: usize = 8_192
+constant MAX_TICKET_SECS: u64 = 3_600
+constant MAX_TOKEN_SECS: u64 = 86_400
+enum ErrorCode
+enum ErrorKind
+enum Route
+impl Clone for Error
+impl Clone for ErrorCode
+impl Clone for ErrorKind
+impl Clone for IssuerUrl
+impl Clone for Lifetimes
+impl Clone for LifetimesBuilder
+impl Clone for Route
+impl Copy for Error
+impl Copy for ErrorCode
+impl Copy for ErrorKind
+impl Copy for Lifetimes
+impl Copy for LifetimesBuilder
+impl Copy for Route
+impl Debug for Error
+impl Debug for ErrorCode
+impl Debug for ErrorKind
+impl Debug for IssuerUrl
+impl Debug for Lifetimes
+impl Debug for LifetimesBuilder
+impl Debug for Provider
+impl Debug for Route
+impl Debug for SigningKeys
+impl Display for Error
+impl Eq for Error
+impl Eq for ErrorCode
+impl Eq for ErrorKind
+impl Eq for IssuerUrl
+impl Eq for Lifetimes
+impl Eq for Route
+impl Error for Error
+impl From<Error> for Error
+impl PartialEq for Error
+impl PartialEq for ErrorCode
+impl PartialEq for ErrorKind
+impl PartialEq for IssuerUrl
+impl PartialEq for Lifetimes
+impl PartialEq for Route
+impl StructuralPartialEq for Error
+impl StructuralPartialEq for ErrorCode
+impl StructuralPartialEq for ErrorKind
+impl StructuralPartialEq for IssuerUrl
+impl StructuralPartialEq for Lifetimes
+impl StructuralPartialEq for Route
+method Error::kind const fn(self: &Self) -> ErrorKind
+method ErrorCode::body fn(self: Self) -> Vec<u8>
+method ErrorCode::name const fn(self: Self) -> &'static str
+method ErrorCode::response fn(self: Self) -> Response<Vec<u8>>
+method ErrorCode::status const fn(self: Self) -> StatusCode
+method IssuerUrl::as_str fn(self: &Self) -> &str
+method IssuerUrl::issuer const fn(self: &Self) -> &jose::Issuer
+method IssuerUrl::parse fn(text: &str) -> Result<Self, Error>
+method Lifetimes::access_token const fn(self: &Self) -> u64
+method Lifetimes::builder const fn() -> LifetimesBuilder
+method Lifetimes::code const fn(self: &Self) -> u64
+method Lifetimes::id_token const fn(self: &Self) -> u64
+method Lifetimes::ticket const fn(self: &Self) -> u64
+method LifetimesBuilder::access_token const fn(self: Self, secs: u64) -> Self
+method LifetimesBuilder::build fn(self: Self) -> Result<Lifetimes, Error>
+method LifetimesBuilder::code const fn(self: Self, secs: u64) -> Self
+method LifetimesBuilder::id_token const fn(self: Self, secs: u64) -> Self
+method LifetimesBuilder::ticket const fn(self: Self, secs: u64) -> Self
+method Provider::issuer const fn(self: &Self) -> &IssuerUrl
+method Provider::jwks const fn(self: &Self) -> &JwkSet
+method Provider::lifetimes const fn(self: &Self) -> Lifetimes
+method Provider::metadata_json fn(self: &Self) -> &[u8]
+method Provider::new fn(issuer: IssuerUrl, lifetimes: Lifetimes, keys: SigningKeys) -> Result<Self, Error>
+method Provider::respond fn(self: &Self, route: Route) -> Option<Response<Vec<u8>>>
+method Provider::route fn(self: &Self, request: &Request<Vec<u8>>) -> Route
+method SigningKeys::kids fn(self: &Self) -> impl Iterator<Item = &str>
+method SigningKeys::new fn(keys: Vec<Jwk>) -> Result<Self, Error>
+struct Error
+struct IssuerUrl
+struct Lifetimes
+struct LifetimesBuilder
+struct Provider
+struct SigningKeys
+variant ErrorCode::AccessDenied
+variant ErrorCode::ConsentRequired
+variant ErrorCode::InvalidClient
+variant ErrorCode::InvalidGrant
+variant ErrorCode::InvalidRequest
+variant ErrorCode::InvalidScope
+variant ErrorCode::LoginRequired
+variant ErrorCode::RegistrationNotSupported
+variant ErrorCode::RequestNotSupported
+variant ErrorCode::RequestUriNotSupported
+variant ErrorCode::ServerError
+variant ErrorCode::UnauthorizedClient
+variant ErrorCode::UnsupportedGrantType
+variant ErrorCode::UnsupportedResponseType
+variant ErrorKind::Duplicate
+variant ErrorKind::Malformed
+variant ErrorKind::Missing
+variant ErrorKind::TooLarge
+variant Route::Authorize
+variant Route::BodyTooLarge
+variant Route::Jwks
+variant Route::Metadata
+variant Route::NotFound
+variant Route::TargetTooLong
+variant Route::Token
