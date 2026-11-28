@@ -71,6 +71,8 @@ fn record_corpus() {
     assert_eq!(replay("fuzz/corpus/record", record::check), 55);
 }
 
+const SEEDS: &str = include_str!("../fuzz/seeds.tsv");
+
 fn unhex(text: &str) -> Option<Vec<u8>> {
     text.trim()
         .as_bytes()
@@ -79,18 +81,49 @@ fn unhex(text: &str) -> Option<Vec<u8>> {
         .collect()
 }
 
-/// The bytes a manifest line's source and rule give, and the outcome its rule gives; `None` bytes are not derived.
-fn derive(target: &str, source: &str, rule: &str) -> Result<(Option<Vec<u8>>, String), String> {
+#[derive(serde::Deserialize)]
+struct Expect {
+    ok: bool,
+    kind: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct Case {
+    id: String,
+    expect: Expect,
+    attestation_object: Option<String>,
+    authenticator_data: Option<String>,
+    client_data_json: Option<String>,
+    input: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct Vector {
+    cases: Vec<Case>,
+}
+
+/// The oracle files and golden rows by name.
+fn sources() -> std::collections::BTreeMap<String, Vec<u8>> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    let read = |path: std::path::PathBuf| {
-        std::fs::read_to_string(&path).map_err(|e| format!("{path:?}: {e}"))
-    };
+    ["../vectors/webauthn-rp-derived", "tests/golden"]
+        .iter()
+        .flat_map(|dir| testkit::fixture::files(&root.join(dir)))
+        .collect()
+}
+
+/// The bytes a manifest line's source and rule give (none for a hand-made input) and the outcome its rule gives.
+fn derive(
+    target: &str,
+    source: &str,
+    rule: &str,
+    files: &std::collections::BTreeMap<String, Vec<u8>>,
+) -> Result<(Option<Vec<u8>>, String), String> {
     if let Some(kind) = rule.strip_prefix("hand:") {
         return Ok((None, kind.to_owned()));
     }
     if let Some(name) = source.strip_prefix("golden:") {
-        let row =
-            unhex(&read(root.join(format!("tests/golden/{name}.hex")))?).ok_or("golden hex")?;
+        let text = files.get(&format!("{name}.hex")).ok_or("no golden row")?;
+        let row = unhex(&String::from_utf8_lossy(text)).ok_or("golden hex")?;
         let (bytes, outcome) = match rule {
             "golden" => (row, "ok"),
             "golden-cut" => (
@@ -105,37 +138,32 @@ fn derive(target: &str, source: &str, rule: &str) -> Result<(Option<Vec<u8>>, St
     }
     let (file, rest) = source.split_once('#').ok_or("source")?;
     let (id, field) = rest.rsplit_once('.').ok_or("source field")?;
-    let vector: serde_json::Value = serde_json::from_str(&read(
-        root.join("../vectors/webauthn-rp-derived").join(file),
-    )?)
-    .map_err(|e| e.to_string())?;
+    let vector: Vector = serde_json::from_slice(files.get(file).ok_or("no oracle file")?)
+        .map_err(|e| e.to_string())?;
     let case = vector
-        .get("cases")
-        .and_then(|c| c.as_array())
-        .and_then(|cases| {
-            cases
-                .iter()
-                .find(|c| c.get("id").and_then(|i| i.as_str()) == Some(id))
-        })
+        .cases
+        .iter()
+        .find(|c| c.id == id)
         .ok_or_else(|| format!("{source}: no such case"))?;
-    let bytes = unhex(
-        case.get(field)
-            .and_then(|f| f.as_str())
-            .ok_or("no such field")?,
-    )
-    .ok_or("case hex")?;
-    let expect = case.get("expect").ok_or("expect")?;
-    let ok = expect
-        .get("ok")
-        .and_then(serde_json::Value::as_bool)
-        .ok_or("expect.ok")?;
-    let kind = expect.get("kind").and_then(|k| k.as_str()).unwrap_or("ok");
-    let finish = !ok && !matches!(kind, "Malformed" | "TooLarge");
+    let hex = match field {
+        "attestation_object" => &case.attestation_object,
+        "authenticator_data" => &case.authenticator_data,
+        "client_data_json" => &case.client_data_json,
+        "input" => &case.input,
+        _ => return Err(format!("{source}: field {field}")),
+    };
+    let bytes = unhex(hex.as_deref().ok_or("no such field")?).ok_or("case hex")?;
+    let kind = case.expect.kind.as_deref().unwrap_or("ok");
+    let finish = !case.expect.ok && !matches!(kind, "Malformed" | "TooLarge");
     let outcome = match rule {
         "oracle" => kind,
         "finish" if finish => "ok",
-        "rawid" if target == "attestation_object" && (ok || finish) => "CredentialIdInvalid",
-        "shape" if target == "attestation_object" && file == "cbor.json" && ok => "Malformed",
+        "rawid" if target == "attestation_object" && (case.expect.ok || finish) => {
+            "CredentialIdInvalid"
+        }
+        "shape" if target == "attestation_object" && file == "cbor.json" && case.expect.ok => {
+            "Malformed"
+        }
         _ => return Err(format!("{source}: rule {rule} does not apply")),
     };
     Ok((Some(bytes), outcome.to_owned()))
@@ -143,21 +171,24 @@ fn derive(target: &str, source: &str, rule: &str) -> Result<(Option<Vec<u8>>, St
 
 #[test]
 fn manifest_derives_every_seed() -> Result<(), String> {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    let text = std::fs::read_to_string(root.join("fuzz/seeds.tsv")).map_err(|e| e.to_string())?;
+    let files = sources();
     let mut listed = std::collections::BTreeSet::new();
-    for line in text.lines() {
+    for line in SEEDS.lines() {
         let [target, seed, source, rule] = line.split('\t').collect::<Vec<_>>()[..] else {
             return Err(format!("not four columns: {line}"));
         };
-        let path = root.join("fuzz/corpus").join(target).join(seed);
-        let (bytes, outcome) = derive(target, source, rule)?;
+        let (bytes, outcome) = derive(target, source, rule, &files)?;
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("fuzz/corpus")
+            .join(target);
+        let corpus = testkit::fixture::files(&dir);
+        let seed_bytes = &corpus
+            .iter()
+            .find(|(name, _)| name == seed)
+            .ok_or("no such seed")?
+            .1;
         if let Some(bytes) = bytes {
-            assert_eq!(
-                std::fs::read(&path).map_err(|e| e.to_string())?,
-                bytes,
-                "{target}/{seed} bytes"
-            );
+            assert_eq!(*seed_bytes, bytes, "{target}/{seed} bytes");
         }
         assert_eq!(
             seed.split_once('-').map(|(want, _)| want),
@@ -176,7 +207,10 @@ fn manifest_derives_every_seed() -> Result<(), String> {
         "client_data",
         "record",
     ] {
-        for (name, _) in testkit::fixture::files(&root.join("fuzz/corpus").join(target)) {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("fuzz/corpus")
+            .join(target);
+        for (name, _) in testkit::fixture::files(&dir) {
             if name.contains('-') {
                 named += 1;
                 assert!(
