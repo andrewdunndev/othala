@@ -110,3 +110,55 @@ fn claims_cases() {
     });
     assert_eq!((tally.total(), tally.checked()), (25, 25));
 }
+
+//= https://www.rfc-editor.org/rfc/rfc7519#section-4
+//= type=test
+//# However, in the absence of such requirements, all claims that are not understood by
+//# implementations MUST be ignored.
+#[test]
+fn claims_not_understood_are_ignored() {
+    use base::b64url_encode;
+    use hmac::{Hmac, KeyInit, Mac};
+    use sha2::Sha256;
+
+    let key =
+        "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow";
+    let sign = |claims: &str| {
+        let input = format!(
+            "{}.{}",
+            b64url_encode(br#"{"alg":"HS256","typ":"at+jwt"}"#),
+            b64url_encode(claims.as_bytes())
+        );
+        Hmac::<Sha256>::new_from_slice(&base::b64url_decode(key).unwrap_or_default())
+            .map(|mut mac| {
+                mac.update(input.as_bytes());
+                format!("{input}.{}", b64url_encode(&mac.finalize().into_bytes()))
+            })
+            .unwrap_or_default()
+    };
+    let verdict = |claims: &str| {
+        let policy = Issuer::new("https://issuer.example").and_then(|iss| {
+            Policy::<AccessToken>::new(iss, Audience::new("client-1")?, Leeway::new(60)?)
+        });
+        SecretJwk::decode(format!(r#"{{"kty":"oct","k":"{key}"}}"#).as_bytes())
+            .and_then(|k| k.verify_key::<jose::Hs256>())
+            .and_then(|k| Jwt::parse(&sign(claims))?.verify(&k))
+            .and_then(|jwt| jwt.claims(&policy?, UnixTime::new(1_700_000_000)))
+            .map(|_| ())
+            .map_err(|e| e.kind())
+    };
+    let base = r#""iss":"https://issuer.example","aud":"client-1","exp":1700000300"#;
+    assert_eq!(verdict(&format!("{{{base}}}")), Ok(()));
+    for extra in [
+        r#""zz":1"#,
+        r#""https://example.test/claim":{"a":[1,null,"x"]}"#,
+        r#""zz":null,"yy":[true]"#,
+    ] {
+        assert_eq!(verdict(&format!("{{{base},{extra}}}")), Ok(()), "{extra}");
+    }
+    // ignoring an unknown claim does not excuse a registered one that is wrong
+    assert_eq!(
+        verdict(r#"{"iss":"https://issuer.example","aud":"client-1","exp":1,"zz":1}"#),
+        Err(jose::ErrorKind::Expired)
+    );
+}

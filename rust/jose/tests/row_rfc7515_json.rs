@@ -111,3 +111,92 @@ fn appendix_a4_to_a7() {
     }
     // A.4 is ES512, in `row_es512`
 }
+
+const H: &str = "eyJhbGciOiJIUzI1NiJ9";
+
+fn kind(json: &str) -> Option<jose::ErrorKind> {
+    Jws::parse_json(json.as_bytes()).err().map(|e| e.kind())
+}
+
+//= https://www.rfc-editor.org/rfc/rfc7515#section-3.2
+//= type=test
+//# In the JWS JSON Serialization, one or both of the JWS Protected Header and JWS Unprotected Header
+//# MUST be present.
+//= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
+//= type=test
+//# At least one of the "protected" and "header" members MUST be present for each signature/MAC
+//# computation so that an "alg" Header Parameter value is conveyed.
+#[test]
+fn a_signature_needs_a_protected_or_unprotected_header() {
+    let malformed = Some(jose::ErrorKind::Malformed);
+    assert_eq!(kind(r#"{"payload":"AA","signature":"AQ"}"#), malformed);
+    assert_eq!(
+        kind(r#"{"payload":"AA","signatures":[{"signature":"AQ"}]}"#),
+        malformed
+    );
+    let one = format!(r#"{{"protected":"{H}","signature":"AQ"}}"#);
+    assert_eq!(
+        kind(&format!(
+            r#"{{"payload":"AA","signatures":[{one},{{"signature":"AQ"}}]}}"#
+        )),
+        malformed
+    );
+    // either member alone conveys `alg`
+    assert_eq!(
+        kind(&format!(r#"{{"payload":"AA",{}}}"#, &one[1..one.len() - 1])),
+        None
+    );
+    let header = r#"{"payload":"AA","header":{"alg":"HS256"},"signature":"AQ"}"#;
+    assert_eq!(kind(header), None);
+}
+
+//= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
+//= type=test
+//# payload The "payload" member MUST be present and contain the value BASE64URL(JWS Payload).
+#[test]
+fn the_payload_member_is_required_and_base64url() {
+    let malformed = Some(jose::ErrorKind::Malformed);
+    let sig = format!(r#"{{"protected":"{H}","signature":"AQ"}}"#);
+    assert_eq!(kind(&format!(r#"{{"signatures":[{sig}]}}"#)), malformed);
+    assert_eq!(
+        kind(&format!(r#"{{"protected":"{H}","signature":"AQ"}}"#)),
+        malformed
+    );
+    assert_eq!(
+        kind(&format!(r#"{{"payload":"A+/=","signatures":[{sig}]}}"#)),
+        malformed
+    );
+    assert_eq!(
+        kind(&format!(r#"{{"payload":"AA","signatures":[{sig}]}}"#)),
+        None
+    );
+}
+
+//= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
+//= type=test
+//# signatures The "signatures" member value MUST be an array of JSON objects.
+#[test]
+fn signatures_is_an_array_of_objects() {
+    let malformed = Some(jose::ErrorKind::Malformed);
+    let sig = format!(r#"{{"protected":"{H}","signature":"AQ"}}"#);
+    for bad in [
+        "5",
+        "null",
+        r#""AQ""#,
+        r#"{"protected":"x"}"#,
+        r#"["AQ"]"#,
+        "[1]",
+        "[[]]",
+        &format!("[{sig},7]"),
+    ] {
+        assert_eq!(
+            kind(&format!(r#"{{"payload":"AA","signatures":{bad}}}"#)),
+            malformed,
+            "{bad}"
+        );
+    }
+    assert_eq!(
+        kind(&format!(r#"{{"payload":"AA","signatures":[{sig}]}}"#)),
+        None
+    );
+}

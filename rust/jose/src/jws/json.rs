@@ -27,14 +27,6 @@ struct Entry<'a> {
 //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
 //# Additional members can be present in both the JSON objects defined above; if not understood by
 //# implementations encountering them, they MUST be ignored.
-//= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
-//= type=todo
-//= reason=no test parses a JSON serialization without its payload member
-//# payload The "payload" member MUST be present and contain the value BASE64URL(JWS Payload).
-//= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
-//= type=todo
-//= reason=no test parses a signatures member that is not an array of objects
-//# signatures The "signatures" member value MUST be an array of JSON objects.
 #[derive(Deserialize)]
 struct Document<'a> {
     payload: &'a str,

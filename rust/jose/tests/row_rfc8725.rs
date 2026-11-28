@@ -157,3 +157,66 @@ fn kid_never_selects() -> Result<(), TestError<(String, usize)>> {
         Ok(())
     })
 }
+
+fn parsed(header: &str) -> Option<jose::ErrorKind> {
+    let text = format!(
+        "{}.{}.AQ",
+        b64url_encode(header.as_bytes()),
+        b64url_encode(b"p")
+    );
+    Jws::parse(&text).err().map(|e| e.kind())
+}
+
+//= https://www.rfc-editor.org/rfc/rfc7515#section-10.12
+//= type=test
+//# Implementations MUST consider JWSs containing such input to be invalid.
+#[test]
+fn a_header_with_input_after_its_json_text_is_invalid() {
+    let malformed = Some(jose::ErrorKind::Malformed);
+    assert_eq!(parsed(r#"{"alg":"HS256"}"#), None);
+    assert_eq!(parsed("{\"alg\":\"HS256\"} \n"), None);
+    for bad in [
+        r#"{"alg":"HS256"}x"#,
+        r#"{"alg":"HS256"}{}"#,
+        r#"{"alg":"HS256"} {"alg":"HS256"}"#,
+        r#"{"alg":"HS256"},"#,
+    ] {
+        assert_eq!(parsed(bad), malformed, "{bad}");
+    }
+}
+
+//= https://www.rfc-editor.org/rfc/rfc7515#section-10.13
+//= type=test
+//# Ideally, JWS implementations SHOULD ensure that characters outside the Basic Multilingual Plane
+//# are preserved and compared correctly; alternatively, if this is not possible due to these
+//# characters exercising limitations present in the underlying JSON implementation, then input
+//# containing them MUST be rejected.
+#[test]
+fn names_outside_the_bmp_are_compared_correctly() {
+    let dup = Some(jose::ErrorKind::DuplicateMember);
+    // one object: the escaped surrogate pair and the literal character are one name
+    assert_eq!(
+        parsed("{\"alg\":\"HS256\",\"\\ud83d\\ude00\":1,\"\u{1F600}\":2}"),
+        dup
+    );
+    assert_eq!(
+        parsed("{\"alg\":\"HS256\",\"\\ud83d\\ude00\":1,\"\\ud83d\\ude01\":2}"),
+        None
+    );
+    // across the protected and unprotected headers
+    let protected = b64url_encode(b"{\"alg\":\"HS256\",\"\\ud83d\\ude00\":1}");
+    let flattened = |header: &str| {
+        format!(
+            r#"{{"payload":"AA","protected":"{protected}","header":{header},"signature":"AQ"}}"#
+        )
+    };
+    let kind = |json: String| Jws::parse_json(json.as_bytes()).err().map(|e| e.kind());
+    assert_eq!(kind(flattened("{\"\u{1F600}\":2}")), dup);
+    assert_eq!(kind(flattened("{\"\\ud83d\\ude00\":2}")), dup);
+    assert_eq!(kind(flattened("{\"\\ud83d\\ude01\":2}")), None);
+    // a lone surrogate cannot be preserved, so it is rejected rather than altered
+    assert_eq!(
+        parsed("{\"alg\":\"HS256\",\"\\ud83d\":1}"),
+        Some(jose::ErrorKind::Malformed)
+    );
+}
