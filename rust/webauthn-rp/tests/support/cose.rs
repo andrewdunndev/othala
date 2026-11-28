@@ -4,6 +4,7 @@ use testkit::vectors::{Outcome, run};
 
 use crate::cbor::{Order, decode};
 use crate::cose::{CoseAlgorithm, CoseKey};
+use crate::error::ErrorKind;
 use crate::hex::hex;
 use crate::refusal::Refusal;
 
@@ -28,12 +29,21 @@ pub(crate) fn cases() {
     let tally = run::<Case>(testkit::vector!("webauthn-rp-derived/cose.json"), 22, |c| {
         let key = decode(&c.input, Order::Canonical).and_then(|value| CoseKey::parse(&value));
         if c.unbuilt.is_some() {
-            // a case that must be accepted proves its marker true: the reader still refuses it
-            assert!(
-                !c.expect.ok || key.as_ref().err().is_some(),
-                "{}: built, drop the marker",
-                c.id
-            );
+            // a case that must be accepted proves its marker true: the reader refuses it today, and for the reason its code gives:
+            // a kty and alg other than ES256 are `Algorithm`, except RS256, whose `n` sits at label -1 and is read as a non-integer `crv`, `Malformed`
+            if c.expect.ok {
+                let kind = if c.expect.alg == Some(-257) {
+                    ErrorKind::Malformed
+                } else {
+                    ErrorKind::Algorithm
+                };
+                assert_eq!(
+                    key.as_ref().err().map(|e| e.kind()),
+                    Some(kind),
+                    "{}: built or refused otherwise, drop or revise the marker",
+                    c.id
+                );
+            }
             return Outcome::NotApplicable;
         }
         match key {
