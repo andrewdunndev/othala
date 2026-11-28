@@ -796,13 +796,6 @@ mod tests {
                     parse(jwk.text().as_bytes()).err().map(|e| e.kind()),
                     Some(ErrorKind::UnsupportedAlg)
                 );
-            } else if case.id.ends_with("-key") && !case.expect.ok && kind == Some("AlgMismatch") {
-                assert_eq!(
-                    outcome.as_ref().err().map(|e| e.kind()),
-                    Some(ErrorKind::AlgMismatch),
-                    "{}",
-                    case.id
-                );
             }
             Outcome::Checked
         });

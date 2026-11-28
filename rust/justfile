@@ -103,7 +103,7 @@ canary:
 
 test:
     cargo test --workspace --all-features
-    cargo test -p jose --no-default-features --lib --tests
+    cargo test -p jose --no-default-features
 
 doc:
     #!/usr/bin/env bash

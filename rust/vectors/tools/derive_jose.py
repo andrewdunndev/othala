@@ -108,7 +108,9 @@ def weak_rsa(bits, seed):
 
 
 def keys():
-    k = lambda cid, spec, alg, jwk, expect: case(cid, spec, expect, op="jwk_verify_key", alg=alg, jwk=jwk)
+    # a P-521 key that is refused is refused whole as UnsupportedAlg when `es512` is off (CONTRACT R16, R50)
+    off521 = lambda jwk, e: {**e, "kind_without_es512": "UnsupportedAlg"} if jwk.get("crv") == "P-521" and not e["ok"] else e
+    k = lambda cid, spec, alg, jwk, expect: case(cid, spec, off521(jwk, expect), op="jwk_verify_key", alg=alg, jwk=jwk)
     off = dict(P256, y=b64(bytes([unb64(P256["y"])[0] ^ 1]) + unb64(P256["y"])[1:]))
     short_x = dict(P256, x=b64(unb64(P256["x"])[1:]))
     zero = dict(P256, x=b64(bytes(32)), y=b64(bytes(32)))
@@ -116,7 +118,7 @@ def keys():
     c = [
         k("es256-p256", "RFC 7518 3.4", "ES256", P256, OK),
         k("es256-p384-key", "RFC 7518 3.4 (ES256 is P-256) and RFC 8725 3.1", "ES256", P384, kind("AlgMismatch")),
-        k("es256-p521-key", "RFC 7518 3.4 and RFC 8725 3.1", "ES256", P521, {**kind("AlgMismatch"), "kind_without_es512": "UnsupportedAlg"}),
+        k("es256-p521-key", "RFC 7518 3.4 and RFC 8725 3.1", "ES256", P521, kind("AlgMismatch")),
         k("es384-p256-key", "RFC 7518 3.4 (ES384 is P-384)", "ES384", P256, kind("AlgMismatch")),
         k("es256-rsa-key", "RFC 7518 3.4 and RFC 8725 3.1", "ES256", RSA, kind("AlgMismatch")),
         k("es256-okp-key", "RFC 7518 3.4 and RFC 8037 3.1", "ES256", ED, kind("AlgMismatch")),
