@@ -50,7 +50,7 @@ fn replay(dir: &str, check: fn(&[u8]) -> Result<(), ErrorKind>) -> usize {
 fn attestation_object_corpus() {
     assert_eq!(
         replay("fuzz/corpus/attestation_object", attestation_object::check),
-        53
+        52
     );
 }
 
@@ -58,18 +58,18 @@ fn attestation_object_corpus() {
 fn authenticator_data_corpus() {
     assert_eq!(
         replay("fuzz/corpus/authenticator_data", authenticator_data::check),
-        18
+        17
     );
 }
 
 #[test]
 fn client_data_corpus() {
-    assert_eq!(replay("fuzz/corpus/client_data", client_data::check), 32);
+    assert_eq!(replay("fuzz/corpus/client_data", client_data::check), 31);
 }
 
 #[test]
 fn record_corpus() {
-    assert_eq!(replay("fuzz/corpus/record", record::check), 55);
+    assert_eq!(replay("fuzz/corpus/record", record::check), 54);
 }
 
 const SEEDS: &str = include_str!("../fuzz/seeds.tsv");
@@ -228,4 +228,19 @@ fn manifest_derives_every_seed() -> Result<(), String> {
     }
     assert_eq!(named, listed.len());
     Ok(())
+}
+
+/// The empty input, which no corpus file holds (an empty file is an unread scan to `just purity`) and libFuzzer
+/// always tries first.
+#[test]
+fn the_empty_input_is_refused_by_kind() {
+    let empty: [(fn(&[u8]) -> Result<(), ErrorKind>, ErrorKind); 4] = [
+        (attestation_object::check, ErrorKind::Malformed),
+        (authenticator_data::check, ErrorKind::Malformed),
+        (client_data::check, ErrorKind::Malformed),
+        (record::check, ErrorKind::Corrupt),
+    ];
+    for (check, kind) in empty {
+        assert_eq!(check(&[]), Err(kind));
+    }
 }

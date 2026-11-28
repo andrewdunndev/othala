@@ -27,7 +27,6 @@ attestation_object	Malformed-26	attestation-object.json#map-length-not-shortest.
 attestation_object	Malformed-27	attestation-object.json#key-integer.input	oracle
 attestation_object	Malformed-28	attestation-object.json#trailing-byte.input	oracle
 attestation_object	Malformed-29	attestation-object.json#not-a-map.input	oracle
-attestation_object	Malformed-30	attestation-object.json#empty.input	oracle
 attestation_object	Malformed-31	attestation-object.json#attstmt-noncanonical-order-refused.input	oracle
 attestation_object	CredentialIdInvalid-32	attestation-object.json#attstmt-canonical-order-read.input	rawid
 attestation_object	Malformed-33	cbor.json#cose-key-canonical.input	shape
@@ -66,7 +65,6 @@ authenticator_data	Malformed-12	authenticator-data.json#authdata-truncated.authe
 authenticator_data	Malformed-13	authenticator-data.json#authdata-at-flag-no-data.authenticator_data	oracle
 authenticator_data	Malformed-14	authenticator-data.json#authdata-ed-flag-no-data.authenticator_data	oracle
 authenticator_data	Malformed-15	authenticator-data.json#authdata-trailing-bytes.authenticator_data	oracle
-authenticator_data	Malformed-16	R4:	hand:Malformed
 authenticator_data	Malformed-17	R4:000000000000000000000000000000000000000000000000000000000000000000000000	hand:Malformed
 authenticator_data	ok-18	R4:00000000000000000000000000000000000000000000000000000000000000000000000000	hand:ok
 client_data	ok-01	registration.json#control-none-es256.client_data_json	oracle
@@ -96,7 +94,6 @@ client_data	ok-24	limits.json#client-data-depth-objects-at-bound.input	oracle
 client_data	TooLarge-25	limits.json#client-data-depth-objects-one-past.input	oracle
 client_data	ok-26	limits.json#client-data-depth-arrays-at-bound.input	oracle
 client_data	TooLarge-27	limits.json#client-data-depth-arrays-one-past.input	oracle
-client_data	Malformed-28	R6:	hand:Malformed
 client_data	ok-29	R6:7b7d	hand:ok
 client_data	Malformed-30	R6:5b	hand:Malformed
 client_data	ok-31	R6:7b2274797065223a22776562617574686e2e676574227d	hand:ok
@@ -152,7 +149,6 @@ record	Corrupt-48	golden:registration_variants_2	golden-extra
 record	ok-49	golden:registration_variants_3	golden
 record	Corrupt-50	golden:registration_variants_3	golden-cut
 record	Corrupt-51	golden:registration_variants_3	golden-extra
-record	Corrupt-52	R15:	hand:Corrupt
 record	Corrupt-53	R15:00	hand:Corrupt
 record	Corrupt-54	R15:02	hand:Corrupt
 record	Corrupt-55	golden:authentication	golden-version
