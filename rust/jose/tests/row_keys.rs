@@ -4,8 +4,8 @@ mod common_figures;
 use std::collections::BTreeMap;
 
 use jose::{
-    Alg, AnySigningKey, AnyVerifyKey, EdDsa, Error, Es256, Es384, Hs256, Hs384, Hs512, Jwk,
-    JwkEntry, JwkSet, Jws, Kid, Kty, Rs256, SecretJwk, SigningAlg, VerifyKey,
+    A256GcmKw, A256Kw, Alg, AnySigningKey, AnyVerifyKey, Dir, EdDsa, Error, Es256, Es384, Hs256,
+    Hs384, Hs512, Jwk, JwkEntry, JwkSet, Jws, Kid, Kty, Rs256, SecretJwk, SigningAlg, VerifyKey,
 };
 use proptest::prelude::*;
 use proptest::test_runner::{RngSeed, TestError, TestRunner};
@@ -35,6 +35,24 @@ fn key_check(alg: &str, jwk: &str) -> Result<(), Error> {
     }
 }
 
+/// Builds the JWE key `jwk` holds for `alg`, to encrypt or to decrypt: an `oct` key.
+fn jwe_key(alg: &str, jwk: &str, decrypt: bool) -> Result<(), Error> {
+    fn built<K: jose::KeyAlg>(jwk: &str, decrypt: bool) -> Result<(), Error> {
+        let key = SecretJwk::decode(jwk.as_bytes())?;
+        if decrypt {
+            key.decrypt_key::<K>().map(|_| ())
+        } else {
+            key.encrypt_key::<K>().map(|_| ())
+        }
+    }
+    match alg {
+        "A256KW" => built::<A256Kw>(jwk, decrypt),
+        "A256GCMKW" => built::<A256GcmKw>(jwk, decrypt),
+        "dir" => built::<Dir>(jwk, decrypt),
+        _ => Err(jose::ErrorKind::UnsupportedAlg.into()),
+    }
+}
+
 type Draw = (usize, String, usize, usize, usize);
 
 #[derive(Deserialize)]
@@ -42,7 +60,9 @@ struct Expect {
     ok: bool,
     kind: Option<String>,
     keys: Option<usize>,
+    kids: Option<Vec<String>>,
     kty: Option<String>,
+    found: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -51,6 +71,8 @@ struct Case {
     op: String,
     alg: Option<String>,
     jwk: Option<Json>,
+    jwk_json: Option<String>,
+    direction: Option<String>,
     jwks: Option<Json>,
     jwks_json: Option<String>,
     kid: Option<String>,
@@ -72,10 +94,15 @@ fn key_cases() {
     let tally = run::<Case>(vector!("jose-derived/keys.json"), 29, |case| {
         let (alg, jwk) = (
             case.alg.as_deref().unwrap_or_default(),
-            case.jwk.as_ref().map_or("", Json::text),
+            case.jwk
+                .as_ref()
+                .map(Json::text)
+                .or(case.jwk_json.as_deref())
+                .unwrap_or_default(),
         );
         let outcome = match case.op.as_str() {
             "jwk_verify_key" => key_check(alg, jwk),
+            "jwk_encrypt_key" => jwe_key(alg, jwk, case.direction.as_deref() == Some("decrypt")),
             _ if jwk.contains(r#""oct""#) => SecretJwk::decode(jwk.as_bytes())
                 .and_then(|key| AnySigningKey::from_jwk(&key))
                 .map(|_| ()),
@@ -86,12 +113,12 @@ fn key_cases() {
         named(&case.expect, outcome, &case.id);
         Outcome::Checked
     });
-    assert_eq!((tally.total(), tally.checked()), (29, 29));
+    assert_eq!((tally.total(), tally.checked()), (40, 40));
 }
 
 #[test]
 fn jwk_sets() {
-    let tally = run::<Case>(vector!("jose-derived/jwks.json"), 8, |case| {
+    let tally = run::<Case>(vector!("jose-derived/jwks.json"), 13, |case| {
         let text = case
             .jwks
             .as_ref()
@@ -100,32 +127,48 @@ fn jwk_sets() {
             .unwrap_or_default();
         let set = JwkSet::decode(text.as_bytes());
         if case.op == "jwks_decode" {
-            let count = set.as_ref().map(|set| set.entries().len()).ok();
+            let kids = set.as_ref().ok().map(|set| {
+                set.entries()
+                    .map(|entry| match entry {
+                        JwkEntry::Public(key) => key.kid().map(|kid| kid.as_str().to_owned()),
+                        JwkEntry::Secret(key) => key.kid().map(|kid| kid.as_str().to_owned()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+            });
             assert_eq!(
-                count,
+                kids.as_ref().map(Vec::len),
                 case.expect.keys.filter(|_| case.expect.ok),
                 "{}",
                 case.id
             );
+            let want = case
+                .expect
+                .kids
+                .as_ref()
+                .map(|kids| kids.iter().cloned().map(Some).collect::<Vec<_>>());
+            assert_eq!(kids.filter(|_| want.is_some()), want, "{}", case.id);
             named(&case.expect, set.map(|_| ()), &case.id);
             return Outcome::Checked;
         }
-        let entry = set.and_then(|set| {
+        let found = set.and_then(|set| {
             let kid = Kid::new(case.kid.as_deref().unwrap_or_default())?;
-            set.find(&kid).map(|entry| match entry {
+            Ok(set.find(&kid).map(|entry| match entry {
                 JwkEntry::Public(key) => key.kty(),
                 JwkEntry::Secret(key) => key.kty(),
                 _ => Kty::Oct,
-            })
+            }))
         });
-        if let Some(kty) = &case.expect.kty {
-            let want = if kty == "oct" { Kty::Oct } else { Kty::Rsa };
-            assert_eq!(entry.as_ref().ok(), Some(&want), "{}", case.id);
-        }
-        named(&case.expect, entry.map(|_| ()), &case.id);
+        let want = match (&case.expect.kty, case.expect.found) {
+            (Some(kty), _) => Some(Some(if kty == "oct" { Kty::Oct } else { Kty::Rsa })),
+            (None, Some(false)) => Some(None),
+            (None, _) => None,
+        };
+        assert_eq!(found.as_ref().ok(), want.as_ref(), "{}", case.id);
+        named(&case.expect, found.map(|_| ()), &case.id);
         Outcome::Checked
     });
-    assert_eq!((tally.total(), tally.checked()), (8, 8));
+    assert_eq!((tally.total(), tally.checked()), (13, 13));
 }
 
 /// The public keys of keys.json by case id.

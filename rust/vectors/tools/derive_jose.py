@@ -135,6 +135,21 @@ def keys():
         k("hs256-use-enc", "RFC 7517 4.2 (use enc is not for signatures)", "HS256", dict(oct_(32), use="enc"), kind("KeyUse")),
         k("hs256-key-ops-encrypt", "RFC 7517 4.3 (key_ops without verify)", "HS256", dict(oct_(32), key_ops=["encrypt"]), kind("KeyUse")),
         k("hs256-use-key-ops-disagree", "RFC 7517 4.3 (use and key_ops SHOULD NOT both be used; when they disagree the key is refused: oracle choice)", "HS256", dict(oct_(32), use="sig", key_ops=["encrypt"]), kind("KeyUse")),
+        k("hs256-key-ops-duplicate", "RFC 7517 4.3 (duplicate key_ops values MUST NOT be present)", "HS256", dict(oct_(32), key_ops=["verify", "verify"]), kind("KeyUse")),
+        case("es256-escaped-members", "RFC 8259 7 (an escape spells the same string) with RFC 7518 6.2.1.1", OK, op="jwk_verify_key", alg="ES256", jwk_json=json.dumps(dict(P256, kty="EC"), separators=(",", ":")).replace('"EC"', '"E\\u0043"').replace('"P-256"', '"P\\u002d256"')),
+    ]
+    e = lambda cid, spec, alg, jwk, expect: case(cid, spec, expect, op="jwk_encrypt_key", alg=alg, jwk=jwk, direction="encrypt")
+    d = lambda cid, spec, alg, jwk, expect: case(cid, spec, expect, op="jwk_encrypt_key", alg=alg, jwk=jwk, direction="decrypt")
+    c += [
+        e("a256kw-key-ops-wrap-key", "RFC 7517 4.3 (wrapKey: encrypt key)", "A256KW", dict(oct_(32), key_ops=["wrapKey"]), OK),
+        d("a256kw-key-ops-unwrap-key", "RFC 7517 4.3 (unwrapKey: decrypt key)", "A256KW", dict(oct_(32), key_ops=["unwrapKey"]), OK),
+        e("kw-key-ops-derive-only", "RFC 7517 4.3 (deriveKey is key agreement, not key wrapping)", "A256KW", dict(oct_(32), key_ops=["deriveKey"]), kind("KeyUse")),
+        e("a256kw-key-ops-encrypt", "RFC 7517 4.3 (encrypt is for content, wrapKey for a key; this oracle follows the wording)", "A256KW", dict(oct_(32), key_ops=["encrypt"]), kind("KeyUse")),
+        d("a256kw-key-ops-wrap-key-only", "RFC 7517 4.3 (a key that only wraps cannot unwrap)", "A256KW", dict(oct_(32), key_ops=["wrapKey"]), kind("KeyUse")),
+        e("a256gcmkw-key-ops-encrypt", "RFC 7517 4.3 (AES GCM key wrapping wraps a key)", "A256GCMKW", dict(oct_(32), key_ops=["encrypt"]), kind("KeyUse")),
+        e("dir-key-ops-encrypt", "RFC 7517 4.3 (dir encrypts the content with the key)", "dir", dict(oct_(32), key_ops=["encrypt"]), OK),
+        e("dir-key-ops-wrap-key", "RFC 7517 4.3 (dir does not wrap a key)", "dir", dict(oct_(32), key_ops=["wrapKey"]), kind("KeyUse")),
+        e("kw-key-ops-sign-only", "RFC 7517 4.3", "A256KW", dict(oct_(32), key_ops=["sign"]), kind("KeyUse")),
     ]
     a = lambda cid, spec, jwk, expect: case(cid, spec, expect, op="any_verify_key", jwk=jwk)
     c += [
@@ -151,16 +166,22 @@ def jwks():
     f = lambda cid, spec, ks, kid, expect: case(cid, spec, expect, op="jwks_find", jwks=ks, kid=kid)
     two = {"keys": [HS_KID, RSA_KID]}
     dup = {"keys": [HS_KID, dict(HS_KID, k=b64(bytes(range(32))))]}
-    unknown = {"keys": [HS_KID, {"kty": "unknown-kty", "kid": "u"}]}
+    bad = lambda **kw: {"keys": [HS_KID, dict(HS_KID, kid="skipped", **kw), RSA_KID]}
+    kept = lambda *ks: {"ok": True, "keys": len(ks), "kids": [k["kid"] for k in ks]}
     return [
-        d("two-keys", "RFC 7517 5", two, {"ok": True, "keys": 2}),
-        d("unknown-kty-skipped", "RFC 7517 5 (SHOULD ignore JWKs whose kty is not understood)", unknown, {"ok": True, "keys": 1}),
+        d("two-keys", "RFC 7517 5", two, kept(HS_KID, RSA_KID)),
+        d("unknown-kty-skipped", "RFC 7517 5 (SHOULD ignore JWKs whose kty is not understood)", {"keys": [HS_KID, {"kty": "unknown-kty", "kid": "u"}]}, kept(HS_KID)),
+        d("member-missing-y-skipped", "RFC 7517 5 (SHOULD ignore JWKs missing required members) with RFC 7518 6.2.1.3", {"keys": [HS_KID, {k: v for k, v in dict(P256, kid="skipped").items() if k != "y"}, RSA_KID]}, kept(HS_KID, RSA_KID)),
+        d("unknown-use-skipped", "RFC 7517 5 (SHOULD ignore JWKs whose values are out of the supported ranges) with 4.2", bad(use="other"), kept(HS_KID, RSA_KID)),
+        d("unknown-key-ops-skipped", "RFC 7517 5 (SHOULD ignore JWKs whose values are out of the supported ranges) with 4.3", bad(key_ops=["other"]), kept(HS_KID, RSA_KID)),
+        d("key-ops-duplicate-skipped", "RFC 7517 4.3 (duplicate key_ops values MUST NOT be present) with 5 (SHOULD ignore)", bad(key_ops=["verify", "verify"]), kept(HS_KID, RSA_KID)),
         d("keys-missing", "RFC 7517 5.1 (keys is REQUIRED)", {"kids": []}, kind("Malformed")),
         d("keys-not-array", "RFC 7517 5.1 (an array of JWKs)", {"keys": HS_KID}, kind("Malformed")),
+        d("member-not-object", "RFC 7517 5.1 (an array of JWKs) with 4 (a JWK is a JSON object)", {"keys": [HS_KID, 1]}, kind("Malformed")),
+        d("dup-kid", "RFC 7517 4.5 (kids SHOULD be distinct; a set with an ambiguous lookup is refused, never a pick)", dup, kind("DuplicateMember")),
         case("dup-keys-member", "RFC 8259 4 with RFC 7517 5 (this oracle rejects duplicate names)", kind("DuplicateMember"), op="jwks_decode", jwks_json='{"keys":[],"keys":[]}'),
         f("find-by-kid", "RFC 7517 4.5", two, HS_KID["kid"], {"ok": True, "kty": "oct"}),
-        f("find-absent-kid", "RFC 7517 4.5", two, "absent", kind("BadSignature")),
-        f("find-duplicate-kid", "RFC 7517 4.5 (kids SHOULD be distinct; an ambiguous lookup is refused, never a pick)", dup, HS_KID["kid"], kind("DuplicateMember")),
+        f("find-absent-kid", "RFC 7517 4.5 (a kid the set lacks is no key, not an error)", two, "absent", {"ok": True, "found": False}),
     ]
 
 
@@ -201,6 +222,8 @@ def claims():
         t("typ-missing", "RFC 8725 3.11 and RFC 9068 4", kind("Type"), hdr='{"alg":"HS256"}'),
         t("dup-claim", "RFC 7519 4 (MUST reject or use the last; this oracle rejects)", kind("DuplicateMember"), raw=f'{{"iss":"https://other.example","iss":"{ISS}","aud":"{AUD}","exp":{NOW + 300}}}'),
         t("claims-array", "RFC 7519 7.2 step 10 (a JSON object)", kind("Malformed"), raw="[1]"),
+        t("claims-leading-whitespace", "RFC 8259 2 (whitespace may precede a value) with RFC 7519 7.2 step 10", OK, raw=" \t\r\n" + json.dumps(base, separators=(",", ":"))),
+        t("claims-whitespace-array", "RFC 8259 2 with RFC 7519 7.2 step 10 (a JSON object, not an array)", kind("Malformed"), raw=" \n[1]"),
     ]
 
 

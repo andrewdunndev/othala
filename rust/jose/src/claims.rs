@@ -314,7 +314,8 @@ pub(crate) fn check<K: TokenKind>(
     payload: &[u8],
 ) -> Result<K::Claims, Error> {
     scan(payload)?;
-    if payload.first() != Some(&b'{') {
+    // the payload is a JSON object; RFC 8259 2 allows whitespace before it, and a struct would also read an array
+    if payload.iter().find(|byte| !b" \t\n\r".contains(byte)) != Some(&b'{') {
         return Err(ErrorKind::Malformed.into());
     }
     let claims: Registered = serde_json::from_slice(payload).map_err(|_| ErrorKind::Malformed)?;
@@ -439,6 +440,9 @@ mod tests {
     fn order() {
         assert_eq!(kind(&format!("{{{GOOD}}}")), None);
         assert_eq!(kind("[1]"), Some(ErrorKind::Malformed));
+        assert_eq!(kind(&format!(" \t\r\n{{{GOOD}}}")), None);
+        assert_eq!(kind(" \n[1]"), Some(ErrorKind::Malformed));
+        assert_eq!(kind("\u{c}{}"), Some(ErrorKind::Malformed));
         assert_eq!(
             kind(r#"{"iss":"i","iss":"i"}"#),
             Some(ErrorKind::DuplicateMember)

@@ -348,13 +348,13 @@ retrieved = "2026-11-26"
 licence = "MIT OR Apache-2.0 (our own derived data; key values from the RFCs, IETF Trust)"
 feeds = ["jose"]
 notes = "Derived by tools/derive_jose.py and tools/derive_jose_jwe.mjs (deterministic, re-run byte-identical) from the specs and the pinned upstream keys only, never from crate code or drafts (ruling R-b). Each case names its spec section in `spec`. expect.kind is set only where the architecture contract or a ruling names the class (DuplicateMember, CriticalHeader, AlgMismatch, WeakKey, KeyUse, KeyAlgMissing, Issuer, Audience, MissingClaim, Expired, NotYetValid, ClaimType, Type, TooLarge; UnsupportedAlg for X25519 per R-e). Oracle choices beyond a MUST are stated in the case's spec text: duplicate names rejected (not last-wins), RFC 7797 not implemented, a duplicate-kid lookup refused, an iat beyond now plus leeway refused. limits.json names each bound as a crate constant (contract rule 5.7 states no numbers: jose::MAX_COMPACT_LEN, jose::MAX_JSON_DEPTH, jose::MAX_JWKS_KEYS) and carries the exact input at the bound (excess 0, accepted) and one past it (excess 1, TooLarge); a JWS is given as its header and payload text, not as a token, so the data does not read as a credential to the secret scan. Header MACs, EC/RSA key validity and every JWE (otherwise valid, so the refusal is for the header alone) were cross-checked with Node crypto; the Ed25519 thumbprint equals RFC 8037 A.3."
-cases = 109
+cases = 128
 files = [
-  { path = "jose-derived/claims.json", sha256 = "e5eecd774966e5e4576f3b9e993eb3395bf673585206f4b168cd8551e1ab99da", cases = 23 },
+  { path = "jose-derived/claims.json", sha256 = "0a41a3a2cb6072a31f6d3dcbaf1e696ceba33b3987dfc8dd71429aa89e67ac31", cases = 25 },
   { path = "jose-derived/header.json", sha256 = "9492f4bdea52555000f9274fc674016bdc5f1c6d92b8ed45a5b0654cf7c1fd65", cases = 23 },
-  { path = "jose-derived/jwe-header.json", sha256 = "b7a9cea064266055110dda580ec60430349bb986998d909ac6aa13425badb067", cases = 11 },
-  { path = "jose-derived/jwks.json", sha256 = "ca7888c0bde66f331c03cfa0b5e7a4f0173f46ab4c43a17f59d4b74c5908e990", cases = 8 },
-  { path = "jose-derived/keys.json", sha256 = "3a3996c0c1faa926b07baa35b06c7802f10f73d92cb8f79d0beb490ea223d4a2", cases = 29 },
+  { path = "jose-derived/jwe-header.json", sha256 = "696c6dc604a4e39c40d1f74ccf06d1f82675ae12a3da86f8dd575242ebb2532e", cases = 12 },
+  { path = "jose-derived/jwks.json", sha256 = "ce3a2dbc9aca1f92d541e93625e19cc44fd961a317edd9d5480be61fab062e4d", cases = 13 },
+  { path = "jose-derived/keys.json", sha256 = "687903e8df689104fdf3b0c3cf97eb2145d557148e93f17b0e7c1781aef79241", cases = 40 },
   { path = "jose-derived/limits.json", sha256 = "68f727a22c03c2db3384e02f878b99855ef58180f74132897dfb43540e8e2748", cases = 8 },
   { path = "jose-derived/thumbprint.json", sha256 = "40ee2e96df446ba3a49185222f9dd77d5eaaeba1b47842b7370cf4b5aa7fd11a", cases = 7 },
 ]

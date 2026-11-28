@@ -25,7 +25,11 @@
    "spec": "RFC 7517 5",
    "expect": {
     "ok": true,
-    "keys": 2
+    "keys": 2,
+    "kids": [
+     "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+     "bilbo.baggins@hobbiton.example"
+    ]
    }
   },
   {
@@ -49,7 +53,168 @@
    "spec": "RFC 7517 5 (SHOULD ignore JWKs whose kty is not understood)",
    "expect": {
     "ok": true,
-    "keys": 1
+    "keys": 1,
+    "kids": [
+     "018c0ae5-4d9b-471b-bfd6-eef314bc7037"
+    ]
+   }
+  },
+  {
+   "id": "member-missing-y-skipped",
+   "op": "jwks_decode",
+   "jwks": {
+    "keys": [
+     {
+      "kty": "oct",
+      "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+      "use": "sig",
+      "alg": "HS256",
+      "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+     },
+     {
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+      "kid": "skipped"
+     },
+     {
+      "kty": "RSA",
+      "kid": "bilbo.baggins@hobbiton.example",
+      "use": "sig",
+      "n": "n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT-O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqVwGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuCLqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5gHdrNP5zw",
+      "e": "AQAB"
+     }
+    ]
+   },
+   "spec": "RFC 7517 5 (SHOULD ignore JWKs missing required members) with RFC 7518 6.2.1.3",
+   "expect": {
+    "ok": true,
+    "keys": 2,
+    "kids": [
+     "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+     "bilbo.baggins@hobbiton.example"
+    ]
+   }
+  },
+  {
+   "id": "unknown-use-skipped",
+   "op": "jwks_decode",
+   "jwks": {
+    "keys": [
+     {
+      "kty": "oct",
+      "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+      "use": "sig",
+      "alg": "HS256",
+      "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+     },
+     {
+      "kty": "oct",
+      "kid": "skipped",
+      "use": "other",
+      "alg": "HS256",
+      "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+     },
+     {
+      "kty": "RSA",
+      "kid": "bilbo.baggins@hobbiton.example",
+      "use": "sig",
+      "n": "n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT-O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqVwGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuCLqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5gHdrNP5zw",
+      "e": "AQAB"
+     }
+    ]
+   },
+   "spec": "RFC 7517 5 (SHOULD ignore JWKs whose values are out of the supported ranges) with 4.2",
+   "expect": {
+    "ok": true,
+    "keys": 2,
+    "kids": [
+     "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+     "bilbo.baggins@hobbiton.example"
+    ]
+   }
+  },
+  {
+   "id": "unknown-key-ops-skipped",
+   "op": "jwks_decode",
+   "jwks": {
+    "keys": [
+     {
+      "kty": "oct",
+      "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+      "use": "sig",
+      "alg": "HS256",
+      "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+     },
+     {
+      "kty": "oct",
+      "kid": "skipped",
+      "use": "sig",
+      "alg": "HS256",
+      "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg",
+      "key_ops": [
+       "other"
+      ]
+     },
+     {
+      "kty": "RSA",
+      "kid": "bilbo.baggins@hobbiton.example",
+      "use": "sig",
+      "n": "n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT-O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqVwGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuCLqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5gHdrNP5zw",
+      "e": "AQAB"
+     }
+    ]
+   },
+   "spec": "RFC 7517 5 (SHOULD ignore JWKs whose values are out of the supported ranges) with 4.3",
+   "expect": {
+    "ok": true,
+    "keys": 2,
+    "kids": [
+     "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+     "bilbo.baggins@hobbiton.example"
+    ]
+   }
+  },
+  {
+   "id": "key-ops-duplicate-skipped",
+   "op": "jwks_decode",
+   "jwks": {
+    "keys": [
+     {
+      "kty": "oct",
+      "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+      "use": "sig",
+      "alg": "HS256",
+      "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+     },
+     {
+      "kty": "oct",
+      "kid": "skipped",
+      "use": "sig",
+      "alg": "HS256",
+      "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg",
+      "key_ops": [
+       "verify",
+       "verify"
+      ]
+     },
+     {
+      "kty": "RSA",
+      "kid": "bilbo.baggins@hobbiton.example",
+      "use": "sig",
+      "n": "n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT-O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqVwGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuCLqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5gHdrNP5zw",
+      "e": "AQAB"
+     }
+    ]
+   },
+   "spec": "RFC 7517 4.3 (duplicate key_ops values MUST NOT be present) with 5 (SHOULD ignore)",
+   "expect": {
+    "ok": true,
+    "keys": 2,
+    "kids": [
+     "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+     "bilbo.baggins@hobbiton.example"
+    ]
    }
   },
   {
@@ -80,6 +245,54 @@
    "expect": {
     "ok": false,
     "kind": "Malformed"
+   }
+  },
+  {
+   "id": "member-not-object",
+   "op": "jwks_decode",
+   "jwks": {
+    "keys": [
+     {
+      "kty": "oct",
+      "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+      "use": "sig",
+      "alg": "HS256",
+      "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+     },
+     1
+    ]
+   },
+   "spec": "RFC 7517 5.1 (an array of JWKs) with 4 (a JWK is a JSON object)",
+   "expect": {
+    "ok": false,
+    "kind": "Malformed"
+   }
+  },
+  {
+   "id": "dup-kid",
+   "op": "jwks_decode",
+   "jwks": {
+    "keys": [
+     {
+      "kty": "oct",
+      "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+      "use": "sig",
+      "alg": "HS256",
+      "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+     },
+     {
+      "kty": "oct",
+      "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+      "use": "sig",
+      "alg": "HS256",
+      "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+     }
+    ]
+   },
+   "spec": "RFC 7517 4.5 (kids SHOULD be distinct; a set with an ambiguous lookup is refused, never a pick)",
+   "expect": {
+    "ok": false,
+    "kind": "DuplicateMember"
    }
   },
   {
@@ -142,38 +355,10 @@
     ]
    },
    "kid": "absent",
-   "spec": "RFC 7517 4.5",
+   "spec": "RFC 7517 4.5 (a kid the set lacks is no key, not an error)",
    "expect": {
-    "ok": false,
-    "kind": "BadSignature"
-   }
-  },
-  {
-   "id": "find-duplicate-kid",
-   "op": "jwks_find",
-   "jwks": {
-    "keys": [
-     {
-      "kty": "oct",
-      "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
-      "use": "sig",
-      "alg": "HS256",
-      "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
-     },
-     {
-      "kty": "oct",
-      "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
-      "use": "sig",
-      "alg": "HS256",
-      "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
-     }
-    ]
-   },
-   "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
-   "spec": "RFC 7517 4.5 (kids SHOULD be distinct; an ambiguous lookup is refused, never a pick)",
-   "expect": {
-    "ok": false,
-    "kind": "DuplicateMember"
+    "ok": true,
+    "found": false
    }
   }
  ]

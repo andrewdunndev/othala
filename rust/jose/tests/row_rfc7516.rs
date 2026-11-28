@@ -95,7 +95,7 @@ fn rfc7516_appendix_a() {
 
 #[test]
 fn header_cases() {
-    row(vector!("jose-derived/jwe-header.json"), 11, 10);
+    row(vector!("jose-derived/jwe-header.json"), 12, 11);
 }
 
 fn key<K: KeyAlg>(len: usize) -> Option<(jose::EncryptKey<K>, SecretJwk)> {
