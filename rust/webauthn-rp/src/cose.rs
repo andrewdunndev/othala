@@ -7,16 +7,22 @@ use p256::{AffinePoint, Sec1Point};
 use crate::cbor::Value;
 use crate::error::{Error, ErrorKind};
 
-/// A COSE algorithm this crate verifies.
+/// A COSE algorithm; only `Es256` is verified so far.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CoseAlgorithm {
     /// -7, ECDSA P-256 with SHA-256.
     Es256,
+    /// Unbuilt: no key of it parses until webauthn-08.
+    ///
     /// -35, ECDSA P-384 with SHA-384.
     Es384,
+    /// Unbuilt: no key of it parses until webauthn-08.
+    ///
     /// -8, Ed25519.
     EdDsa,
+    /// Unbuilt: no key of it parses until webauthn-08.
+    ///
     /// -257, RSASSA-PKCS1-v1_5 with SHA-256.
     Rs256,
 }

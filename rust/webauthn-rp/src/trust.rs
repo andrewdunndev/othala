@@ -11,14 +11,24 @@ use crate::record::Aaguid;
 pub enum Format {
     /// `none` (8.7).
     None,
+    /// Unbuilt: no statement of it verifies until webauthn-08.
+    ///
     /// `packed` (8.2).
     Packed,
+    /// Unbuilt: no statement of it verifies until webauthn-10.
+    ///
     /// `tpm` (8.3).
     Tpm,
+    /// Unbuilt: no statement of it verifies until webauthn-11.
+    ///
     /// `android-key` (8.4).
     AndroidKey,
+    /// Unbuilt: no statement of it verifies until webauthn-12.
+    ///
     /// `apple` (8.8).
     Apple,
+    /// Unbuilt: no statement of it verifies until webauthn-13.
+    ///
     /// `fido-u2f` (8.6).
     FidoU2f,
 }
@@ -45,6 +55,8 @@ pub enum AttestationType {
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Trust {
+    /// Unbuilt: never reported until the chain walk lands with webauthn-09.
+    ///
     /// The chain, or its leaf, matched an anchor.
     Anchored,
     /// None, self, an internally valid chain that met no anchor, or a chain signed by an algorithm the walk does not verify (C7).
@@ -105,12 +117,16 @@ impl TrustQuery<'_> {
     }
 }
 
+/// Unbuilt: `finish_registration` takes a source and never asks it until trust dispatch lands with webauthn-09 (CONTRACT, Planned).
+///
 /// Where registrations find acceptable attestation roots and refusals (L3 7.1 step 23). Implemented by hosts and by `webauthn-mds`.
 pub trait TrustSource {
     /// Decide one statement with a trust path; never asked for none or self attestation.
     fn decide(&self, query: &TrustQuery<'_>) -> TrustDecision<'_>;
 }
 
+/// Unbuilt: no `TrustSource` is asked until trust dispatch lands with webauthn-09 (CONTRACT, Planned).
+///
 /// A `TrustSource`'s answer for one statement.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug)]
@@ -123,6 +139,8 @@ pub enum TrustDecision<'a> {
     Unknown,
 }
 
+/// Unbuilt: never built until trust dispatch lands with webauthn-09 (CONTRACT, Planned).
+///
 /// What a `TrustSource` is asked.
 #[derive(Clone, Copy, Debug)]
 pub struct TrustQuery<'a> {
@@ -131,6 +149,8 @@ pub struct TrustQuery<'a> {
     pub(crate) chain: &'a [Digest],
 }
 
+/// Unbuilt: `from_der` and the chain walk that reads it land with webauthn-09 (CONTRACT, Planned).
+///
 /// A root certificate, parsed and bounded; its X.509 form stays inside the crate.
 #[derive(Clone, Debug)]
 #[expect(dead_code, reason = "read by the chain walk, webauthn-09")]

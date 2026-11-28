@@ -15,7 +15,10 @@
 // Rust sources are read with comments and string literals blanked, so a commented-out test or a `proptest!` in a comment counts for nothing.
 // unit/lib/it/store resolve in the exact module path given: a file for the longest `src/a/b.rs` prefix (lib.rs for none), then inline `mod`s.
 // fuzz:t is a non-empty fuzz/fuzz_targets/t.rs with a committed file (not a dotfile) in fuzz/corpus/t and a test under tests/ whose string literal names fuzz/corpus/t.
-// vec/oracle `#id` is an `id` field value in the JSON file, w3c `#s` a `section` field value.
+// vec/oracle `#id` is an `id` field value in the JSON file, w3c `#s` a `section` field value; an oracle or w3c file also needs a string literal
+// under the crate's tests/ that names it, so a vector no test reads proves nothing. oracle reads only the crate's own `<crate>-derived` family.
+// row:f is tests/row_f.rs holding a `#[test]` fn that is not `#[ignore]`d (source text only: a test a cfg compiles out is not seen).
+// mutants:m is src/m.rs (or src/m/mod.rs) holding a fn with a body. oracle:f is a bare file name, never a path.
 // api:Item and api-absent:Item read the crate's committed public-api.txt (and need a `just api` recipe). Its items are the path each line
 // declares, generics dropped (`method Jws::parse fn(..)` declares Jws::parse); impl and attr lines declare none. api:Item resolves when
 // Item equals a declared path, so a bare name must be a top-level item. api-absent:A::b resolves when A is declared and A::b is not;
@@ -110,6 +113,8 @@ const matchBrace = (s, open) => {
 };
 const ATTR = /#\[\s*(?:\w+::)*test(?:_case)?\b/;
 const hasTestIn = (s, a = 0, b = s.length) => ATTR.test(s.slice(a, b)) || /\bproptest!/.test(s.slice(a, b));
+// a `#[test]` fn (or a `proptest!` block) that is not `#[ignore]`d; comments are already blanked, cfgs are not evaluated
+const liveTest = (s) => [...s.matchAll(/((?:#\[[^\]]*\]\s*)+)(?:pub\s+)?(?:async\s+)?fn\s+\w+/g)].some((m) => ATTR.test(m[1]) && !/#\[\s*ignore\b/.test(m[1])) || /\bproptest!\s*\{/.test(s);
 
 // the [start, end) of `mod a { mod b { .. } }` nested in order inside range, or null
 function locate(s, mods, range = [0, s.length]) {
@@ -198,9 +203,18 @@ const expand = (v) => {
 };
 const family = (c, v, dirs, key) => {
     const f = v.split('#')[0];
-    const hit = dirs.map((d) => join(c.rust, 'vectors', d, f)).find(existsSync);
-    return hit ? vecIn(hit, v, key) : `no ${f} under vectors`;
+    const d = dirs.find((x) => existsSync(join(c.rust, 'vectors', x, f)));
+    if (!d) return `no ${f} under vectors`;
+    return readVec(c, `${d}/${v}`, key);
 };
+// `rel` (a path under vectors/, with an optional `#id`) holds the id and a string literal under the crate's tests/ names its file
+function readVec(c, rel, key) {
+    const [f] = rel.split('#');
+    const r = vecIn(join(c.rust, 'vectors', f), rel, key);
+    if (r !== 'ok') return r;
+    const named = new RegExp(`"[^"]*\\b${esc(f)}"`);
+    return walk(join(c.dir, 'tests'), '.rs').some((p) => named.test(code(p, true))) ? 'ok' : `no test under tests/ reads vectors/${f}`;
+}
 
 // the item paths a crate's public-api.txt declares, or the reason it cannot be read
 const KINDS = new Set(['constant', 'enum', 'field', 'function', 'method', 'macro', 'module', 'static', 'struct', 'trait', 'trait_item', 'type_alias', 'union', 'variant']);
@@ -228,7 +242,11 @@ const resolvers = {
     unit,
     lib: unit,
     it: (c, v) => testFile(join(c.dir, 'tests'), v, 'tests'),
-    row: (c, v) => (isFile(join(c.dir, 'tests', `row_${v}.rs`)) ? 'ok' : `no tests/row_${v}.rs`),
+    row: (c, v) => {
+        const p = join(c.dir, 'tests', `row_${v}.rs`);
+        if (!isFile(p)) return `no tests/row_${v}.rs`;
+        return liveTest(code(p)) ? 'ok' : `tests/row_${v}.rs holds no test that is not ignored`;
+    },
     ui: (c, v) => {
         const need = [`fail/${v}.rs`, `fail/${v}.stderr`, `pass/${v}.rs`].filter((f) => !isFile(join(c.dir, 'tests/ui', f)));
         return need.length ? `no tests/ui/${need.join(', tests/ui/')}` : 'ok';
@@ -245,7 +263,7 @@ const resolvers = {
             .filter((r) => r !== 'ok');
         return bad[0] ?? 'ok';
     },
-    oracle: (c, v) => (existsSync(join(c.rust, 'vectors', v.split('#')[0])) ? vecIn(join(c.rust, 'vectors', v.split('#')[0]), v, 'id') : family(c, v, c.derived, 'id')),
+    oracle: (c, v) => (v.split('#')[0].includes('/') ? `oracle:${v} leaves the crate's own family; name a file of ${c.dir.slice(c.rust.length + 1)}-derived` : family(c, v, [`${c.dir.slice(c.rust.length + 1)}-derived`], 'id')),
     w3c: (c, v) => family(c, v, c.w3c, 'section'),
     fuzz: (c, v) => {
         const target = join(c.dir, 'fuzz', 'fuzz_targets', `${v}.rs`);
@@ -257,8 +275,9 @@ const resolvers = {
         return walk(join(c.dir, 'tests'), '.rs').some((f) => replay.test(code(f, true))) ? 'ok' : `no test under tests/ replays "fuzz/corpus/${v}"`;
     },
     mutants: (c, v) => {
-        const rel = v.split('::').join('/');
-        return [`${rel}.rs`, `${rel}/mod.rs`].some((f) => isFile(join(c.dir, 'src', f))) ? 'ok' : `no src/${rel}.rs`;
+        const f = modFile(c.dir, v.split('::'));
+        if (!f) return `no src/${v.split('::').join('/')}.rs`;
+        return /\bfn\s+[A-Za-z_]\w*[^;{]*\{/.test(code(f)) ? 'ok' : `${f.slice(c.dir.length + 1)} holds no fn with a body`;
     },
     conf: (c, v) => {
         const p = join(c.rust, 'testkit/src/conformance.rs');
@@ -326,7 +345,7 @@ function check(rust) {
         const defined = new Set();
         for (const i of legend) for (const m of lines[i].matchAll(/`([a-z][a-z0-9]*(?:-[a-z][a-z0-9]*)*):(?!:)/g)) defined.add(m[1]);
         for (const p of defined) if (!resolvers[p.replace(/-pending$/, '')]) fail(start, `legend prefix ${p}:`, 'the claims tool has no resolver for it');
-        const ctx = { dir: join(rust, d), rust, derived: vdirs(/-derived$/), w3c: vdirs(/^w3c-/) };
+        const ctx = { dir: join(rust, d), rust, w3c: vdirs(/^w3c-/) };
         const known = recipes(rust);
         let fence = null;
         const seen = new Set();
