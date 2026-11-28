@@ -88,7 +88,7 @@ fn totp_op(t: Totp, code: String) -> Op {
             Record::TotpStep(s) => Some(Row::new(s, r.version())),
             _ => None,
         });
-        let permit = Throttle::unlimited().check(attempts, NOW).ok()?;
+        let permit = common::permit(attempts, NOW)?;
         let pending = t
             .verify(permit, &OtpCode::parse(&code).ok()?, step, e)
             .ok()?;
@@ -109,7 +109,7 @@ fn recovery_op(code: String) -> Op {
             Record::Recovery(h) => Some(Row::new(h, r.version())),
             _ => None,
         });
-        let permit = Throttle::unlimited().check(attempts, NOW).ok()?;
+        let permit = common::permit(attempts, NOW)?;
         let pending = recovery_verify(permit, &code, hash, e).ok()?;
         shaped(&[Key::Attempts, code.key()], pending.effect());
         owned(pending.effect(), e)
@@ -221,7 +221,7 @@ fn counted_sequences() -> Result<(), TestError<Plays>> {
             any::<bool>(),
             prop::option::of(0usize..3),
         ),
-        0..14,
+        0..=10,
     );
     TestRunner::new(config(64)).run(&plays, |plays| {
         let (mut store, mut e) = (Mem::new(), seeded(5));
@@ -242,9 +242,8 @@ fn counted_sequences() -> Result<(), TestError<Plays>> {
                     Record::Recovery(h) => Some(Row::new(h, r.version())),
                     _ => None,
                 });
-                let permit = Throttle::unlimited()
-                    .check(attempts.as_ref().map(seen), now)
-                    .map_err(|_| fail("permit"))?;
+                let permit = common::permit(attempts.as_ref().map(seen), now)
+                    .ok_or_else(|| fail("permit"))?;
                 let pending = recovery_verify(permit, code, hash, &mut e).map_err(fail)?;
                 let receipt =
                     applied(&mut store, pending.effect(), now).ok_or_else(|| fail("apply"))?;
@@ -322,9 +321,7 @@ fn no_internal_totp() -> Result<(), TestError<Constructed>> {
             Record::TotpStep(s) => Some(Row::new(s, base::Version::new(1))),
             _ => None,
         });
-        let permit = Throttle::unlimited()
-            .check(None, UnixTime::new(time))
-            .map_err(|_| fail("permit"))?;
+        let permit = common::permit(None, UnixTime::new(time)).ok_or_else(|| fail("permit"))?;
         let verdict = t.verify(permit, &OtpCode::parse(&code).map_err(fail)?, held, &mut e);
         let _pending = verdict.map_err(fail)?;
         Ok(())
@@ -352,9 +349,7 @@ fn no_internal_recovery() -> Result<(), TestError<(u8, u64, bool)>> {
                     Record::Recovery(h) => Some(Row::new(h, r.version())),
                     _ => None,
                 });
-            let permit = Throttle::unlimited()
-                .check(None, NOW)
-                .map_err(|_| fail("permit"))?;
+            let permit = common::permit(None, NOW).ok_or_else(|| fail("permit"))?;
             let _pending = recovery_verify(permit, code, hash, &mut e).map_err(fail)?;
             Ok(())
         },
@@ -372,9 +367,7 @@ fn err_independent_of_secret() -> Result<(), Boxed> {
     let stored = Phc::parse(factor::password_hash(&new, cost, &mut seeded(2))?.as_str())?;
     // right, wrong and unrelated presented passwords all return a verdict, never an error, and hold the count alone
     for presented in ["correct horse battery", "correct horse batterz", "x"] {
-        let permit = Throttle::unlimited()
-            .check(None, NOW)
-            .map_err(|_| "permit")?;
+        let permit = common::permit(None, NOW).ok_or("permit")?;
         let pending = factor::password_verify(
             permit,
             &factor::Password::presented(presented)?,

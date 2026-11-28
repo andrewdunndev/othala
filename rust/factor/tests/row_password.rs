@@ -7,8 +7,11 @@ use base::UnixTime;
 use common::{Mem, applied};
 use factor::{
     Cost, ErrorKind, Key, Lanes, Memory, Minimum, NewPassword, Passes, Password, PasswordMatch,
-    Phc, Record, Rehash, Rejected, Throttle, password_hash, password_verify,
+    Phc, Record, Rehash, Rejected, password_hash, password_verify,
 };
+use serde::Deserialize;
+use testkit::vector;
+use testkit::vectors::{Outcome, run};
 
 type Boxed = Box<dyn std::error::Error>;
 
@@ -267,9 +270,7 @@ fn verify(
     cost: Cost,
 ) -> Result<(Result<PasswordMatch, Rejected>, Mem), Boxed> {
     let (mut store, mut e, now) = (Mem::new(), testkit::seeded(4), UnixTime::new(100));
-    let permit = Throttle::unlimited()
-        .check(None, now)
-        .map_err(|_| "permit")?;
+    let permit = common::permit(None, now).ok_or("permit")?;
     let pending = password_verify(
         permit,
         &Password::presented(presented)?,
@@ -308,6 +309,21 @@ fn hashed(password: &str, c: Cost) -> Result<Phc, Boxed> {
 fn verify_matches_and_counts_either_way() -> Result<(), Boxed> {
     let c = cost(7_168, 5, 1)?;
     let stored = hashed("correct horse battery", c)?;
+    // R25: the fresh hash carries the exact cost, a 16-byte salt and a 32-byte tag, and verifies as current at it
+    assert!(
+        stored
+            .as_str()
+            .starts_with("$argon2id$v=19$m=7168,t=5,p=1$")
+    );
+    assert_eq!(
+        stored
+            .as_str()
+            .rsplit('$')
+            .map(str::len)
+            .take(2)
+            .collect::<Vec<_>>(),
+        [43, 22]
+    );
     let (hit, mut store) = verify(&stored, "correct horse battery", c)?;
     let Ok(hit) = hit else {
         return Err("rejected".into());
@@ -413,5 +429,87 @@ fn debug_names_the_type_only() -> Result<(), Boxed> {
     let len = text("m=7168,t=5,p=1", 22, 43).len();
     assert_eq!(parsed(&at(256 - len)), Some(ErrorKind::Malformed));
     assert_eq!(parsed(&at(257 - len)), Some(ErrorKind::TooLarge));
+    Ok(())
+}
+
+#[derive(Deserialize)]
+struct Reference {
+    id: String,
+    password: String,
+    t: u32,
+    m: u32,
+    p: u32,
+    expect: Expected,
+}
+
+#[derive(Deserialize)]
+struct Expected {
+    encoded: String,
+}
+
+/// The P-H-C reference implementation's Argon2id v19 strings: each is read back byte for byte, matches its own
+/// password at the stored parameters, and a matched hash below this crate's salt length is rehashed at the larger of each cost.
+#[test]
+fn reference_strings() {
+    let cost = cost(47_104, 1, 1).ok();
+    let tally = run(
+        vector!("phc-winner-argon2/argon2id.json"),
+        8,
+        |c: &Reference| {
+            let Some(cost) = cost else {
+                return Outcome::NotApplicable;
+            };
+            if c.m > 65_536 {
+                // over R23's memory ceiling, however well formed
+                assert_eq!(
+                    parsed(&c.expect.encoded),
+                    Some(ErrorKind::Malformed),
+                    "{}",
+                    c.id
+                );
+                return Outcome::Checked;
+            }
+            let stored = Phc::parse(&c.expect.encoded).ok();
+            assert_eq!(
+                stored.as_ref().map(Phc::as_str),
+                Some(c.expect.encoded.as_str()),
+                "{}",
+                c.id
+            );
+            let Some(stored) = stored else {
+                return Outcome::NotApplicable;
+            };
+            let hit = verify(&stored, &c.password, cost).ok().map(|(v, _)| v);
+            // every reference salt is 8 bytes, short of this crate's 16, so a match is always rehashed
+            let want = format!(
+                "$argon2id$v=19$m={},t={},p={}$",
+                c.m.max(47_104),
+                c.t.max(1),
+                c.p.max(1)
+            );
+            assert!(
+                matches!(hit, Some(Ok(m)) if matches!(m.rehash(), Rehash::Needed(n) if n.as_str().starts_with(&want))),
+                "{}",
+                c.id
+            );
+            Outcome::Checked
+        },
+    );
+    assert_eq!(tally.checked(), tally.total());
+}
+
+/// A password other than the one a reference string was made for is `Wrong`, so the tag compare is not vacuous.
+#[test]
+fn reference_string_rejects_another_password() -> Result<(), Boxed> {
+    let stored = Phc::parse(
+        "$argon2id$v=19$m=256,t=2,p=1$c29tZXNhbHQ$nf65EOgLrQMR/uIPnA4rEsF5h7TKyQwu9U1bMCHGi/4",
+    )?;
+    let (hit, _) = verify(&stored, "password", cost(7_168, 5, 1)?)?;
+    // the reference's 8-byte salt is short of 16, so the match is rehashed at the larger of each cost
+    assert!(
+        matches!(hit, Ok(m) if matches!(m.rehash(), Rehash::Needed(n) if n.as_str().starts_with("$argon2id$v=19$m=7168,t=5,p=1$")))
+    );
+    let (miss, _) = verify(&stored, "passwore", cost(7_168, 5, 1)?)?;
+    assert!(matches!(miss, Err(Rejected::Wrong)));
     Ok(())
 }

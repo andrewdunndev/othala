@@ -2,8 +2,8 @@
 #![allow(dead_code, reason = "each row uses part of this")]
 use base::{Effect, Row, Slot, Store, UnixTime};
 use factor::{
-    Attempts, Digits, ErrorKind, Key, OtpAlg, OtpCode, OtpKey, OtpMatch, Period, Record, Rejected,
-    Skew, Throttle, Totp,
+    Attempts, Backoff, Cap, Digits, ErrorKind, FreeAttempts, Key, OtpAlg, OtpCode, OtpKey,
+    OtpMatch, Period, Permit, Record, Rejected, Skew, Throttle, Totp, Wait,
 };
 use serde::Deserialize;
 use testkit::{MemStore, Seeded, seeded};
@@ -115,6 +115,16 @@ pub(crate) fn seen<T>(row: &Row<T>) -> Row<&T> {
     Row::new(row.record(), row.version())
 }
 
+/// A permit from a throttle with ten free attempts: a test that only counts never meets a wait, and none makes more than ten verdicts.
+pub(crate) fn permit(attempts: Option<Row<&Attempts>>, now: UnixTime) -> Option<Permit> {
+    let policy = Backoff::new(
+        FreeAttempts::new(10).ok()?,
+        Wait::new(1).ok()?,
+        Cap::new(3_600).ok()?,
+    );
+    Throttle::new(policy).check(attempts, now).ok()
+}
+
 /// One verdict as a host runs it: read the rows, check, verify, apply, settle.
 pub(crate) fn verify_once(
     store: &mut Mem,
@@ -124,9 +134,7 @@ pub(crate) fn verify_once(
     now: UnixTime,
 ) -> Option<Result<OtpMatch, Rejected>> {
     let (attempts, step) = (attempts_row(store), last(store));
-    let permit = Throttle::unlimited()
-        .check(attempts.as_ref().map(seen), now)
-        .ok()?;
+    let permit = permit(attempts.as_ref().map(seen), now)?;
     let pending = totp.verify(permit, code, step.as_ref().map(seen), e).ok()?;
     let receipt = applied(store, pending.effect(), now)?;
     pending.settle(receipt).ok()

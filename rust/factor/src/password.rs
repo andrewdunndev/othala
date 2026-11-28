@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use core::fmt;
 
@@ -175,12 +176,43 @@ impl Cost {
 
 /// An Argon2id v19 hash in canonical PHC string form, held to this crate's policy; the host stores it.
 #[derive(Clone)]
-pub struct Phc(String);
+pub struct Phc {
+    text: String,
+    parsed: Box<Parsed>,
+}
+
+/// What `parse` and `hash` read once, so a verify never reads the text again.
+#[derive(Clone)]
+struct Parsed {
+    hash: PasswordHash,
+    memory: Memory,
+    passes: Passes,
+    lanes: Lanes,
+    salt: usize,
+    tag: usize,
+}
+
+impl Parsed {
+    /// The one reading of a hash's parameters and sizes, for `parse` and `hash` alike.
+    fn read(hash: PasswordHash) -> Option<(Self, Params)> {
+        let params = Params::try_from(&hash).ok()?;
+        let (salt, tag) = (hash.salt.as_ref()?.len(), hash.hash.as_ref()?.len());
+        let shape = Self {
+            memory: Memory(params.m_cost()),
+            passes: Passes(params.t_cost()),
+            lanes: Lanes(params.p_cost()),
+            salt,
+            tag,
+            hash,
+        };
+        Some((shape, params))
+    }
+}
 
 impl Phc {
     /// The canonical PHC text, for the host to store.
     pub fn as_str(&self) -> &str {
-        &self.0
+        &self.text
     }
 }
 
@@ -206,7 +238,12 @@ fn hash(password: &Password, cost: Cost, e: &mut impl Entropy) -> Result<Phc, Er
     let hash = argon
         .hash_password_with_salt(password.0.expose(), &salt)
         .map_err(hashing)?;
-    Ok(Phc(hash.to_string()))
+    let text = hash.to_string();
+    let (parsed, _) = Parsed::read(hash).ok_or(err(ErrorKind::Internal))?;
+    Ok(Phc {
+        text,
+        parsed: Box::new(parsed),
+    })
 }
 
 impl Phc {
@@ -224,23 +261,22 @@ impl Phc {
         {
             return Err(unsupported);
         }
-        let params = Params::try_from(&hash).map_err(|_| malformed)?;
+        let (parsed, params) = Parsed::read(hash).ok_or(malformed)?;
         // `phc` itself bounds the salt to 8 to 48 bytes and the tag to 10 to 64
-        let (Some(_), Some(tag)) = (&hash.salt, &hash.hash) else {
-            return Err(malformed);
-        };
         let ranged = (1..=MAX_PASSES_AND_LANES).contains(&params.t_cost())
             && (1..=MAX_PASSES_AND_LANES).contains(&params.p_cost())
             && params.m_cost() <= MAX_MEMORY_KIB;
         let canonical = PasswordHash {
             params: ParamsString::try_from(&params).map_err(|_| malformed)?,
-            ..hash.clone()
+            ..parsed.hash.clone()
         };
-        if ranged && tag.len() >= MIN_PARSED_TAG && canonical.to_string() == text {
-            Ok(Self(text.to_string()))
-        } else {
-            Err(malformed)
+        if !(ranged && parsed.tag >= MIN_PARSED_TAG && canonical.to_string() == text) {
+            return Err(malformed);
         }
+        Ok(Self {
+            text: text.to_string(),
+            parsed: Box::new(parsed),
+        })
     }
 }
 
@@ -275,35 +311,31 @@ pub fn password_verify(
     cost: Cost,
     e: &mut impl Entropy,
 ) -> Result<Pending<Result<PasswordMatch, Rejected>>, Error> {
-    let internal = err(ErrorKind::Internal);
-    let parsed = PasswordHash::new(&stored.0).map_err(|_| internal)?;
-    let params = Params::try_from(&parsed).map_err(|_| internal)?;
-    let tag = params.output_len().ok_or(internal)?;
+    let stored = &*stored.parsed;
     let argon = argon2id(
-        Memory(params.m_cost()),
-        Passes(params.t_cost()),
-        Lanes(params.p_cost()),
-        tag,
+        stored.memory,
+        stored.passes,
+        stored.lanes,
+        stored.tag,
         &[],
         &[],
     )?;
-    let matched = match argon.verify_password(password.0.expose(), &parsed) {
+    let matched = match argon.verify_password(password.0.expose(), &stored.hash) {
         Ok(()) => true,
         Err(password_hash::Error::PasswordInvalid) => false,
         Err(e) => return Err(hashing(e)),
     };
-    let salt = parsed.salt.map_or(0, |s| s.len());
-    let below = params.m_cost() < cost.memory.0
-        || params.t_cost() < cost.passes.0
-        || params.p_cost() < cost.lanes.0
-        || salt < SALT_LEN
-        || tag < TAG_LEN;
+    let below = stored.memory.0 < cost.memory.0
+        || stored.passes.0 < cost.passes.0
+        || stored.lanes.0 < cost.lanes.0
+        || stored.salt < SALT_LEN
+        || stored.tag < TAG_LEN;
     // computed whether or not it matched, so an `Err` never tells the two apart
     let fresh = if below {
         let top = Cost {
-            memory: Memory(params.m_cost().max(cost.memory.0)),
-            passes: Passes(params.t_cost().max(cost.passes.0)),
-            lanes: Lanes(params.p_cost().max(cost.lanes.0)),
+            memory: Memory(stored.memory.0.max(cost.memory.0)),
+            passes: Passes(stored.passes.0.max(cost.passes.0)),
+            lanes: Lanes(stored.lanes.0.max(cost.lanes.0)),
         };
         Some(hash(password, top, e)?)
     } else {
@@ -316,7 +348,10 @@ pub fn password_verify(
     } else {
         Err(Rejected::Wrong)
     };
-    let effect = permit.count(e).build().map_err(|_| internal)?;
+    let effect = permit
+        .count(e)
+        .build()
+        .map_err(|_| err(ErrorKind::Internal))?;
     Ok(Pending::new(verdict, effect))
 }
 

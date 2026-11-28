@@ -4,8 +4,8 @@ mod common;
 use base::{Digest, Entropy, Guard, Row, UnixTime};
 use common::{Mem, applied, stored};
 use factor::{
-    ErrorKind, Key, Record, RecoveryCode, RecoveryCount, RecoveryHash, Rejected, Throttle,
-    recovery_generate, recovery_verify,
+    ErrorKind, Key, Record, RecoveryCode, RecoveryCount, RecoveryHash, Rejected, recovery_generate,
+    recovery_verify,
 };
 
 type Boxed = Box<dyn std::error::Error>;
@@ -196,9 +196,7 @@ fn each_code_is_consumed_once() -> Result<(), Boxed> {
             Record::Attempts(a) => Some(Row::new(a, r.version())),
             _ => None,
         });
-        let permit = Throttle::unlimited()
-            .check(attempts, now)
-            .map_err(|_| "permit")?;
+        let permit = common::permit(attempts, now).ok_or("permit")?;
         let read = row(store, code);
         let seen = read.as_ref().map(|r| Row::new(r.record(), r.version()));
         let pending = recovery_verify(permit, code, seen, e)?;
@@ -237,9 +235,7 @@ fn a_row_holding_another_digest_is_not_a_match() -> Result<(), Boxed> {
         row(&mut store, a).ok_or("row")?,
         row(&mut store, b).ok_or("row")?,
     );
-    let permit = Throttle::unlimited()
-        .check(None, now)
-        .map_err(|_| "permit")?;
+    let permit = common::permit(None, now).ok_or("permit")?;
     let seen = Row::new(under_b.record(), under_a.version());
     let pending = recovery_verify(permit, a, Some(seen), &mut e)?;
     let receipt = applied(&mut store, pending.effect(), now).ok_or("apply")?;
