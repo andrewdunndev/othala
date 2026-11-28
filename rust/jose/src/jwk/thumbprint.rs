@@ -15,6 +15,25 @@ use crate::key::Public;
 use crate::key::public_of;
 use crate::{Jwk, Kid, SecretJwk};
 
+//= https://www.rfc-editor.org/rfc/rfc7518#section-6.3.2.7
+//= type=exception
+//= reason=jose writes no private JWK (SecretJwk is not Serialize, T16), so it produces no oth member; a decoder refuses any key that carries oth
+//# Each array element MUST be an object with the following members.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-6.3.2.7
+//= type=exception
+//= reason=jose writes no private JWK (SecretJwk is not Serialize, T16), so it produces no oth member; a decoder refuses any key that carries oth
+//# When three or more primes have been used, the number of array elements MUST be the number of
+//# primes used minus two.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-6.3.2.7
+//= type=exception
+//= reason=jose writes no private JWK (SecretJwk is not Serialize, T16), so it produces no oth member; a decoder refuses any key that carries oth
+//# When only two primes have been used (the normal case), this parameter MUST be omitted.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-6.3.2
+//= type=exception
+//= reason=jose writes no private JWK (SecretJwk is not Serialize, T16), so it produces no oth member; a decoder refuses any key that carries oth
+//# If the producer includes any of the other private key parameters, then all of the others MUST be
+//# present, with the exception of "oth", which MUST only be present when more than two prime
+//# factors were used.
 /// A key's JWK members besides `kid`, `alg`, `use` and `key_ops`, `kty` first: canonical (full-length coordinates,
 /// minimal integers), so they equal the text a JWK carried.
 pub(crate) fn members(key: &Public) -> Vec<(&'static str, String)> {

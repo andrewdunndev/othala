@@ -35,6 +35,8 @@ macro_rules! es {
                 let Public::$variant(key) = key else {
                     return Err(ErrorKind::AlgMismatch.into());
                 };
+                //= https://www.rfc-editor.org/rfc/rfc7518#section-3.4
+                //# The JWS Signature value MUST be a 64-octet sequence.
                 let signature = $curve::ecdsa::Signature::from_slice(signature)
                     .map_err(|_| ErrorKind::BadSignature)?;
                 $curve::ecdsa::VerifyingKey::from(key)
@@ -55,6 +57,9 @@ macro_rules! es {
                 let signature: $curve::ecdsa::Signature = $curve::ecdsa::SigningKey::from(key)
                     .try_sign(input)
                     .map_err(|_| ErrorKind::Signer)?;
+                //= https://www.rfc-editor.org/rfc/rfc7518#section-3.4
+                //# The octet sequence representations MUST NOT be shortened to omit any leading
+                //# zero octets contained in the values.
                 Ok(signature.to_bytes().into())
             }
         }
@@ -71,6 +76,13 @@ mod tests {
     use crate::key::{Private, Public};
     use crate::{Alg, ErrorKind};
 
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-3.4
+    //= type=test
+    //# The JWS Signature value MUST be a 64-octet sequence.
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-3.4
+    //= type=test
+    //# The octet sequence representations MUST NOT be shortened to omit any leading zero octets
+    //# contained in the values.
     #[test]
     fn signatures_verify_only_under_their_curve() {
         let (p256, p384) = (

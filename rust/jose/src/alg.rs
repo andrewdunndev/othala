@@ -79,6 +79,29 @@ pub trait Enc: crate::jwe::envelope::sealed::Enc {
     const ENC: JweEnc;
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7518#section-3.6
+//= type=exception
+//= reason=alg none is not shipped: no SigningAlg variant, so no unsecured JWS is made or accepted; non-goal N1 (R2, R4, T12)
+//# In order to mitigate downgrade attacks, applications MUST NOT signal acceptance of Unsecured
+//# JWSs at a global level, and SHOULD signal acceptance on a per-object basis.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-3.6
+//= type=exception
+//= reason=alg none is not shipped: no SigningAlg variant, so no unsecured JWS is made or accepted; non-goal N1 (R2, R4, T12)
+//# Implementations MUST NOT accept Unsecured JWSs by default.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-3.6
+//= type=exception
+//= reason=alg none is not shipped: no SigningAlg variant, so no unsecured JWS is made or accepted; non-goal N1 (R2, R4, T12)
+//# Implementations that support Unsecured JWSs MUST NOT accept such objects as valid unless the
+//# application specifies that it is acceptable for a specific object to not be integrity protected.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-3.6
+//= type=exception
+//= reason=alg none is not shipped: no SigningAlg variant, so no unsecured JWS is made or accepted; non-goal N1 (R2, R4, T12)
+//# Recipients MUST verify that the JWS Signature value is the empty octet sequence.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-3.6
+//= type=exception
+//= reason=alg none is not shipped: no SigningAlg variant, so no unsecured JWS is made or accepted; non-goal N1 (R2, R4, T12)
+//# An Unsecured JWS uses the "alg" value "none" and is formatted identically to other JWSs, but
+//# MUST use the empty octet sequence as its JWS Signature value.
 //= https://www.rfc-editor.org/rfc/rfc7519#section-8
 //= type=exception
 //= reason=HS256 is implemented; none is non-goal N1 (RFC 8725 3.2)
@@ -116,6 +139,45 @@ pub enum SigningAlg {
     EdDsa,
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7518#section-4.8.1.2
+//= type=exception
+//= reason=PBES2 is not shipped: no JweAlg variant, since an attacker-chosen p2c is a denial of service; non-goal N3
+//# This Header Parameter MUST be present and MUST be understood and processed by implementations
+//# when these algorithms are used.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-4.8.1.1
+//= type=exception
+//= reason=PBES2 is not shipped: no JweAlg variant, since an attacker-chosen p2c is a denial of service; non-goal N3
+//# A new Salt Input value MUST be generated randomly for every encryption operation; see RFC 4086
+//# [RFC4086] for considerations on generating random values.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-4.8.1.1
+//= type=exception
+//= reason=PBES2 is not shipped: no JweAlg variant, since an attacker-chosen p2c is a denial of service; non-goal N3
+//# A Salt Input value containing 8 or more octets MUST be used.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-4.8.1.1
+//= type=exception
+//= reason=PBES2 is not shipped: no JweAlg variant, since an attacker-chosen p2c is a denial of service; non-goal N3
+//# This Header Parameter MUST be present and MUST be understood and processed by implementations
+//# when these algorithms are used.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-4.8
+//= type=exception
+//= reason=PBES2 is not shipped: no JweAlg variant, since an attacker-chosen p2c is a denial of service; non-goal N3
+//# The iteration count parameter MUST be provided as the "p2c" (PBES2 count) Header Parameter
+//# value.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-4.8
+//= type=exception
+//= reason=PBES2 is not shipped: no JweAlg variant, since an attacker-chosen p2c is a denial of service; non-goal N3
+//# The salt parameter MUST be computed from the "p2s" (PBES2 salt input) Header Parameter value and
+//# the "alg" (algorithm) Header Parameter value as specified in the "p2s" definition below.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-4.8
+//= type=exception
+//= reason=PBES2 is not shipped: no JweAlg variant, since an attacker-chosen p2c is a denial of service; non-goal N3
+//# The PBES2 password input is an octet sequence; if the password to be used is represented as a
+//# text string rather than an octet sequence, the UTF-8 encoding of the text string MUST be used as
+//# the octet sequence.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-4.2
+//= type=exception
+//= reason=RSA1_5 is not shipped: no JweAlg variant; non-goal N2
+//# A key of size 2048 bits or larger MUST be used with this algorithm.
 //= https://www.rfc-editor.org/rfc/rfc7519#section-8
 //= type=exception
 //= reason=A128KW, A256KW, A128CBC-HS256, A256CBC-HS512 are implemented; RSA1_5 is non-goal N2
@@ -156,6 +218,8 @@ pub enum JweAlg {
     RsaOaep256,
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7516#section-4.1.2
+//# This algorithm MUST be an AEAD algorithm with a specified key length.
 /// A JWE `enc` value this crate implements (RFC 7518 section 5.1).
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

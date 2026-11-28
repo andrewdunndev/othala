@@ -98,6 +98,33 @@ impl<'a> Jws<'a> {
 }
 
 impl Compact {
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //# encrypted_key The "encrypted_key" member MUST be present and contain the value BASE64URL(JWE
+    //# Encrypted Key) when the JWE Encrypted Key value is non-empty; otherwise, it MUST be absent.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //# header The "header" member MUST be present and contain the value JWE Per-Recipient
+    //# Unprotected Header when the JWE Per-Recipient Unprotected Header value is non-empty;
+    //# otherwise, it MUST be absent.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //# tag The "tag" member MUST be present and contain the value BASE64URL(JWE Authentication Tag)
+    //# when the JWE Authentication Tag value is non-empty; otherwise, it MUST be absent.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //# ciphertext The "ciphertext" member MUST be present and contain the value BASE64URL(JWE
+    //# Ciphertext).
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //# aad The "aad" member MUST be present and contain the value BASE64URL(JWE AAD)) when the JWE
+    //# AAD value is non-empty; otherwise, it MUST be absent.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //# iv The "iv" member MUST be present and contain the value BASE64URL(JWE Initialization
+    //# Vector) when the JWE Initialization Vector value is non-empty; otherwise, it MUST be absent.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //# unprotected The "unprotected" member MUST be present and contain the value JWE Shared
+    //# Unprotected Header when the JWE Shared Unprotected Header value is non-empty; otherwise, it
+    //# MUST be absent.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //# protected The "protected" member MUST be present and contain the value BASE64URL(UTF8(JWE
+    //# Protected Header)) when the JWE Protected Header value is non-empty; otherwise, it MUST be
+    //# absent.
     //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
     //# protected The "protected" member MUST be present and contain the value BASE64URL(UTF8(JWS
     //# Protected Header)) when the JWS Protected Header value is non-empty; otherwise, it MUST be
@@ -127,6 +154,13 @@ impl Compact {
         }
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //= type=exception
+    //= reason=jose produces no general JWE serialization, so no recipients member is written; non-goal N10
+    //# This member MUST be present with exactly one array element per recipient, even if some or
+    //# all of the array element values are the empty JSON object "{}" (which can happen when all
+    //# Header Parameter values are shared between all recipients and when no encrypted key is used,
+    //# such as when doing Direct Encryption).
     /// The general JSON serialization of JWS tokens over one payload; different payloads or a JWE are `Malformed`,
     /// and more than `MAX_ENTRIES` tokens `TooLarge`.
     pub fn general(tokens: &[Compact]) -> Result<String, Error> {
@@ -206,6 +240,41 @@ mod tests {
         assert_eq!(kind(&with(r#""x":1"#)), None);
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //= type=test
+    //# encrypted_key The "encrypted_key" member MUST be present and contain the value BASE64URL(JWE
+    //# Encrypted Key) when the JWE Encrypted Key value is non-empty; otherwise, it MUST be absent.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //= type=test
+    //# header The "header" member MUST be present and contain the value JWE Per-Recipient
+    //# Unprotected Header when the JWE Per-Recipient Unprotected Header value is non-empty;
+    //# otherwise, it MUST be absent.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //= type=test
+    //# tag The "tag" member MUST be present and contain the value BASE64URL(JWE Authentication Tag)
+    //# when the JWE Authentication Tag value is non-empty; otherwise, it MUST be absent.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //= type=test
+    //# ciphertext The "ciphertext" member MUST be present and contain the value BASE64URL(JWE
+    //# Ciphertext).
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //= type=test
+    //# aad The "aad" member MUST be present and contain the value BASE64URL(JWE AAD)) when the JWE
+    //# AAD value is non-empty; otherwise, it MUST be absent.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //= type=test
+    //# iv The "iv" member MUST be present and contain the value BASE64URL(JWE Initialization
+    //# Vector) when the JWE Initialization Vector value is non-empty; otherwise, it MUST be absent.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //= type=test
+    //# unprotected The "unprotected" member MUST be present and contain the value JWE Shared
+    //# Unprotected Header when the JWE Shared Unprotected Header value is non-empty; otherwise, it
+    //# MUST be absent.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //= type=test
+    //# protected The "protected" member MUST be present and contain the value BASE64URL(UTF8(JWE
+    //# Protected Header)) when the JWE Protected Header value is non-empty; otherwise, it MUST be
+    //# absent.
     //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
     //= type=test
     //# protected The "protected" member MUST be present and contain the value BASE64URL(UTF8(JWS

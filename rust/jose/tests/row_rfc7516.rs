@@ -97,11 +97,22 @@ fn row(file: Vector, total: usize, applicable: usize) {
     assert_eq!((tally.total(), tally.checked()), (total, applicable));
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7516#section-5.2
+//= type=test
+//# If there was no recipient for which all of the decryption steps succeeded, then the JWE MUST be
+//# considered invalid.
 #[test]
 fn rfc7516_appendix_a() {
     row(vector!("rfc7516/jwe.json"), 15, 9);
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+//= type=test
+//# At least one of the "header", "protected", and "unprotected" members MUST be present so that
+//# "alg" and "enc" Header Parameter values are conveyed for each recipient computation.
+//= https://www.rfc-editor.org/rfc/rfc7516#section-4.1.2
+//= type=test
+//# This Header Parameter MUST be present and MUST be understood and processed by implementations.
 #[test]
 fn header_cases() {
     row(vector!("jose-derived/jwe-header.json"), 13, 12);
@@ -191,6 +202,19 @@ macro_rules! all_enc {
     }};
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7518#section-5.3
+//= type=test
+//# The requested size of the Authentication Tag output MUST be 128 bits, regardless of the key
+//# size.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-5.3
+//= type=test
+//# Use of an IV of size 96 bits is REQUIRED with this algorithm.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-5.2.2.1
+//= type=test
+//# The number of octets in the input key K MUST be the sum of MAC_KEY_LEN and ENC_KEY_LEN.
+//= https://www.rfc-editor.org/rfc/rfc7516#section-5.1
+//= type=test
+//# The CEK MUST have a length equal to that required for the content encryption algorithm.
 #[test]
 fn jwe_round_trip() {
     let config = ProptestConfig {
@@ -282,6 +306,17 @@ fn tamper<K: LocalKeyAlg, E: Enc>(
     Ok(())
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7516#section-5.2
+//= type=test
+//# If there was no recipient for which all of the decryption steps succeeded, then the JWE MUST be
+//# considered invalid.
+//= https://www.rfc-editor.org/rfc/rfc7516#section-5.2
+//= type=test
+//# The CEK MUST have a length equal to that required for the content encryption algorithm.
+//= https://www.rfc-editor.org/rfc/rfc7516#section-5.2
+//= type=test
+//# However, in all cases, the encrypted content for at least one recipient MUST successfully
+//# validate or the JWE MUST be considered invalid.
 #[test]
 fn jwe_tamper_is_decrypt() {
     let config = ProptestConfig {

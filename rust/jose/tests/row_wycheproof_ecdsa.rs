@@ -72,6 +72,9 @@ fn p256_p1363() {
     );
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7518#section-3.4
+//= type=test
+//# The JWS Signature value MUST be a 64-octet sequence.
 #[test]
 fn p256_der_is_refused() {
     row::<Es256>(

@@ -1,0 +1,120 @@
+{
+ "rfc": 7516,
+ "source": "https://www.rfc-editor.org/rfc/rfc7516.txt",
+ "sha256": "722cfcddc15f58e746891ba4b846853d3711153a774e4dd55ad6db100474a21f",
+ "licence": "IETF Trust (quoted RFC text)",
+ "requirements": [
+  {
+   "section": "3.2",
+   "text": "In the JWE JSON Serialization, one or more of the JWE Protected Header, JWE Shared Unprotected Header, and JWE Per-Recipient Unprotected Header MUST be present."
+  },
+  {
+   "section": "4",
+   "text": "The Header Parameter names within the JOSE Header MUST be unique, just as described in Section 4 of [JWS]."
+  },
+  {
+   "section": "4.1.2",
+   "text": "This algorithm MUST be an AEAD algorithm with a specified key length."
+  },
+  {
+   "section": "4.1.2",
+   "text": "This Header Parameter MUST be present and MUST be understood and processed by implementations."
+  },
+  {
+   "section": "4.1.3",
+   "text": "When used, this Header Parameter MUST be integrity protected; therefore, it MUST occur only within the JWE Protected Header."
+  },
+  {
+   "section": "4.1.3",
+   "text": "This Header Parameter MUST be understood and processed by implementations."
+  },
+  {
+   "section": "5.1",
+   "text": "The CEK MUST have a length equal to that required for the content encryption algorithm."
+  },
+  {
+   "section": "5.2",
+   "text": "However, in all cases, the encrypted content for at least one recipient MUST successfully validate or the JWE MUST be considered invalid."
+  },
+  {
+   "section": "5.2",
+   "text": "When using the JWE JSON Serialization, this restriction includes that the same Header Parameter name also MUST NOT occur in distinct JSON object values that together comprise the JOSE Header."
+  },
+  {
+   "section": "5.2",
+   "text": "The CEK MUST have a length equal to that required for the content encryption algorithm."
+  },
+  {
+   "section": "5.2",
+   "text": "If there was no recipient for which all of the decryption steps succeeded, then the JWE MUST be considered invalid."
+  },
+  {
+   "section": "7.2.1",
+   "text": "protected The \"protected\" member MUST be present and contain the value BASE64URL(UTF8(JWE Protected Header)) when the JWE Protected Header value is non-empty; otherwise, it MUST be absent."
+  },
+  {
+   "section": "7.2.1",
+   "text": "unprotected The \"unprotected\" member MUST be present and contain the value JWE Shared Unprotected Header when the JWE Shared Unprotected Header value is non-empty; otherwise, it MUST be absent."
+  },
+  {
+   "section": "7.2.1",
+   "text": "iv The \"iv\" member MUST be present and contain the value BASE64URL(JWE Initialization Vector) when the JWE Initialization Vector value is non-empty; otherwise, it MUST be absent."
+  },
+  {
+   "section": "7.2.1",
+   "text": "aad The \"aad\" member MUST be present and contain the value BASE64URL(JWE AAD)) when the JWE AAD value is non-empty; otherwise, it MUST be absent."
+  },
+  {
+   "section": "7.2.1",
+   "text": "ciphertext The \"ciphertext\" member MUST be present and contain the value BASE64URL(JWE Ciphertext)."
+  },
+  {
+   "section": "7.2.1",
+   "text": "tag The \"tag\" member MUST be present and contain the value BASE64URL(JWE Authentication Tag) when the JWE Authentication Tag value is non-empty; otherwise, it MUST be absent."
+  },
+  {
+   "section": "7.2.1",
+   "text": "recipients The \"recipients\" member value MUST be an array of JSON objects."
+  },
+  {
+   "section": "7.2.1",
+   "text": "This member MUST be present with exactly one array element per recipient, even if some or all of the array element values are the empty JSON object \"{}\" (which can happen when all Header Parameter values are shared between all recipients and when no encrypted key is used, such as when doing Direct Encryption)."
+  },
+  {
+   "section": "7.2.1",
+   "text": "header The \"header\" member MUST be present and contain the value JWE Per-Recipient Unprotected Header when the JWE Per-Recipient Unprotected Header value is non-empty; otherwise, it MUST be absent."
+  },
+  {
+   "section": "7.2.1",
+   "text": "encrypted_key The \"encrypted_key\" member MUST be present and contain the value BASE64URL(JWE Encrypted Key) when the JWE Encrypted Key value is non-empty; otherwise, it MUST be absent."
+  },
+  {
+   "section": "7.2.1",
+   "text": "At least one of the \"header\", \"protected\", and \"unprotected\" members MUST be present so that \"alg\" and \"enc\" Header Parameter values are conveyed for each recipient computation."
+  },
+  {
+   "section": "7.2.1",
+   "text": "Additional members can be present in both the JSON objects defined above; if not understood by implementations encountering them, they MUST be ignored."
+  },
+  {
+   "section": "7.2.1",
+   "text": "The Header Parameter names in the three locations MUST be disjoint."
+  },
+  {
+   "section": "7.2.1",
+   "text": "Therefore, all Header Parameters that specify the treatment of the plaintext value MUST be the same for all recipients."
+  },
+  {
+   "section": "7.2.1",
+   "text": "This primarily means that the \"enc\" (encryption algorithm) Header Parameter value in the JOSE Header for each recipient and any parameters of that algorithm MUST be the same."
+  },
+  {
+   "section": "7.2.2",
+   "text": "The \"recipients\" member MUST NOT be present when using this syntax."
+  },
+  {
+   "section": "11.5",
+   "text": "To mitigate the attacks described in RFC 3218 [RFC3218], the recipient MUST NOT distinguish between format, padding, and length errors of encrypted keys."
+  }
+ ]
+}

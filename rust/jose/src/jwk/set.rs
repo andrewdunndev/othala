@@ -59,6 +59,18 @@ fn distinct<'a>(kids: impl Iterator<Item = &'a Kid>) -> Result<(), Error> {
     }
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7517#section-5
+//= type=todo
+//= reason=no test decodes a JWK Set with a member it does not know
+//# Additional members can be present in the JWK Set; if not understood by implementations
+//# encountering them, they MUST be ignored.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-5
+//# Additional members can be present in the JWK Set; if not understood by implementations
+//# encountering them, they MUST be ignored.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-5
+//# The JSON object MUST have a "keys" member, with its value being an array of JWKs.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-2
+//# The JSON object MUST have a "keys" member, which is an array of JWKs.
 #[derive(Deserialize)]
 struct Document<'a> {
     #[serde(borrow)]
@@ -82,6 +94,11 @@ impl JwkSet {
         Self::read(json, true)
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7517#section-5
+    //# The member names within a JWK Set MUST be unique; JWK Set parsers MUST either reject JWK
+    //# Sets with duplicate member names or use a JSON parser that returns only the lexically last
+    //# duplicate member name, as specified in Section 15.12 ("The JSON Object") of ECMAScript 5.1
+    //# [ECMAScript].
     fn read(json: &[u8], public_only: bool) -> Result<Self, Error> {
         scan(json)?;
         let document: Document<'_> =
@@ -143,6 +160,70 @@ impl JwkSet {
     }
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4.9
+//= type=exception
+//= reason=x5u, x5c, x5t and x5t#S256 are ignored at decode and never written, so no certificate is read or matched; non-goal N9 (R30)
+//# If other members are present, the contents of those members MUST be semantically consistent with
+//# the related fields in the referenced certificate.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4.9
+//= type=exception
+//= reason=x5u, x5c, x5t and x5t#S256 are ignored at decode and never written, so no certificate is read or matched; non-goal N9 (R30)
+//# The key in the certificate MUST match the public key represented by other members of the JWK.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4.8
+//= type=exception
+//= reason=x5u, x5c, x5t and x5t#S256 are ignored at decode and never written, so no certificate is read or matched; non-goal N9 (R30)
+//# If other members are present, the contents of those members MUST be semantically consistent with
+//# the related fields in the referenced certificate.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4.8
+//= type=exception
+//= reason=x5u, x5c, x5t and x5t#S256 are ignored at decode and never written, so no certificate is read or matched; non-goal N9 (R30)
+//# The key in the certificate MUST match the public key represented by other members of the JWK.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4.7
+//= type=exception
+//= reason=x5u, x5c, x5t and x5t#S256 are ignored at decode and never written, so no certificate is read or matched; non-goal N9 (R30)
+//# If other members are present, the contents of those members MUST be semantically consistent with
+//# the related fields in the first certificate.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4.7
+//= type=exception
+//= reason=x5u, x5c, x5t and x5t#S256 are ignored at decode and never written, so no certificate is read or matched; non-goal N9 (R30)
+//# The key in the first certificate MUST match the public key represented by other members of the
+//# JWK.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4.7
+//= type=exception
+//= reason=x5u, x5c, x5t and x5t#S256 are ignored at decode and never written, so no certificate is read or matched; non-goal N9 (R30)
+//# The PKIX certificate containing the key value MUST be the first certificate.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4.6
+//= type=exception
+//= reason=x5u, x5c, x5t and x5t#S256 are ignored at decode and never written, so no certificate is read or matched; non-goal N9 (R30)
+//# Similarly, if the "alg" member is present, it MUST correspond to the algorithm specified in the
+//# certificate.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4.6
+//= type=exception
+//= reason=x5u, x5c, x5t and x5t#S256 are ignored at decode and never written, so no certificate is read or matched; non-goal N9 (R30)
+//# For instance, if the "use" member is present, then it MUST correspond to the usage that is
+//# specified in the certificate, when it includes this information.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4.6
+//= type=exception
+//= reason=x5u, x5c, x5t and x5t#S256 are ignored at decode and never written, so no certificate is read or matched; non-goal N9 (R30)
+//# If other members are present, the contents of those members MUST be semantically consistent with
+//# the related fields in the first certificate.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4.6
+//= type=exception
+//= reason=x5u, x5c, x5t and x5t#S256 are ignored at decode and never written, so no certificate is read or matched; non-goal N9 (R30)
+//# The protocol used to acquire the resource MUST provide integrity protection; an HTTP GET request
+//# to retrieve the certificate MUST use TLS [RFC2818] [RFC5246]; the identity of the server MUST be
+//# validated, as per Section 6 of RFC 6125 [RFC6125].
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4.6
+//= type=exception
+//= reason=x5u, x5c, x5t and x5t#S256 are ignored at decode and never written, so no certificate is read or matched; non-goal N9 (R30)
+//# The key in the first certificate MUST match the public key represented by other members of the
+//# JWK.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4.6
+//= type=exception
+//= reason=x5u, x5c, x5t and x5t#S256 are ignored at decode and never written, so no certificate is read or matched; non-goal N9 (R30)
+//# The identified resource MUST provide a representation of the certificate or certificate chain
+//# that conforms to RFC 5280 [RFC5280] in PEM-encoded form, with each certificate delimited as
+//# specified in Section 6.1 of RFC 4945 [RFC4945].
 impl Serialize for Jwk {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
@@ -165,6 +246,15 @@ impl Serialize for Jwk {
     }
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7517#section-9.2
+//= type=exception
+//= reason=storing and moving private and symmetric keys safely is the host's (O5, O11); jose's part is T16 (no Serialize) and R64 (Debug redaction)
+//# Private and symmetric keys MUST be protected from disclosure to unintended parties.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-7
+//= type=exception
+//= reason=who may reach a non-public JWK is the host's (O5); jose's part is that SecretJwk is not Serialize (T16) and JwkSet writes public keys only (R30)
+//# Access to JWKs containing non-public key material by parties without legitimate access to the
+//# non-public information MUST be prevented.
 impl Serialize for JwkSet {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(Some(1))?;
@@ -224,6 +314,13 @@ mod tests {
         format!(r#"{{"kty":"oct","kid":"{kid}","k":"{K}",{member}}}"#)
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7517#section-4.3
+    //= type=test
+    //# The "use" and "key_ops" JWK members SHOULD NOT be used together; however, if both are used,
+    //# the information they convey MUST be consistent.
+    //= https://www.rfc-editor.org/rfc/rfc7517#section-4.3
+    //= type=test
+    //# Duplicate key operation values MUST NOT be present in the array.
     #[test]
     fn members_that_are_not_supported_keys_are_skipped() {
         let x = "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo";
@@ -247,6 +344,12 @@ mod tests {
         assert_eq!(set(&[]), Ok(0));
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7517#section-5
+    //= type=test
+    //# The JSON object MUST have a "keys" member, with its value being an array of JWKs.
+    //= https://www.rfc-editor.org/rfc/rfc7517#section-2
+    //= type=test
+    //# The JSON object MUST have a "keys" member, which is an array of JWKs.
     #[test]
     fn a_set_malformed_as_a_whole_is_refused() {
         let refused = |text: &str| kids(text).err();

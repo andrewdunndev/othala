@@ -93,7 +93,13 @@ fn derive(
     let bits = u32::try_from(len * 8).map_err(|_| decrypt())?;
     let info = [
         part(algorithm.as_bytes())?,
+        //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6.1.2
+        //# This Header Parameter MUST be understood and processed by implementations when these
+        //# algorithms are used.
         part(&params.apu)?,
+        //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6.1.3
+        //# This Header Parameter MUST be understood and processed by implementations when these
+        //# algorithms are used.
         part(&params.apv)?,
         bits.to_be_bytes().to_vec(),
     ]
@@ -150,12 +156,28 @@ fn wrap(
     params: &mut Params,
     e: &mut dyn Entropy,
 ) -> Result<(SecretBytes, Vec<u8>), Error> {
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6
+    //= type=todo
+    //= reason=no test compares the ephemeral keys of two agreements drawn from different entropy; the host owes fresh entropy (O1)
+    //# A new ephemeral public key value MUST be generated for each key agreement operation.
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6
+    //# A new ephemeral public key value MUST be generated for each key agreement operation.
     let eph = ephemeral(key, e)?;
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6.2
+    //= type=exception
+    //= reason=encrypt never sets apu or apv, and decrypt does not check them for distinctness since the Concat KDF is sound either way
+    //# The "apu" and "apv" values MUST be distinct, when used.
     let z = agree(&eph, key)?;
     params.epk = Some(alloc::sync::Arc::new(public_of(&eph)));
     match mode {
+        //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6
+        //# In Direct Key Agreement mode, the output of the Concat KDF MUST be a key of the same
+        //# length as that used by the "enc" algorithm.
         Mode::Direct => Ok((derive(&z, enc.name(), params, enc.cek_len())?, Vec::new())),
         Mode::Wrap(len) => {
+            //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6
+            //# In Key Agreement with Key Wrapping mode, the output of the Concat KDF MUST be a key
+            //# of the length needed for the specified key wrapping algorithm.
             let kek = derive(&z, alg.name(), params, len)?;
             let mut cek = vec![0; enc.cek_len()];
             e.fill(&mut cek);
@@ -173,6 +195,14 @@ fn unwrap(
     enc: JweEnc,
     params: &Params,
 ) -> Result<SecretBytes, Error> {
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6.1.1
+    //= type=todo
+    //= reason=no test decrypts an ECDH-ES token whose epk is absent; appendix C proves epk is processed
+    //# This Header Parameter MUST be present and MUST be understood and processed by
+    //# implementations when these algorithms are used.
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6.1.1
+    //# This Header Parameter MUST be present and MUST be understood and processed by
+    //# implementations when these algorithms are used.
     let epk = params.epk.as_ref().ok_or_else(decrypt)?;
     let z = agree(key, epk)?;
     match mode {
@@ -329,6 +359,10 @@ mod tests {
         }
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6
+    //= type=test
+    //# In Direct Key Agreement mode, the output of the Concat KDF MUST be a key of the same length
+    //# as that used by the "enc" algorithm.
     #[test]
     fn derivation_and_curves() {
         let params = Params {
@@ -476,6 +510,10 @@ mod tests {
         assert_eq!(kw.and_then(Result::ok), Some((16, 24)));
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6
+    //= type=test
+    //# In Key Agreement with Key Wrapping mode, the output of the Concat KDF MUST be a key of the
+    //# length needed for the specified key wrapping algorithm.
     #[test]
     fn key_wrap_algs_derive_their_own_key_length() {
         let secret = p256::SecretKey::from_slice(&[1; 32]).ok();
