@@ -180,7 +180,7 @@ function check(crate, root) {
   const defined = new Map();
   for (const u of lib.matchAll(/\bpub(?:\([^)]*\))?\s+use\s+([^;]*);/g)) {
     for (const leaf of leaves(u[1])) {
-      const path = leaf.path[0] === 'crate' ? leaf.path.slice(1) : leaf.path;
+      const path = leaf.path[0] === 'crate' || leaf.path[0] === 'self' ? leaf.path.slice(1) : leaf.path;
       const mod = fileModule(path);
       if (mod === null) errors.push(`${crate}: lib.rs re-exports ${path.join('::')}, which is in no module`);
       else defined.set(leaf.as, mod);
@@ -223,8 +223,14 @@ function check(crate, root) {
     const absolute = (anchor, rest, pos) => {
       if (anchor === 'crate') return rest;
       if (names.has(anchor)) return [...names.get(anchor).split('::'), ...rest];
-      const supers = anchor === 'self' ? 0 : anchor.split('::').length;
+      if (anchor.startsWith('self::super')) anchor = anchor.slice('self::'.length); // `self` is the module the `super`s count from
       const d = depthAt(pos);
+      if (anchor === 'self') {
+        if (d > 0) return null; // the items of an inline module of this file
+        if (names.has(rest[0])) return [...names.get(rest[0]).split('::'), ...rest.slice(1)];
+        return [...me, ...rest]; // a module or namespace below this one, or this file's own item (which resolves to this file)
+      }
+      const supers = anchor.split('::').length;
       if (supers <= d) return null; // a path inside this file's own inline modules
       const up = supers - d;
       if (up > me.length) return undefined; // above the crate root
@@ -242,6 +248,7 @@ function check(crate, root) {
           if (pass === 1 && !['crate', 'super', 'self'].includes(p[0])) continue;
           let k = 1;
           let anchor = p[0];
+          if (anchor === 'self' && p[1] === 'super') { anchor = 'super'; k = 2; }
           while (anchor.startsWith('super') && p[k] === 'super') { anchor += '::super'; k++; }
           const abs = absolute(anchor, p.slice(k), u.index);
           if (abs === null || abs === undefined) { if (abs === undefined) errors.push(`${crate}: ${mod}: ${p.join('::')} climbs above the crate root`); continue; }
@@ -252,7 +259,7 @@ function check(crate, root) {
     }
     // inline paths: the use statements blanked, then every `anchor::path`
     const rest = text.replace(/\buse\s+[^;]*;/g, (s) => s.replace(/[^\n]/g, ' '));
-    const inline = new RegExp(`(?<![\\w:])(crate|self|super(?:::super)*${[...names.keys()].map((n) => `|${n}`).join('')})::((?:\\w+::)*\\w+)`, 'g');
+    const inline = new RegExp(`(?<![\\w:])(crate|self(?:::super)*|super(?:::super)*${[...names.keys()].map((n) => `|${n}`).join('')})::((?:\\w+::)*\\w+)`, 'g');
     for (const m of rest.matchAll(inline)) {
       const abs = absolute(m[1], m[2].split('::'), m.index);
       if (abs === null) continue;
@@ -313,6 +320,14 @@ const seeds = [
     'jose: error (layer 0 base) imports jwk::decode (layer 4 jwk), above it'],
   ['crate:: path after a url string on its line', (s) => appendFileSync(join(s, 'error.rs'), 'fn zz() { let _u = "https://x"; let _ = crate::Jwk::kty; }\n'),
     'jose: error (layer 0 base) imports jwk::decode (layer 4 jwk), above it'],
+  ['self:: through a namespace import', (s) => appendFileSync(join(s, 'sig/hmac.rs'), 'use crate::jwe;\npub(crate) use self::jwe::envelope::Jwe as J2;\n'),
+    'jose: sig::hmac (layer 3 implementations) imports jwe::envelope (layer 5 formats), above it'],
+  ['self::super::super:: inline path', (s) => appendFileSync(join(s, 'sig/hmac.rs'), 'fn _z(_: self::super::super::jwt::Jwt) {}\n'),
+    'jose: sig::hmac (layer 3 implementations) imports jwt (layer 6 tokens), above it'],
+  ['self::super chain inside an inline mod', (s) => appendFileSync(join(s, 'sig/hmac.rs'), 'mod inner { pub(crate) use self::super::super::super::jwt::Jwt; }\n'),
+    'jose: sig::hmac (layer 3 implementations) imports jwt (layer 6 tokens), above it'],
+  ['re-export through self:: under an alias', (s) => { appendFileSync(join(s, 'lib.rs'), 'pub(crate) use self::jwt::Jwt as Tok;\n'); appendFileSync(join(s, 'alg.rs'), 'use crate::Tok;\n'); },
+    'jose: alg (layer 2 algorithms) imports jwt (layer 6 tokens), above it'],
   ['cycle inside one layer', (s) => appendFileSync(join(s, 'jwk/decode.rs'), 'use crate::jwk::thumbprint::members as m;\n'),
     'jose: import cycle among jwk::decode, jwk::thumbprint'],
   ['module in no layer', (s) => writeFileSync(join(s, 'extra.rs'), '\n'),
