@@ -125,6 +125,18 @@ files = [
   { path = "rfc9106/argon2id.json", sha256 = "cd1db3ed9942cd04bce7ca2256728e37b5a2ddca29964ecdeed264a53e02ef69", cases = 1 },
 ]
 
+[source."phc-winner-argon2"]
+url = "https://github.com/P-H-C/phc-winner-argon2"
+revision = "f57e61e19229e23c4445b85494dbf7c07de721cb, src/test.c (sha256 ec518844e823fb6a1bd38f79f2b5d1bbddf23f490c0a343c450aa8e3f5af5988)"
+retrieved = "2026-11-28"
+licence = "CC0-1.0 OR Apache-2.0 (the values; our extractor MIT OR Apache-2.0)"
+feeds = ["factor"]
+notes = "tools/extract_phc_argon2.py on that test.c, which it refuses unless the sha256 matches: the eight Argon2id version 19 hashtest cases (password, salt, passes, memory in KiB, lanes, raw tag, encoded string), each checked by the script against its own encoded string. Argon2i and version 1.0 cases and the error-state calls are not extracted: the crate reads only Argon2id v19."
+cases = 8
+files = [
+  { path = "phc-winner-argon2/argon2id.json", sha256 = "ab79a416db0023c7e34a7920ff94b7018188534d8b27579a0bf8216ec85d3095", cases = 8 },
+]
+
 [source."rfc8725-derived"]
 url = "https://www.rfc-editor.org/rfc/rfc8725.txt"
 revision = "RFC 8725 section 3.1 with RFC 7515 section 4.1.1"

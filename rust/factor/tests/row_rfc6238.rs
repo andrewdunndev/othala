@@ -3,7 +3,7 @@ mod common;
 
 use base::{Row, UnixTime};
 use common::{Case, Mem, Outcome, applied, attempts, last, run, step_record, stored, totp};
-use factor::{ErrorKind, Key, OtpCode, OtpKey, Period, Rejected, Throttle};
+use factor::{ErrorKind, Key, OtpCode, OtpKey, Period, Rejected};
 use testkit::vectors::{Outcome as Seen, run as run_vector};
 use testkit::{seeded, vector};
 
@@ -138,9 +138,7 @@ fn confirm_records_the_step_and_bars_its_own_code() -> Result<(), Box<dyn std::e
         step_record(1)
     );
     // the same code at the first login is a replay
-    let permit = Throttle::unlimited()
-        .check(None, now)
-        .map_err(|_| "permit")?;
+    let permit = common::permit(None, now).ok_or("permit")?;
     let seen = Row::new(row.record(), row.version());
     let verdict = t.verify(permit, &code, Some(seen.clone()), &mut e)?;
     let receipt = applied(&mut store, verdict.effect(), now).ok_or("apply")?;

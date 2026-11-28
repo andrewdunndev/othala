@@ -9,6 +9,6 @@
   },
   "mutants": { "floor": 179, "tests": ["factor"] },
   "expose": ["otp", "password", "recovery"],
-  "vectors": ["rfc4226", "rfc6238", "rfc9106"],
+  "vectors": ["rfc4226", "rfc6238", "rfc9106", "phc-winner-argon2"],
   "allow": ["argon2", "blake2", "cmov", "ctutils", "hmac", "password-hash", "phc", "sha1"]
 }

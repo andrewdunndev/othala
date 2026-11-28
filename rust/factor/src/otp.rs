@@ -79,24 +79,28 @@ fn mac<M: Mac + KeyInit>(key: &[u8], counter: u64) -> Option<Zeroizing<Vec<u8>>>
     Some(tag)
 }
 
-/// RFC 4226 5.3: HMAC of the counter, dynamic truncation, modulo `10^digits`.
-pub(crate) fn hotp(key: &OtpKey, alg: OtpAlg, counter: u64, digits: Digits) -> u32 {
+/// RFC 4226 5.3 dynamic truncation: the 31 bits at the offset the tag's last nibble names; `None` when the tag is too short for it.
+fn truncate(tag: &[u8]) -> Option<u32> {
+    let offset = usize::from(tag.last()? & 0x0f);
+    let bytes = tag.get(offset..)?.first_chunk::<4>()?;
+    Some(u32::from_be_bytes(*bytes) & 0x7fff_ffff)
+}
+
+/// RFC 4226 5.3: HMAC of the counter, dynamic truncation, modulo `10^digits`; `None` when no code can be made, never a code.
+pub(crate) fn hotp(key: &OtpKey, alg: OtpAlg, counter: u64, digits: Digits) -> Option<u32> {
     let key = key.0.expose();
     let tag = match alg {
         OtpAlg::Sha1 => mac::<Hmac<Sha1>>(key, counter),
         OtpAlg::Sha256 => mac::<Hmac<Sha256>>(key, counter),
         OtpAlg::Sha512 => mac::<Hmac<Sha512>>(key, counter),
-    };
-    let word = tag.as_ref().and_then(|t| {
-        let offset = usize::from(t.last()? & 0x0f);
-        let bytes = t.get(offset..)?.first_chunk::<4>()?;
-        Some(u32::from_be_bytes(*bytes) & 0x7fff_ffff)
-    });
-    word.unwrap_or(0)
-        % match digits {
-            Digits::Six => 1_000_000,
-            Digits::Eight => 100_000_000,
-        }
+    }?;
+    Some(
+        truncate(&tag)?
+            % match digits {
+                Digits::Six => 1_000_000,
+                Digits::Eight => 100_000_000,
+            },
+    )
 }
 
 impl OtpKey {
@@ -216,18 +220,18 @@ impl Totp {
     }
 
     /// The code's digits for `step`, zero-padded, in the front of the array.
-    fn text(&self, step: u64) -> (Zeroizing<[u8; 8]>, usize) {
+    fn text(&self, step: u64) -> Option<(Zeroizing<[u8; 8]>, usize)> {
         let width = match self.digits {
             Digits::Six => 6,
             Digits::Eight => 8,
         };
-        let mut value = hotp(&self.key, self.alg, step, self.digits);
+        let mut value = hotp(&self.key, self.alg, step, self.digits)?;
         let mut text = Zeroizing::new([b'0'; 8]);
         for slot in text.iter_mut().take(width).rev() {
             *slot = b'0' + u8::try_from(value % 10).unwrap_or_default();
             value /= 10;
         }
-        (text, width)
+        Some((text, width))
     }
 
     /// The earliest candidate step after `last` that `code` matches; every candidate is compared, in constant time.
@@ -239,7 +243,9 @@ impl Totp {
         };
         let (mut fresh, mut stale) = (None, false);
         for step in at.saturating_sub(span)..=at.saturating_add(span) {
-            let (text, width) = self.text(step);
+            let Some((text, width)) = self.text(step) else {
+                continue;
+            };
             let hit = text
                 .get(..width)
                 .is_some_and(|t| bool::from(t.ct_eq(code.0.expose())));
@@ -345,7 +351,7 @@ mod rfc4226 {
     use serde::Deserialize;
     use testkit::vectors::{Outcome, run};
 
-    use super::{Digits, OtpAlg, OtpKey, hotp};
+    use super::{Digits, OtpAlg, OtpKey, hotp, truncate};
     use crate::tests::unhex;
 
     #[derive(Deserialize)]
@@ -389,8 +395,28 @@ mod rfc4226 {
         let width = usize::from(n);
         Some(alloc::format!(
             "{:0width$}",
-            hotp(&key, OtpAlg::Sha1, counter, digits(n)?)
+            hotp(&key, OtpAlg::Sha1, counter, digits(n)?)?
         ))
+    }
+
+    // RFC 4226 5.4's worked example: offset 0xa, bytes 50ef7f19 are 1357872199
+    #[test]
+    fn truncation_reads_the_offset_nibble() {
+        let tag = [
+            0x1f, 0x86, 0x98, 0x69, 0x0e, 0x02, 0xca, 0x16, 0x61, 0x85, 0x50, 0xef, 0x7f, 0x19,
+            0xda, 0x8e, 0x94, 0x5b, 0x55, 0x5a,
+        ];
+        assert_eq!(truncate(&tag), Some(0x50ef_7f19));
+    }
+
+    // a tag too short for its own offset makes no code, so the verifier finds no hit rather than a code of zeros
+    #[test]
+    fn a_short_tag_makes_no_code() {
+        assert_eq!(truncate(&[]), None);
+        assert_eq!(truncate(&[0, 0, 0]), None);
+        assert_eq!(truncate(&[0x0f; 18]), None);
+        assert_eq!(truncate(&[0x0f; 19]), Some(0x0f0f_0f0f));
+        assert_eq!(truncate(&[0xf0; 4]), Some(0x70f0_f0f0));
     }
 
     #[test]

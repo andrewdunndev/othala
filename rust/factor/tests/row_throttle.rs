@@ -1,4 +1,4 @@
-//! Row m3-factor-throttle, the claims reachable through the public API: R7's bounds, and R8 and R9 with no row.
+//! Row m3-factor-throttle, the claims reachable through the public API: R7's bounds, and R8 with no row.
 use base::{Row, UnixTime, Version};
 use factor::{Backoff, Cap, Closed, ErrorKind, FreeAttempts, Record, Throttle, Wait};
 
@@ -28,7 +28,6 @@ fn no_row_permits() -> Result<(), factor::Error> {
     ));
     for now in [0, 1, u64::MAX].map(UnixTime::new) {
         assert!(strict.check(None, now).is_ok());
-        assert!(Throttle::unlimited().check(None, now).is_ok());
     }
     Ok(())
 }

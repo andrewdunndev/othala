@@ -42,7 +42,7 @@ pub struct Backoff {
 /// Issues the one [`Permit`] each verification needs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Throttle {
-    policy: Option<Backoff>,
+    policy: Backoff,
 }
 
 /// Why no permit was issued.
@@ -117,42 +117,31 @@ impl Backoff {
 impl Throttle {
     /// A throttle under `policy`.
     pub const fn new(policy: Backoff) -> Self {
-        Self {
-            policy: Some(policy),
-        }
-    }
-
-    /// Permits at every count; verdicts still count.
-    pub const fn unlimited() -> Self {
-        Self { policy: None }
+        Self { policy }
     }
 
     /// A permit, or the time from which one is issued; the wait is decided here at `now`, never by a store expiry.
     pub fn check(&self, attempts: Option<Row<&Attempts>>, now: UnixTime) -> Result<Permit, Closed> {
         let seen = attempts.map(|row| (row.version(), **row.record()));
-        match self
-            .policy
-            .zip(seen)
-            .and_then(|(p, (_, a))| p.until(a, now))
+        if let Some(until) = seen.and_then(|(_, a)| self.policy.until(a, now))
+            && now < until
         {
-            Some(until) if now < until => Err(Closed::Wait(until)),
-            _ => {
-                let faulted = |p: Backoff, a: &Attempts| p.faulted(a.last, now);
-                let mut fault = false;
-                let seen = seen.map(|(v, a)| match self.policy {
-                    Some(p) if faulted(p, &a) => {
-                        fault = true;
-                        (v, Attempts { last: now, ..a })
-                    }
-                    _ => (v, a),
-                });
-                Ok(Permit {
-                    seen,
-                    at: now,
-                    fault,
-                })
-            }
+            return Err(Closed::Wait(until));
         }
+        let mut fault = false;
+        let seen = seen.map(|(v, a)| {
+            if self.policy.faulted(a.last, now) {
+                fault = true;
+                (v, Attempts { last: now, ..a })
+            } else {
+                (v, a)
+            }
+        });
+        Ok(Permit {
+            seen,
+            at: now,
+            fault,
+        })
     }
 
     /// The one way the count falls; the consumer merges it into the session effect that completes a login.
@@ -211,6 +200,12 @@ mod tests {
         Ok(Throttle::new(policy))
     }
 
+    // ten free attempts, so a test that only counts is never closed
+    fn roomy() -> Result<Throttle, Error> {
+        let policy = Backoff::new(FreeAttempts::new(10)?, Wait::new(1)?, Cap::new(3_600)?);
+        Ok(Throttle::new(policy))
+    }
+
     fn row(count: u32, last: UnixTime) -> Row<Attempts> {
         Row::new(Attempts { count, last }, Version::new(7))
     }
@@ -236,7 +231,9 @@ mod tests {
     // one verdict's effect as every verifier starts it, from a permit issued at `now`, then applied
     fn verdict(store: &mut Mem, e: &mut Seeded, now: u64) -> Option<Attempts> {
         let read = load(store);
-        let permit = Throttle::unlimited().check(read.as_ref().map(seen), UnixTime::new(now));
+        let permit = roomy()
+            .ok()?
+            .check(read.as_ref().map(seen), UnixTime::new(now));
         let effect = permit.ok()?.count(e).build().ok()?;
         let guard = read.map_or(Guard::Absent(KEY), |r| Guard::Unchanged(KEY, r.version()));
         assert_eq!(effect.guards().collect::<Vec<_>>(), [guard]);
@@ -277,7 +274,8 @@ mod tests {
             Err(Closed::Wait(UnixTime::new(u64::MAX)))
         );
         assert_eq!(check(t, &end, u64::MAX), Ok(()));
-        assert_eq!(check(Throttle::unlimited(), &end, 0), Ok(()));
+        // a stamp this far ahead is a clock fault, released at once
+        assert_eq!(check(t, &end, 0), Ok(()));
         Ok(())
     }
 
@@ -371,11 +369,16 @@ mod tests {
             );
         }
         let top = row(u32::MAX, LAST);
-        let effect = Throttle::unlimited()
-            .check(Some(seen(&top)), LAST)
-            .map(|p| p.count(&mut e).build());
-        let put = Record::Attempts(*top.record());
-        assert!(matches!(effect, Ok(Ok(ef)) if ef.puts().all(|(_, r, _)| *r == put)));
+        // the count saturates, and the stamp moves to the permit's time once the wait is over
+        let at = UnixTime::new(LAST.secs() + 3_600);
+        let effect = throttle()
+            .map(|t| t.check(Some(seen(&top)), at))
+            .map(|r| r.map(|p| p.count(&mut e).build()));
+        let put = Record::Attempts(Attempts {
+            count: u32::MAX,
+            last: at,
+        });
+        assert!(matches!(effect, Ok(Ok(Ok(ef))) if ef.puts().all(|(_, r, _)| *r == put)));
     }
 
     #[test]
