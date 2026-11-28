@@ -1,6 +1,6 @@
 # oidc-provider contract
 
-The public surface is the generated `public-api.txt`. This is the first slice of the provider: the issuer, the one discovery document, the JWKS, routing, error responses, bounds and redacting `Debug`. The authorization endpoint and the token endpoint are advertised and routed here and answered by later items (N1, N2). Each claim carries one tag: *Type* (the program does not compile, or the snapshot lacks the item), *Runtime* (a check returns an error or a value), *Obligation* (the host's, which the crate cannot see). Non-goals follow; each names the claim that holds it.
+The public surface is the generated `public-api.txt`. This is the first slice of the provider: the issuer, the one discovery document, the JWKS, routing, error responses, bounds and redacting `Debug`. The authorization endpoint and the token endpoint are advertised and routed here and answered by later items (N1, N2); the crate must not be deployed before the token endpoint lands, since the document advertises endpoints that answer `None`. Each claim carries one tag: *Type* (the program does not compile, or the snapshot lacks the item), *Runtime* (a check returns an error or a value), *Obligation* (the host's, which the crate cannot see). Non-goals follow; each names the claim that holds it.
 
 Checks:
 - `api:<Item>` is an item path the committed `public-api.txt` declares (`Type::method`, or a bare top-level name) and `api-absent:<Item>` one it does not declare (a bare name matches no path's last segment); the snapshot is `just api`.
@@ -17,7 +17,7 @@ Checks:
 - T6 It builds for wasm32-unknown-unknown and on the MSRV against the committed lock: gate:wasm, gate:msrv.
 
 ## Runtime: issuer and keys
-- R1 `IssuerUrl::parse` accepts an `https` URL with a lowercase DNS host, an optional port 1 to 65535, and an optional path of unreserved segments, up to `MAX_ISSUER` bytes; it refuses another scheme, a query, a fragment, userinfo, an IP literal, percent-encoding, an empty, dot or dot-dot segment and a trailing slash as `Malformed`, and a longer text as `TooLarge`; the text is kept as given (OpenID Connect Core 2, Discovery 3): row:issuer, mutants:issuer.
+- R1 `IssuerUrl::parse` accepts an `https` URL with a lowercase DNS host, an optional port 1 to 65535 other than 443 (one spelling per issuer), and an optional path of unreserved segments, up to `MAX_ISSUER` bytes; it refuses another scheme, a query, a fragment, userinfo, an IP literal or an all-digit or IPv4 host (the last label starts with a letter), a label over 63 bytes or with an edge hyphen, percent-encoding, an empty, dot or dot-dot segment and a trailing slash as `Malformed`, and a longer text as `TooLarge`; the text is kept as given (OpenID Connect Core 2, Discovery 3): row:issuer, mutants:issuer.
 - R2 `SigningKeys::new` accepts a key only with a `kid` (`Missing`), `alg` `RS256`, `use` `sig` and an RSA key (`Malformed`); a modulus under 2048 bits is refused by jose when the JWK is decoded (RFC 7518 3.3, OpenID Connect Core 15.1): row:keys, mutants:keys.
 - R3 `SigningKeys::new` keeps the given order of any number of keys from one to `MAX_KEYS`, so a new key can be published before it signs; none is `Missing`, more is `TooLarge` and a `kid` given twice is `Duplicate`: row:keys, mutants:keys.
 
@@ -31,7 +31,7 @@ Checks:
 - R10 `respond` answers the document and the JWKS, and 404, 414 and 413 with no body and no header; `Authorize` and `Token` give none, since later items answer them: row:routing.
 
 ## Runtime: errors, lifetimes, Debug
-- R11 Each `ErrorCode` has its registered name, one status (401 for `invalid_client`, 500 for `server_error`, else 400) and the body `{"error":"<name>"}`, and its response is `application/json` with `Cache-Control: no-store` and `Pragma: no-cache` (RFC 6749 5.1, 5.2): row:errors, mutants:error.
+- R11 Each `ErrorCode` has its registered name, one status (401 for `invalid_client`, 500 for `server_error`, else 400) and the body `{"error":"<name>"}`, and its response is `application/json` with `Cache-Control: no-store` and `Pragma: no-cache` (RFC 6749 4.1.2.1, 5.1, 5.2): row:errors, mutants:error.
 - R12 `LifetimesBuilder::build` refuses an unset lifetime as `Missing`, zero as `Malformed` and a lifetime past its bound as `TooLarge`, each bound inclusive: the code at `MAX_CODE_SECS` (RFC 6749 4.1.2), the access and ID token at `MAX_TOKEN_SECS`, the ticket at `MAX_TICKET_SECS`: row:limits, mutants:lifetimes.
 - R13 The `Debug` of a `Provider` is its issuer, its kids and its lifetimes, and no key member: row:redaction.
 
@@ -42,8 +42,9 @@ Checks:
 
 ## Non-goal
 - N1 The authorization endpoint (parameters, `redirect_uri` matching, PKCE, tickets, the `iss` parameter): the next item; `Route::Authorize` has no answer here (R10).
-- N2 The token endpoint, client authentication, codes and the ID token, so also signing, the `rsa-sign` feature and a `WWW-Authenticate` challenge on a 401: the item after; R11 gives the status and body only.
+- N2 The token endpoint, client authentication, codes and the ID token, so also signing, the `rsa-sign` feature and the 401 challenge: RFC 9110 15.5.2 requires `WWW-Authenticate` on a 401, so with `none` client authentication, where no Authorization header was sent, the token endpoint must either always challenge or answer 400; R11 gives the status and body only.
 - N3 Refresh tokens, so `refresh_token` is not an advertised grant (R4).
 - N4 Userinfo, revocation, introspection, registration, logout, `request` and `request_uri` objects, implicit and hybrid flows, other signing algorithms: R4 advertises none of them.
+- N7 `interaction_required` and `temporarily_unavailable` are not error codes here: no flow of this provider reaches `interaction_required` (login and consent have their own codes) or asks a client to retry later, and an unreachable code would be dead surface (R11).
 - N5 A `405` with `Allow` for a wrong method: R9 answers `NotFound`.
 - N6 The RFC 8414 well-known path: an OpenID provider needs only the one in R7.

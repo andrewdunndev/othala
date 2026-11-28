@@ -6,8 +6,9 @@ pub const MAX_ISSUER: usize = 256;
 const SCHEME: &str = "https://";
 
 /// An issuer identifier (OpenID Connect Core 1.0 section 2, Discovery 1.0 section 3): an `https` URL with a host,
-/// an optional port and an optional path, and no query, fragment, userinfo, percent-encoding or trailing slash. The
-/// text is kept as given, since relying parties compare it byte for byte.
+/// an optional port other than 443 and an optional path, and no query, fragment, userinfo, percent-encoding or
+/// trailing slash, so each issuer has one spelling. The text is kept as given, since relying parties compare it byte
+/// for byte.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct IssuerUrl {
     text: String,
@@ -17,7 +18,8 @@ pub struct IssuerUrl {
 
 impl IssuerUrl {
     /// Parses `text`: past `MAX_ISSUER` bytes is `TooLarge`; anything outside the form above is `Malformed`. The host
-    /// is lowercase letters, digits and hyphens in dot-separated labels (no IP literal), and a path segment is
+    /// is dot-separated labels of lowercase letters, digits and inner hyphens, each at most 63 bytes, whose last label
+    /// starts with a letter, so no IPv4 form or all-digit name passes (WHATWG URL 3.5), and a path segment is
     /// letters, digits and `-._~`, never `.` or `..`.
     pub fn parse(text: &str) -> Result<Self, Error> {
         if text.len() > MAX_ISSUER {
@@ -33,7 +35,7 @@ impl IssuerUrl {
         let path_ok = path
             .strip_prefix('/')
             .is_none_or(|p| p.split('/').all(segment));
-        if !host.split('.').all(label) || !port.is_none_or(valid_port) || !path_ok {
+        if !host_ok(host) || !port.is_none_or(valid_port) || !path_ok {
             return Err(malformed());
         }
         Ok(Self {
@@ -59,15 +61,26 @@ impl IssuerUrl {
     }
 }
 
+fn host_ok(host: &str) -> bool {
+    host.split('.').all(label)
+        && host
+            .rsplit('.')
+            .next()
+            .is_some_and(|last| last.starts_with(|c: char| c.is_ascii_lowercase()))
+}
+
 fn label(label: &str) -> bool {
-    !label.is_empty()
+    (1..=63).contains(&label.len())
+        && !label.starts_with('-')
+        && !label.ends_with('-')
         && label
             .bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
 fn valid_port(port: &str) -> bool {
-    !port.starts_with('0')
+    port != "443"
+        && !port.starts_with('0')
         && port.bytes().all(|b| b.is_ascii_digit())
         && port.parse::<u16>().ok().is_some()
 }

@@ -12,7 +12,6 @@ fn accepted_forms_are_kept_as_given() -> Result<(), Error> {
     for text in [
         "https://op.example",
         "https://op.example:8443",
-        "https://op.example:443",
         "https://op.example:1",
         "https://op.example:65535",
         "https://op.example/tenant",
@@ -59,6 +58,16 @@ fn refused_forms_are_malformed() {
         "https://[::1]",
         "https://op.example:",
         "https://op.example:0",
+        "https://op.example:443",
+        "https://127.0.0.1",
+        "https://1.2.3.4",
+        "https://1.2.3.4:8443/x",
+        "https://0",
+        "https://-a.example",
+        "https://a-.example",
+        "https://a.-.b",
+        "https://op.1",
+        "https://op.example1.2",
         "https://op.example:080",
         "https://op.example:65536",
         "https://op.example:+80",
@@ -74,8 +83,19 @@ fn refused_forms_are_malformed() {
 }
 
 #[test]
+fn a_label_is_at_most_63_bytes() {
+    let label = |n: usize| format!("https://{}.example", "a".repeat(n));
+    assert_eq!(kind(&label(63)), Ok(()));
+    assert_eq!(kind(&label(64)), Err(ErrorKind::Malformed));
+    assert_eq!(kind("https://a1.b2"), Ok(()));
+}
+
+#[test]
 fn the_bound_is_inclusive() {
-    let at = format!("https://{}", "a".repeat(MAX_ISSUER - "https://".len()));
+    let at = format!(
+        "https://op.example/{}",
+        "a".repeat(MAX_ISSUER - "https://op.example/".len())
+    );
     assert_eq!(at.len(), MAX_ISSUER);
     assert_eq!(kind(&at), Ok(()));
     assert_eq!(kind(&format!("{at}a")), Err(ErrorKind::TooLarge));

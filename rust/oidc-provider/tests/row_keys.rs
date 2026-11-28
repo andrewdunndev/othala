@@ -104,3 +104,14 @@ fn each_error_kind_reads_distinctly() -> Result {
     assert_eq!(bad.to_string(), "value outside its grammar or range");
     Ok(())
 }
+
+#[test]
+fn a_1024_bit_rsa_key_is_refused_by_jose_as_weak() {
+    let n = format!("{}8", "_".repeat(170));
+    let text =
+        format!(r#"{{"kty":"RSA","n":"{n}","e":"AQAB","kid":"k","alg":"RS256","use":"sig"}}"#);
+    let verdict = Jwk::decode(text.as_bytes())
+        .map(|_| ())
+        .map_err(|e| e.kind());
+    assert_eq!(verdict, Err(jose::ErrorKind::WeakKey));
+}
