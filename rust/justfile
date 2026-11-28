@@ -76,6 +76,20 @@ claims:
     command -v node > /dev/null || { echo 'claims: node is not on PATH; mise.toml pins it, so run under `mise x --`'; exit 1; }
     node canary/claims.mjs
 
+# re-derive each rust/spec/rfcN.json from the pinned RFC text in <dir> (rfcN.txt, as fetched from the file's `source`) and fail on any difference; the texts are not committed, so `gate` checks citations against the derived files (`just claims`) and this recipe proves the derivation
+spec-extract dir:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    command -v node > /dev/null || { echo 'spec-extract: node is not on PATH; mise.toml pins it, so run under `mise x --`'; exit 1; }
+    d=$(cd "{{ invocation_directory() }}" && cd "{{ dir }}" && pwd)
+    t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
+    for f in spec/rfc*.json; do
+        n=$(basename "$f" .json)
+        node spec/extract.mjs "$d/$n.txt" > "$t/$n.json"
+        diff -u "$f" "$t/$n.json" > /dev/null || { echo "spec-extract: $f differs from a fresh extraction of $d/$n.txt (its sha256 or its sentences)"; exit 1; }
+    done
+    echo "spec-extract: $(ls spec/rfc*.json | wc -l) files equal a fresh extraction"
+
 # the vector oracle's gate, offline: every derive script reproduces its committed files, SOURCES.toml's hashes and counts match, every WebAuthn step or section a vector cites exists and each quoted passage is in its step, and webauthn-ext passes (rust/vectors/justfile check)
 vectors:
     command -v python3 > /dev/null || { echo 'vectors: python3 is not on PATH; the gate needs python 3.11 or newer'; exit 1; }

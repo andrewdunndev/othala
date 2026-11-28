@@ -562,6 +562,9 @@ impl<K: KeyAlg> EncryptKey<K> {
         self.seal::<E>(plaintext, e, false)
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7519#section-7.1
+    //# * Else, if the JWT is a JWE, create a JWE using the Message as the plaintext for the JWE;
+    //# all steps specified in [JWE] for creating a JWE MUST be followed.
     /// Encrypts a compact JWS as a nested JWT: the header gets `cty` `JWT` (RFC 7519 5.2).
     pub fn encrypt_jwt<E: Enc>(
         &self,
@@ -596,6 +599,10 @@ impl<K: KeyAlg> EncryptKey<K> {
             ));
         }
         if nested {
+            //= https://www.rfc-editor.org/rfc/rfc7519#section-5.2
+            //# In the case that nested signing or encryption is employed, this Header Parameter
+            //# MUST be present; in this case, the value MUST be "JWT", to indicate that a Nested
+            //# JWT is carried in this JWT.
             header.push_str(r#","cty":"JWT""#);
         }
         if let Some(epk) = &params.epk {
@@ -1064,6 +1071,15 @@ mod tests {
         String::from_utf8(base::b64url_decode(segment).unwrap_or_default()).unwrap_or_default()
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7519#section-5.2
+    //= type=test
+    //# In the case that nested signing or encryption is employed, this Header Parameter MUST be
+    //# present; in this case, the value MUST be "JWT", to indicate that a Nested JWT is carried in
+    //# this JWT.
+    //= https://www.rfc-editor.org/rfc/rfc7519#section-7.1
+    //= type=test
+    //# * Else, if the JWT is a JWE, create a JWE using the Message as the plaintext for the JWE;
+    //# all steps specified in [JWE] for creating a JWE MUST be followed.
     #[test]
     fn issued_headers() {
         let kid = Kid::new("k\"1").ok();

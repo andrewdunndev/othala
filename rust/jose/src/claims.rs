@@ -69,6 +69,16 @@ pub struct Audience(pub(crate) String);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Leeway(pub(crate) u64);
 
+//= https://www.rfc-editor.org/rfc/rfc7515#section-2
+//= type=exception
+//= reason=iss and aud are compared exactly with the host's value, never parsed as a URI
+//# StringOrURI A JSON string value, with the additional requirement that while arbitrary string
+//# values MAY be used, any value containing a ":" character MUST be a URI [RFC3986].
+//= https://www.rfc-editor.org/rfc/rfc7519#section-2
+//= type=exception
+//= reason=iss and aud are compared exactly with the host's value, never parsed as a URI
+//# StringOrURI A JSON string value, with the additional requirement that while arbitrary string
+//# values MAY be used, any value containing a ":" character MUST be a URI [RFC3986].
 fn name(text: &str) -> Result<String, Error> {
     if text.is_empty() {
         Err(ErrorKind::Malformed.into())
@@ -248,6 +258,26 @@ enum Audiences {
     Many(Vec<String>),
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7519#section-4
+//# However, in the absence of such requirements, all claims that are not understood by
+//# implementations MUST be ignored.
+//= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.2
+//= type=exception
+//= reason=assigning sub values is the issuer's; jose reads no sub
+//# The subject value MUST either be scoped to be locally unique in the context of the issuer or be
+//# globally unique.
+//= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.7
+//= type=exception
+//= reason=assigning jti values is the issuer's; single use is the consumer's (O4)
+//# The identifier value MUST be assigned in a manner that ensures that there is a negligible
+//# probability that the same value will be accidentally assigned to a different data object; if the
+//# application uses multiple issuers, collisions MUST be prevented among values produced by
+//# different issuers as well.
+//= https://www.rfc-editor.org/rfc/rfc7519#section-4
+//= type=todo
+//= reason=no test or vector carries a claim jose does not understand
+//# However, in the absence of such requirements, all claims that are not understood by
+//# implementations MUST be ignored.
 #[derive(Deserialize)]
 struct Registered {
     #[serde(default = "absent")]
@@ -296,6 +326,12 @@ fn seconds(number: &Number, up: bool) -> Option<i64> {
     }
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.9
+//# A recipient using the media type value MUST treat it as if "application/" were prepended to any
+//# "typ" value not containing a '/'.
+//= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.10
+//# A recipient using the media type value MUST treat it as if "application/" were prepended to any
+//# "cty" value not containing a '/'.
 /// Lower case, with an `application/` prefix removed (RFC 7515 4.1.9).
 fn media_type(typ: &str) -> String {
     let lower = typ.to_ascii_lowercase();
@@ -304,6 +340,9 @@ fn media_type(typ: &str) -> String {
         .map_or(lower.clone(), str::to_owned)
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7519#section-7.2
+//# If any of the listed steps fail, then the JWT MUST be rejected -- that is, treated by the
+//# application as an invalid input.
 /// The checks of a [`Policy`] over a verified payload, in the order the contract names; the first failure is the
 /// error.
 pub(crate) fn check<K: TokenKind>(
@@ -313,6 +352,11 @@ pub(crate) fn check<K: TokenKind>(
     cty: Option<&str>,
     payload: &[u8],
 ) -> Result<K::Claims, Error> {
+    //= https://www.rfc-editor.org/rfc/rfc7519#section-4
+    //# The Claim Names within a JWT Claims Set MUST be unique; JWT parsers MUST either reject JWTs
+    //# with duplicate Claim Names or use a JSON parser that returns only the lexically last
+    //# duplicate member name, as specified in Section 15.12 ("The JSON Object") of ECMAScript 5.1
+    //# [ECMAScript].
     scan(payload)?;
     // the payload is a JSON object; RFC 8259 2 allows whitespace before it, and a struct would also read an array
     if payload.iter().find(|byte| !b" \t\n\r".contains(byte)) != Some(&b'{') {
@@ -333,9 +377,19 @@ pub(crate) fn check<K: TokenKind>(
     match &claims.iss {
         Claim::Absent => return Err(ErrorKind::MissingClaim.into()),
         Claim::Wrong => return Err(ErrorKind::ClaimType.into()),
+        //= https://www.rfc-editor.org/rfc/rfc7519#section-7.3
+        //# These comparison rules MUST be used for all JSON string comparisons except in cases
+        //# where the definition of the member explicitly calls out that a different comparison rule
+        //# is to be used for that member value.
         Claim::Good(iss) if *iss != policy.issuer.0 => return Err(ErrorKind::Issuer.into()),
         Claim::Good(_) => {}
     }
+    //= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.3
+    //# Each principal intended to process the JWT MUST identify itself with a value in the audience
+    //# claim.
+    //= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.3
+    //# If the principal processing the claim does not identify itself with a value in the "aud"
+    //# claim when this claim is present, then the JWT MUST be rejected.
     match (&claims.aud, &policy.audience) {
         (Claim::Absent, _) => return Err(ErrorKind::MissingClaim.into()),
         (Claim::Wrong, _) => return Err(ErrorKind::ClaimType.into()),
@@ -351,6 +405,14 @@ pub(crate) fn check<K: TokenKind>(
         (Claim::Good(_), None) => {}
     }
     let (now, leeway) = (i128::from(now.secs()), i128::from(policy.leeway.0));
+    //= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.4
+    //# The "exp" (expiration time) claim identifies the expiration time on or after which the JWT
+    //# MUST NOT be accepted for processing.
+    //= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.4
+    //# The processing of the "exp" claim requires that the current date/time MUST be before the
+    //# expiration date/time listed in the "exp" claim.
+    //= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.4
+    //# Its value MUST be a number containing a NumericDate value.
     match (&claims.exp, policy.expiry) {
         (Claim::Absent, Expiry::Required) => return Err(ErrorKind::MissingClaim.into()),
         (Claim::Wrong, _) => return Err(ErrorKind::ClaimType.into()),
@@ -365,6 +427,16 @@ pub(crate) fn check<K: TokenKind>(
         }
         (Claim::Absent, _) => {}
     }
+    //= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.5
+    //# The "nbf" (not before) claim identifies the time before which the JWT MUST NOT be accepted
+    //# for processing.
+    //= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.5
+    //# The processing of the "nbf" claim requires that the current date/time MUST be after or equal
+    //# to the not-before date/time listed in the "nbf" claim.
+    //= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.5
+    //# Its value MUST be a number containing a NumericDate value.
+    //= https://www.rfc-editor.org/rfc/rfc7519#section-4.1.6
+    //# Its value MUST be a number containing a NumericDate value.
     for claim in [&claims.nbf, &claims.iat] {
         match claim {
             Claim::Wrong => return Err(ErrorKind::ClaimType.into()),
@@ -537,6 +609,14 @@ mod tests {
         );
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.9
+    //= type=test
+    //# A recipient using the media type value MUST treat it as if "application/" were prepended to
+    //# any "typ" value not containing a '/'.
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.10
+    //= type=test
+    //# A recipient using the media type value MUST treat it as if "application/" were prepended to
+    //# any "cty" value not containing a '/'.
     #[test]
     fn typ_and_cty() {
         let run = |typ: Option<&str>, cty: Option<&str>| {

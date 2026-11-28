@@ -41,6 +41,47 @@ fn row(file: Vector, total: usize) {
     assert_eq!((tally.total(), tally.checked()), (total, total));
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7515#section-4
+//= type=test
+//# The Header Parameter names within the JOSE Header MUST be unique; JWS parsers MUST either reject
+//# JWSs with duplicate Header Parameter names or use a JSON parser that returns only the lexically
+//# last duplicate member name, as specified in Section 15.12 ("The JSON Object") of ECMAScript 5.1
+//# [ECMAScript].
+//= https://www.rfc-editor.org/rfc/rfc7515#section-10.12
+//= type=test
+//# The Header Parameter names within the JOSE Header MUST be unique; JWS parsers MUST either reject
+//# JWSs with duplicate Header Parameter names or use a JSON parser that returns only the lexically
+//# last duplicate member name, as specified in Section 15.12 ("The JSON Object") of ECMAScript 5.1
+//# [ECMAScript].
+//= https://www.rfc-editor.org/rfc/rfc7515#section-10.12
+//= type=test
+//# Thus, this specification requires that the "SHOULD" in Section 4 of [RFC7159] be treated as a
+//# "MUST" by producers and that it be either treated as a "MUST" or treated in the manner specified
+//# in ECMAScript 5.1 by consumers.
+//= https://www.rfc-editor.org/rfc/rfc7515#section-10.12
+//= type=test
+//# In particular, any JSON inputs not conforming to the JSON-text syntax defined in RFC 7159 MUST
+//# be rejected in their entirety by JSON parsers.
+//= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.1
+//= type=test
+//# This Header Parameter MUST be present and MUST be understood and processed by implementations.
+//= https://www.rfc-editor.org/rfc/rfc7515#section-4
+//= type=test
+//# Implementations are required to understand the specific Header Parameters defined by this
+//# specification that are designated as "MUST be understood" and process them in the manner defined
+//# in this specification.
+//= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.11
+//= type=test
+//# The "crit" (critical) Header Parameter indicates that extensions to this specification and/or
+//# [JWA] are being used that MUST be understood and processed.
+//= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.11
+//= type=test
+//# This Header Parameter MUST be understood and processed by implementations.
+//= https://www.rfc-editor.org/rfc/rfc7515#section-5.3
+//= type=test
+//# These comparison rules MUST be used for all JSON string comparisons except in cases where the
+//# definition of the member explicitly calls out that a different comparison rule is to be used for
+//# that member value.
 #[test]
 fn header_cases() {
     row(vector!("jose-derived/header.json"), 23);
@@ -74,6 +115,20 @@ fn token(kid: &str, extra: &str) -> String {
         .unwrap_or_default()
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7515#section-4
+//= type=test
+//# All other Header Parameters defined by this specification that are not so designated MUST be
+//# ignored when not understood.
+//= https://www.rfc-editor.org/rfc/rfc7515#section-4
+//= type=test
+//# Unless listed as a critical Header Parameter, per Section 4.1.11, all Header Parameters not
+//# defined by this specification MUST be ignored when not understood.
+//= https://www.rfc-editor.org/rfc/rfc7515#section-6
+//= type=test
+//# These Header Parameters MUST be integrity protected if the information that they convey is to be
+//# utilized in a trust decision; however, if the only information used in the trust decision is a
+//# key, these parameters need not be integrity protected, since changing them in a way that causes
+//# a different key to be used will cause the validation to fail.
 #[test]
 fn kid_never_selects() -> Result<(), TestError<(String, usize)>> {
     let extras = [

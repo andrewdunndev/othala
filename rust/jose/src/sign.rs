@@ -70,6 +70,19 @@ impl<A: Alg> Header<A> {
         A::ALG
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-5.1
+    //# The "alg" (algorithm) Header Parameter MUST be present in the JOSE Header, with the
+    //# algorithm value accurately representing the algorithm used to construct the JWS Signature.
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.11
+    //# Producers MUST NOT include Header Parameter names defined by this specification or [JWA] for
+    //# use with JWS, duplicate names, or names that do not occur as Header Parameter names within
+    //# the JOSE Header in the "crit" list.
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.11
+    //# Producers MUST NOT use the empty list "[]" as the "crit" value.
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-10.12
+    //# Thus, this specification requires that the "SHOULD" in Section 4 of [RFC7159] be treated as
+    //# a "MUST" by producers and that it be either treated as a "MUST" or treated in the manner
+    //# specified in ECMAScript 5.1 by consumers.
     /// `{"alg":..,"kid":..,"typ":..}` without whitespace, `kid` JSON-escaped.
     fn json(&self) -> String {
         let mut json = alloc::format!(r#"{{"alg":"{}""#, A::ALG.name());
@@ -110,6 +123,11 @@ impl<A: Alg> Unsigned<A> {
         })
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7519#section-7.1
+    //# The JWT MUST conform to either the [JWS] or [JWE] specification.
+    //= https://www.rfc-editor.org/rfc/rfc7519#section-7.1
+    //# * If the JWT is a JWS, create a JWS using the Message as the JWS Payload; all steps
+    //# specified in [JWS] for creating a JWS MUST be followed.
     /// A JWT whose payload is `claims`, a JSON object, and whose `typ` is `K`'s: `JWT` for `Typ::Generic`, else the
     /// explicit value, which must be non-empty, lower case, not `application/`-prefixed and not `jwt`.
     pub fn jwt<K: TokenKind>(header: Header<A>, claims: &K::Claims) -> Result<Self, Error>
@@ -249,6 +267,23 @@ mod tests {
         header.json()
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-5.1
+    //= type=test
+    //# The "alg" (algorithm) Header Parameter MUST be present in the JOSE Header, with the
+    //# algorithm value accurately representing the algorithm used to construct the JWS Signature.
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.11
+    //= type=test
+    //# Producers MUST NOT include Header Parameter names defined by this specification or [JWA] for
+    //# use with JWS, duplicate names, or names that do not occur as Header Parameter names within
+    //# the JOSE Header in the "crit" list.
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.11
+    //= type=test
+    //# Producers MUST NOT use the empty list "[]" as the "crit" value.
+    //= https://www.rfc-editor.org/rfc/rfc7515#section-10.12
+    //= type=test
+    //# Thus, this specification requires that the "SHOULD" in Section 4 of [RFC7159] be treated as
+    //# a "MUST" by producers and that it be either treated as a "MUST" or treated in the manner
+    //# specified in ECMAScript 5.1 by consumers.
     #[test]
     fn header_bytes() {
         assert_eq!(text(&Header::<Hs256>::new()), r#"{"alg":"HS256"}"#);
@@ -296,6 +331,9 @@ mod tests {
     kind!(Prefixed, Typ::Explicit("application/at+jwt"));
     kind!(Lower, Typ::Explicit("jwt"));
 
+    //= https://www.rfc-editor.org/rfc/rfc7519#section-7.1
+    //= type=test
+    //# The JWT MUST conform to either the [JWS] or [JWE] specification.
     #[test]
     fn typ_from_kind() {
         let claims = Claims {

@@ -13,6 +13,11 @@ pub struct Jwt<'a> {
     pub(crate) jws: Jws<'a>,
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7519#section-12
+//= type=exception
+//= reason=confidentiality of private claims (JWE, TLS) is the host's; Debug prints no payload
+//# When this is the case, measures MUST be taken to prevent disclosure of this information to
+//# unintended parties.
 /// A JWT whose signature verified; its claims are reachable only through a [`crate::Policy`]. `Debug` prints its
 /// `kid` only.
 pub struct VerifiedJwt {

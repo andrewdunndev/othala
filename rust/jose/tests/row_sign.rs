@@ -104,6 +104,10 @@ fn config(seed: u64) -> ProptestConfig {
     }
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7519#section-7.1
+//= type=test
+//# * If the JWT is a JWS, create a JWS using the Message as the JWS Payload; all steps specified in
+//# [JWS] for creating a JWS MUST be followed.
 #[test]
 fn sign_round_trip() {
     let appendix_c = vector!("rfc7518/appendix-c.json");

@@ -1,0 +1,100 @@
+{
+ "rfc": 7519,
+ "source": "https://www.rfc-editor.org/rfc/rfc7519.txt",
+ "sha256": "fecd930e9ccf2276b95c0017c6c4ff5d09352e4bc3c7629946447894e0f97248",
+ "licence": "IETF Trust (quoted RFC text)",
+ "requirements": [
+  {
+   "section": "2",
+   "text": "StringOrURI A JSON string value, with the additional requirement that while arbitrary string values MAY be used, any value containing a \":\" character MUST be a URI [RFC3986]."
+  },
+  {
+   "section": "4",
+   "text": "The Claim Names within a JWT Claims Set MUST be unique; JWT parsers MUST either reject JWTs with duplicate Claim Names or use a JSON parser that returns only the lexically last duplicate member name, as specified in Section 15.12 (\"The JSON Object\") of ECMAScript 5.1 [ECMAScript]."
+  },
+  {
+   "section": "4",
+   "text": "However, in the absence of such requirements, all claims that are not understood by implementations MUST be ignored."
+  },
+  {
+   "section": "4.1.2",
+   "text": "The subject value MUST either be scoped to be locally unique in the context of the issuer or be globally unique."
+  },
+  {
+   "section": "4.1.3",
+   "text": "Each principal intended to process the JWT MUST identify itself with a value in the audience claim."
+  },
+  {
+   "section": "4.1.3",
+   "text": "If the principal processing the claim does not identify itself with a value in the \"aud\" claim when this claim is present, then the JWT MUST be rejected."
+  },
+  {
+   "section": "4.1.4",
+   "text": "The \"exp\" (expiration time) claim identifies the expiration time on or after which the JWT MUST NOT be accepted for processing."
+  },
+  {
+   "section": "4.1.4",
+   "text": "The processing of the \"exp\" claim requires that the current date/time MUST be before the expiration date/time listed in the \"exp\" claim."
+  },
+  {
+   "section": "4.1.4",
+   "text": "Its value MUST be a number containing a NumericDate value."
+  },
+  {
+   "section": "4.1.5",
+   "text": "The \"nbf\" (not before) claim identifies the time before which the JWT MUST NOT be accepted for processing."
+  },
+  {
+   "section": "4.1.5",
+   "text": "The processing of the \"nbf\" claim requires that the current date/time MUST be after or equal to the not-before date/time listed in the \"nbf\" claim."
+  },
+  {
+   "section": "4.1.5",
+   "text": "Its value MUST be a number containing a NumericDate value."
+  },
+  {
+   "section": "4.1.6",
+   "text": "Its value MUST be a number containing a NumericDate value."
+  },
+  {
+   "section": "4.1.7",
+   "text": "The identifier value MUST be assigned in a manner that ensures that there is a negligible probability that the same value will be accidentally assigned to a different data object; if the application uses multiple issuers, collisions MUST be prevented among values produced by different issuers as well."
+  },
+  {
+   "section": "5.2",
+   "text": "In the case that nested signing or encryption is employed, this Header Parameter MUST be present; in this case, the value MUST be \"JWT\", to indicate that a Nested JWT is carried in this JWT."
+  },
+  {
+   "section": "7.1",
+   "text": "The JWT MUST conform to either the [JWS] or [JWE] specification."
+  },
+  {
+   "section": "7.1",
+   "text": "* If the JWT is a JWS, create a JWS using the Message as the JWS Payload; all steps specified in [JWS] for creating a JWS MUST be followed."
+  },
+  {
+   "section": "7.1",
+   "text": "* Else, if the JWT is a JWE, create a JWE using the Message as the plaintext for the JWE; all steps specified in [JWE] for creating a JWE MUST be followed."
+  },
+  {
+   "section": "7.2",
+   "text": "If any of the listed steps fail, then the JWT MUST be rejected -- that is, treated by the application as an invalid input."
+  },
+  {
+   "section": "7.3",
+   "text": "These comparison rules MUST be used for all JSON string comparisons except in cases where the definition of the member explicitly calls out that a different comparison rule is to be used for that member value."
+  },
+  {
+   "section": "8",
+   "text": "Of the signature and MAC algorithms specified in JSON Web Algorithms [JWA], only HMAC SHA-256 (\"HS256\") and \"none\" MUST be implemented by conforming JWT implementations."
+  },
+  {
+   "section": "8",
+   "text": "If an implementation provides encryption capabilities, of the encryption algorithms specified in [JWA], only RSAES-PKCS1-v1_5 with 2048-bit keys (\"RSA1_5\"), AES Key Wrap with 128- and 256-bit keys (\"A128KW\" and \"A256KW\"), and the composite authenticated encryption algorithm using AES-CBC and HMAC SHA-2 (\"A128CBC-HS256\" and \"A256CBC-HS512\") MUST be implemented by conforming implementations."
+  },
+  {
+   "section": "12",
+   "text": "When this is the case, measures MUST be taken to prevent disclosure of this information to unintended parties."
+  }
+ ]
+}

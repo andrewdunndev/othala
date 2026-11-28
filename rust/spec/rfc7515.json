@@ -1,0 +1,196 @@
+{
+ "rfc": 7515,
+ "source": "https://www.rfc-editor.org/rfc/rfc7515.txt",
+ "sha256": "ecbf84674118e62526511c1237e1deaa86aada86d25b247623a2a7e04ae62e40",
+ "licence": "IETF Trust (quoted RFC text)",
+ "requirements": [
+  {
+   "section": "2",
+   "text": "StringOrURI A JSON string value, with the additional requirement that while arbitrary string values MAY be used, any value containing a \":\" character MUST be a URI [RFC3986]."
+  },
+  {
+   "section": "3.2",
+   "text": "In the JWS JSON Serialization, one or both of the JWS Protected Header and JWS Unprotected Header MUST be present."
+  },
+  {
+   "section": "4",
+   "text": "The Header Parameter names within the JOSE Header MUST be unique; JWS parsers MUST either reject JWSs with duplicate Header Parameter names or use a JSON parser that returns only the lexically last duplicate member name, as specified in Section 15.12 (\"The JSON Object\") of ECMAScript 5.1 [ECMAScript]."
+  },
+  {
+   "section": "4",
+   "text": "Implementations are required to understand the specific Header Parameters defined by this specification that are designated as \"MUST be understood\" and process them in the manner defined in this specification."
+  },
+  {
+   "section": "4",
+   "text": "All other Header Parameters defined by this specification that are not so designated MUST be ignored when not understood."
+  },
+  {
+   "section": "4",
+   "text": "Unless listed as a critical Header Parameter, per Section 4.1.11, all Header Parameters not defined by this specification MUST be ignored when not understood."
+  },
+  {
+   "section": "4.1.1",
+   "text": "This Header Parameter MUST be present and MUST be understood and processed by implementations."
+  },
+  {
+   "section": "4.1.2",
+   "text": "The keys MUST be encoded as a JWK Set [JWK]."
+  },
+  {
+   "section": "4.1.2",
+   "text": "The protocol used to acquire the resource MUST provide integrity protection; an HTTP GET request to retrieve the JWK Set MUST use Transport Layer Security (TLS) [RFC2818] [RFC5246]; and the identity of the server MUST be validated, as per Section 6 of RFC 6125 [RFC6125]."
+  },
+  {
+   "section": "4.1.4",
+   "text": "Its value MUST be a case-sensitive string."
+  },
+  {
+   "section": "4.1.5",
+   "text": "The identified resource MUST provide a representation of the certificate or certificate chain that conforms to RFC 5280 [RFC5280] in PEM-encoded form, with each certificate delimited as specified in Section 6.1 of RFC 4945 [RFC4945]."
+  },
+  {
+   "section": "4.1.5",
+   "text": "The certificate containing the public key corresponding to the key used to digitally sign the JWS MUST be the first certificate."
+  },
+  {
+   "section": "4.1.5",
+   "text": "The protocol used to acquire the resource MUST provide integrity protection; an HTTP GET request to retrieve the certificate MUST use TLS [RFC2818] [RFC5246]; and the identity of the server MUST be validated, as per Section 6 of RFC 6125 [RFC6125]."
+  },
+  {
+   "section": "4.1.6",
+   "text": "The certificate containing the public key corresponding to the key used to digitally sign the JWS MUST be the first certificate."
+  },
+  {
+   "section": "4.1.6",
+   "text": "The recipient MUST validate the certificate chain according to RFC 5280 [RFC5280] and consider the certificate or certificate chain to be invalid if any validation failure occurs."
+  },
+  {
+   "section": "4.1.9",
+   "text": "A recipient using the media type value MUST treat it as if \"application/\" were prepended to any \"typ\" value not containing a '/'."
+  },
+  {
+   "section": "4.1.10",
+   "text": "A recipient using the media type value MUST treat it as if \"application/\" were prepended to any \"cty\" value not containing a '/'."
+  },
+  {
+   "section": "4.1.11",
+   "text": "The \"crit\" (critical) Header Parameter indicates that extensions to this specification and/or [JWA] are being used that MUST be understood and processed."
+  },
+  {
+   "section": "4.1.11",
+   "text": "Producers MUST NOT include Header Parameter names defined by this specification or [JWA] for use with JWS, duplicate names, or names that do not occur as Header Parameter names within the JOSE Header in the \"crit\" list."
+  },
+  {
+   "section": "4.1.11",
+   "text": "Producers MUST NOT use the empty list \"[]\" as the \"crit\" value."
+  },
+  {
+   "section": "4.1.11",
+   "text": "When used, this Header Parameter MUST be integrity protected; therefore, it MUST occur only within the JWS Protected Header."
+  },
+  {
+   "section": "4.1.11",
+   "text": "This Header Parameter MUST be understood and processed by implementations."
+  },
+  {
+   "section": "5.1",
+   "text": "The \"alg\" (algorithm) Header Parameter MUST be present in the JOSE Header, with the algorithm value accurately representing the algorithm used to construct the JWS Signature."
+  },
+  {
+   "section": "5.2",
+   "text": "However, in all cases, at least one JWS Signature value MUST successfully validate, or the JWS MUST be considered invalid."
+  },
+  {
+   "section": "5.2",
+   "text": "When using the JWS JSON Serialization, this restriction includes that the same Header Parameter name also MUST NOT occur in distinct JSON object values that together comprise the JOSE Header."
+  },
+  {
+   "section": "5.2",
+   "text": "Validate the JWS Signature against the JWS Signing Input ASCII(BASE64URL(UTF8(JWS Protected Header)) || '.' || BASE64URL(JWS Payload)) in the manner defined for the algorithm being used, which MUST be accurately represented by the value of the \"alg\" (algorithm) Header Parameter, which MUST be present."
+  },
+  {
+   "section": "5.2",
+   "text": "If none of the validations in step 9 succeeded, then the JWS MUST be considered invalid."
+  },
+  {
+   "section": "5.3",
+   "text": "These comparison rules MUST be used for all JSON string comparisons except in cases where the definition of the member explicitly calls out that a different comparison rule is to be used for that member value."
+  },
+  {
+   "section": "6",
+   "text": "These Header Parameters MUST be integrity protected if the information that they convey is to be utilized in a trust decision; however, if the only information used in the trust decision is a key, these parameters need not be integrity protected, since changing them in a way that causes a different key to be used will cause the validation to fail."
+  },
+  {
+   "section": "7.2.1",
+   "text": "payload The \"payload\" member MUST be present and contain the value BASE64URL(JWS Payload)."
+  },
+  {
+   "section": "7.2.1",
+   "text": "signatures The \"signatures\" member value MUST be an array of JSON objects."
+  },
+  {
+   "section": "7.2.1",
+   "text": "protected The \"protected\" member MUST be present and contain the value BASE64URL(UTF8(JWS Protected Header)) when the JWS Protected Header value is non-empty; otherwise, it MUST be absent."
+  },
+  {
+   "section": "7.2.1",
+   "text": "header The \"header\" member MUST be present and contain the value JWS Unprotected Header when the JWS Unprotected Header value is non-empty; otherwise, it MUST be absent."
+  },
+  {
+   "section": "7.2.1",
+   "text": "signature The \"signature\" member MUST be present and contain the value BASE64URL(JWS Signature)."
+  },
+  {
+   "section": "7.2.1",
+   "text": "At least one of the \"protected\" and \"header\" members MUST be present for each signature/MAC computation so that an \"alg\" Header Parameter value is conveyed."
+  },
+  {
+   "section": "7.2.1",
+   "text": "Additional members can be present in both the JSON objects defined above; if not understood by implementations encountering them, they MUST be ignored."
+  },
+  {
+   "section": "7.2.1",
+   "text": "The Header Parameter names in the two locations MUST be disjoint."
+  },
+  {
+   "section": "7.2.2",
+   "text": "The \"signatures\" member MUST NOT be present when using this syntax."
+  },
+  {
+   "section": "8",
+   "text": "Implementations supporting the \"jku\" and/or \"x5u\" Header Parameters MUST support TLS."
+  },
+  {
+   "section": "8",
+   "text": "To protect against information disclosure and tampering, confidentiality protection MUST be applied using TLS with a ciphersuite that provides confidentiality and integrity protection."
+  },
+  {
+   "section": "8",
+   "text": "Whenever TLS is used, the identity of the service provider encoded in the TLS server certificate MUST be verified using the procedures described in Section 6 of RFC 6125 [RFC6125]."
+  },
+  {
+   "section": "10.6",
+   "text": "When using such libraries, as part of the algorithm validation performed, implementations MUST ensure that the algorithm information encoded in the signature corresponds to that specified with the \"alg\" Header Parameter."
+  },
+  {
+   "section": "10.12",
+   "text": "In particular, any JSON inputs not conforming to the JSON-text syntax defined in RFC 7159 MUST be rejected in their entirety by JSON parsers."
+  },
+  {
+   "section": "10.12",
+   "text": "The Header Parameter names within the JOSE Header MUST be unique; JWS parsers MUST either reject JWSs with duplicate Header Parameter names or use a JSON parser that returns only the lexically last duplicate member name, as specified in Section 15.12 (\"The JSON Object\") of ECMAScript 5.1 [ECMAScript]."
+  },
+  {
+   "section": "10.12",
+   "text": "Thus, this specification requires that the \"SHOULD\" in Section 4 of [RFC7159] be treated as a \"MUST\" by producers and that it be either treated as a \"MUST\" or treated in the manner specified in ECMAScript 5.1 by consumers."
+  },
+  {
+   "section": "10.12",
+   "text": "Implementations MUST consider JWSs containing such input to be invalid."
+  },
+  {
+   "section": "10.13",
+   "text": "Ideally, JWS implementations SHOULD ensure that characters outside the Basic Multilingual Plane are preserved and compared correctly; alternatively, if this is not possible due to these characters exercising limitations present in the underlying JSON implementation, then input containing them MUST be rejected."
+  }
+ ]
+}
