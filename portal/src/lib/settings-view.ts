@@ -1,6 +1,8 @@
 import { asInput, nodesByGroup } from './nodes';
 import type { FlowNode, FlowMessage, NodeImageAttributes, NodeInputAttributes, NodeTextAttributes } from './types';
 import type { PasskeyNames } from './passkey-names';
+import { POLICY_DIR } from './constants';
+import { kratosDurationMs } from './contract';
 
 export interface CredentialItem {
   /** Hex credential id: the passkey_remove / webauthn_remove node value. */
@@ -169,10 +171,18 @@ export function formatAdded(d: Date | null): string | null {
   return d ? `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}` : null;
 }
 
-/** The privileged window kratos.yml sets (settings.privileged_session_max_age); a lapsed one makes Kratos ask for a fresh sign-in on save. */
-export const PRIVILEGED_WINDOW_MS = 5 * 60 * 1000;
+/** The privileged window is kratos.yml selfservice.flows.settings.privileged_session_max_age, read from the shipped policy; a lapsed one makes Kratos ask for a fresh sign-in on save. */
+export function privilegedWindowMs(policyDir: string = POLICY_DIR): number {
+  return kratosDurationMs(['selfservice', 'flows', 'settings', 'privileged_session_max_age'], policyDir);
+}
 
-export function privilegedLapsed(authenticatedAt: Date | string | undefined | null, now = Date.now()): boolean {
+export function privilegedLapsed(authenticatedAt: Date | string | undefined | null, now = Date.now(), policyDir: string = POLICY_DIR): boolean {
   const t = authenticatedAt ? new Date(authenticatedAt).getTime() : NaN;
-  return Number.isFinite(t) && now - t > PRIVILEGED_WINDOW_MS;
+  if (!Number.isFinite(t)) return false;
+  try {
+    return now - t > privilegedWindowMs(policyDir);
+  } catch {
+    // Fail safe: an unreadable window grants no privileged access, so the session counts as lapsed and the page asks for a fresh sign-in.
+    return true;
+  }
 }

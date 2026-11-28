@@ -1,23 +1,15 @@
 import type { Session } from './types';
 import { getSessionRelay } from './kratos';
 import { kratosAdmin } from './ory-fetch';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { POLICY_DIR } from './constants';
-import { parseOryYaml } from './contract';
+import { kratosDurationMs } from './contract';
 
 // Counted from authenticated_at, which an extend never moves; an extend past it is skipped, so no Kratos cookie outlives a year since sign-in.
 export const ABSOLUTE_CAP_MS = 365 * 86_400_000;
-let idle: { dir: string; ms: number } | undefined;
 
 /** The idle window is kratos.yml session.lifespan, read from the shipped policy rather than kept as a second copy. */
 export function idleMs(policyDir: string = POLICY_DIR): number {
-  if (idle?.dir === policyDir) return idle.ms;
-  const doc = parseOryYaml(readFileSync(join(policyDir, 'kratos/kratos.yml'), 'utf8')) as { session?: { lifespan?: unknown } } | null;
-  const hours = /^(\d+)h$/.exec(String(doc?.session?.lifespan))?.[1];
-  if (!hours) throw new Error('kratos.yml session.lifespan is not a whole number of hours');
-  idle = { dir: policyDir, ms: Number(hours) * 3_600_000 };
-  return idle.ms;
+  return kratosDurationMs(['session', 'lifespan'], policyDir);
 }
 
 export interface Slid {

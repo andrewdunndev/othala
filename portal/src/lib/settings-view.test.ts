@@ -1,7 +1,11 @@
 // Invariant: the settings view model reads each recorded fixture state the way the page presents it.
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { splitCodes, credentialItems, totpView, lookupView, securityStatus, passwordPanelOpen, keyOnlyKeeper, emailVerified, formatAdded } from './settings-view';
+import { splitCodes, credentialItems, totpView, lookupView, securityStatus, passwordPanelOpen, keyOnlyKeeper, emailVerified, formatAdded, privilegedWindowMs, privilegedLapsed } from './settings-view';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { devSettings, isDevSettingsState } from './settings-fixtures';
 
 const nodesOf = (s: Parameters<typeof devSettings>[0]) => devSettings(s).flow.ui.nodes;
@@ -112,5 +116,41 @@ describe('formatAdded without locale data', () => {
     expect(formatAdded(new Date(Date.UTC(2026, 5, 12, 23, 59)))).toBe('12 Jun 2026');
     expect(formatAdded(new Date(Date.UTC(2026, 0, 1)))).toBe('1 Jan 2026');
     expect(formatAdded(null)).toBeNull();
+  });
+});
+
+describe('privileged window', () => {
+  const shipped = fileURLToPath(new URL('../../../', import.meta.url));
+  const dirs: string[] = [];
+  const policy = (kratos: string) => {
+    const d = mkdtempSync(join(tmpdir(), 'priv-'));
+    dirs.push(d);
+    mkdirSync(join(d, 'kratos'));
+    writeFileSync(join(d, 'kratos/kratos.yml'), kratos);
+    return d;
+  };
+  afterEach(() => dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })));
+
+  it('is the shipped kratos.yml privileged_session_max_age, exactly', () => {
+    expect(privilegedWindowMs(shipped)).toBe(5 * 60_000);
+  });
+
+  it('follows the configured value rather than a built-in one', () => {
+    expect(privilegedWindowMs(policy('selfservice:\n  flows:\n    settings:\n      privileged_session_max_age: 90s\n'))).toBe(90_000);
+  });
+
+  it('lapses only past the window', () => {
+    const now = Date.UTC(2026, 10, 28);
+    expect(privilegedLapsed(new Date(now - 5 * 60_000), now, shipped)).toBe(false);
+    expect(privilegedLapsed(new Date(now - 5 * 60_000 - 1), now, shipped)).toBe(true);
+  });
+
+  it('fails safe: an unreadable or unparseable window counts as lapsed', () => {
+    const now = Date.UTC(2026, 10, 28);
+    const fresh = new Date(now);
+    const bad = policy('selfservice:\n  flows:\n    settings:\n      privileged_session_max_age: soon\n');
+    expect(() => privilegedWindowMs(bad)).toThrow(/privileged_session_max_age is not a whole number/);
+    expect(privilegedLapsed(fresh, now, bad)).toBe(true);
+    expect(privilegedLapsed(fresh, now, join(tmpdir(), 'no-such-policy-dir'))).toBe(true);
   });
 });
