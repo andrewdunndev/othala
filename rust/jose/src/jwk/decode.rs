@@ -13,7 +13,7 @@ use serde::de::IgnoredAny;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::alg::{CONTENT, SIGNING, registry_name};
-use crate::json::{named, scan};
+use crate::json::{named, object, scan};
 use crate::key::{Fam, Private, Public, dup, dup_private, private_info, public_info, public_of};
 use crate::{
     Alg, DecryptKey, EncryptKey, Error, ErrorKind, JweAlg, KeyAlg, MAX_NAME_LEN, MAX_RSA_BITS,
@@ -99,29 +99,45 @@ struct Raw<'a> {
     //# This member MUST be present in a JWK.
     #[serde(borrow)]
     kty: Cow<'a, str>,
+    #[serde(default, deserialize_with = "named")]
     kid: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     alg: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     #[serde(rename = "use")]
     usage: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     key_ops: Option<Vec<String>>,
+    #[serde(default, deserialize_with = "named")]
     #[serde(borrow)]
     crv: Option<Cow<'a, str>>,
+    #[serde(default, deserialize_with = "named")]
     #[serde(borrow)]
     x: Option<Cow<'a, str>>,
+    #[serde(default, deserialize_with = "named")]
     #[serde(borrow)]
     y: Option<Cow<'a, str>>,
+    #[serde(default, deserialize_with = "named")]
     #[serde(borrow)]
     n: Option<Cow<'a, str>>,
+    #[serde(default, deserialize_with = "named")]
     #[serde(borrow)]
     e: Option<Cow<'a, str>>,
+    #[serde(default, deserialize_with = "named")]
     d: Option<&'a str>,
+    #[serde(default, deserialize_with = "named")]
     p: Option<&'a str>,
+    #[serde(default, deserialize_with = "named")]
     q: Option<&'a str>,
+    #[serde(default, deserialize_with = "named")]
     dp: Option<&'a str>,
+    #[serde(default, deserialize_with = "named")]
     dq: Option<&'a str>,
+    #[serde(default, deserialize_with = "named")]
     qi: Option<&'a str>,
     #[serde(default, deserialize_with = "named")]
     oth: Option<Vec<IgnoredAny>>,
+    #[serde(default, deserialize_with = "named")]
     k: Option<&'a str>,
 }
 
@@ -348,7 +364,7 @@ pub(crate) fn parse(json: &[u8]) -> Result<(Meta, Key), Error> {
 /// As [`parse`]; with `public_only` a key carrying a private parameter or an `oct` key is `None`, before any is built.
 pub(crate) fn parse_filtered(json: &[u8], public_only: bool) -> Result<Option<(Meta, Key)>, Error> {
     scan(json)?;
-    let r: Raw<'_> = serde_json::from_slice(json).map_err(|_| malformed())?;
+    let r: Raw<'_> = object(json).map_err(|_| malformed())?;
     let private = [r.d, r.p, r.q, r.dp, r.dq, r.qi]
         .iter()
         .any(Option::is_some);
@@ -1100,6 +1116,43 @@ mod tests {
         assert_eq!(oth("null"), Some(ErrorKind::Malformed));
         assert_eq!(oth("5"), Some(ErrorKind::Malformed));
         assert_eq!(oth("[]"), Some(ErrorKind::UnsupportedAlg));
+    }
+
+    // RFC 7517 4.1 to 4.4 give each member a string or array value; the RFC has no sentence that refuses null, so
+    // this is a deliberate strictness (R67), not a cited requirement
+    #[test]
+    fn a_null_member_is_malformed_not_absent() {
+        let injected = |base: &Members, name: &str| {
+            let json = text(base).replacen('{', &format!("{{\"{name}\":null,"), 1);
+            parse(json.as_bytes()).err().map(|e| e.kind())
+        };
+        assert_eq!(kind(&oct()), None);
+        assert_eq!(kind(&ec_private()), None);
+        for name in [
+            "kid", "alg", "use", "key_ops", "crv", "x", "y", "n", "e", "d", "p", "q", "dp", "dq",
+            "qi", "k",
+        ] {
+            let base = if name == "k" {
+                ec_private()
+            } else {
+                without(&oct(), name)
+            };
+            assert_eq!(injected(&base, name), Some(ErrorKind::Malformed), "{name}");
+        }
+    }
+
+    #[test]
+    fn a_key_written_as_an_array_is_malformed() {
+        // serde reads a struct from an array by position; the members, in order, must not make a key
+        let key = r#"["oct","a","HS256","sig",["sign"],"c","x","y","n","e","d","p","q","dp","dq","qi",[],"AAAA"]"#;
+        assert_eq!(
+            parse(key.as_bytes()).err().map(|e| e.kind()),
+            Some(ErrorKind::Malformed)
+        );
+        assert_eq!(
+            parse(br#"["EC","1"]"#).err().map(|e| e.kind()),
+            Some(ErrorKind::Malformed)
+        );
     }
 
     #[test]

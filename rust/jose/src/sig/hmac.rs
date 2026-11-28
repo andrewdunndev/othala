@@ -47,7 +47,7 @@ macro_rules! hs {
                 mac::<$hash>(key.expose(), input)?
                     //= https://www.rfc-editor.org/rfc/rfc7518#section-3.2
                     //= type=exception
-                    //= reason=the comparison is the hmac crate's verify_slice, which is constant time (NC2); no test can observe timing, so it is held by that dependency and review, not claimed as tested
+                    //= reason=the comparison is Mac::verify_slice of digest 0.11 as re-exported by hmac, which compares with subtle's ct_eq and so is constant time (NC2); no test can observe timing, so it is held by that dependency and review, not claimed as tested
                     //# The comparison of the computed HMAC value to the JWS Signature value MUST be
                     //# done in a constant-time manner to thwart timing attacks.
                     .verify_slice(signature)
