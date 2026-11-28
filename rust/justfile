@@ -7,9 +7,9 @@ default:
     @just --list
 
 # the pre-merge set, and the only list of it: CI's jobs call these recipes and re-type nothing
-gate: gate-rust claims vectors
+gate: gate-rust claims layers vectors
 
-# the gates that run on CI's ci-rust image, which has no node or python3; claims and vectors run on theirs
+# the gates that run on CI's ci-rust image, which has no node or python3; claims, layers and vectors run on theirs
 gate-rust: (tool-pins "jq") lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api
 
 # the pinned nightly, which CI installs in .rust's before_script
@@ -76,6 +76,12 @@ queue:
 claims:
     command -v node > /dev/null || { echo 'claims: node is not on PATH; mise.toml pins it, so run under `mise x --`'; exit 1; }
     node canary/claims.mjs
+
+# each crate with a layers.json keeps its modules in the listed layers, lowest first: no module imports from a layer above its own, and no import cycle forms within one; a new module must be placed in a layer; the recipe first plants each form of bad import (super, super::super, a namespace import, an aliased re-export, code after an inner cfg(test), a same-layer cycle, an unplaced module, an inline crate:: path, an unresolved path) in a temporary copy and requires its exact error (canary/layers.mjs)
+layers:
+    command -v node > /dev/null || { echo 'layers: node is not on PATH; mise.toml pins it, so run under `mise x --`'; exit 1; }
+    node canary/layers.mjs --self-test
+    node canary/layers.mjs
 
 # re-derive each rust/spec/rfcN.json from the pinned RFC text in <dir> (rfcN.txt, as fetched from the file's `source`) and fail on any difference; the texts are not committed, so `gate` checks citations against the derived files (`just claims`) and this recipe proves the derivation
 spec-extract dir:

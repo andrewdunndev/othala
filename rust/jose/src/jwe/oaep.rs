@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use base::{Entropy, SecretBytes};
 use rsa::Oaep;
 
-use crate::jwe::envelope::{Params, sealed};
+use crate::alg::{Params, sealed};
 use crate::key::{Private, Public};
 use crate::rng::Source;
 use crate::{BlindedKeyAlg, Error, ErrorKind, JweAlg, JweEnc, KeyAlg, PublicKeyAlg};
@@ -101,7 +101,7 @@ mod tests {
 
     use super::{RsaOaep, RsaOaep256};
     use crate::JweEnc;
-    use crate::jwe::envelope::sealed::BlindedUnwrap as _;
+    use crate::alg::sealed::BlindedUnwrap as _;
     use crate::jwk::decode::{Key, parse};
     use crate::key::Private;
     use crate::testing::hex;

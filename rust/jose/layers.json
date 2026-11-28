@@ -1,0 +1,18 @@
+{
+  "layers": [
+    { "name": "base", "modules": ["error", "rng", "testing"] },
+    { "name": "leaves", "modules": ["json", "crit", "key"] },
+    { "name": "algorithms", "modules": ["alg"] },
+    {
+      "name": "implementations",
+      "modules": [
+        "claims", "verify",
+        "sig::ecdsa", "sig::ecdsa_p521", "sig::eddsa", "sig::hmac", "sig::pss", "sig::rsa", "sig::rsa_sign",
+        "jwe::content", "jwe::ecdh", "jwe::kw", "jwe::oaep"
+      ]
+    },
+    { "name": "jwk", "modules": ["jwk::decode", "jwk::thumbprint", "jwk::set", "sign"] },
+    { "name": "formats", "modules": ["jwk::any", "jws::header", "jws::compact", "jws::json", "jwe::envelope"] },
+    { "name": "tokens", "modules": ["jwt"] }
+  ]
+}

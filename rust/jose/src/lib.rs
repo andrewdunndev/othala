@@ -13,6 +13,17 @@
 
 extern crate alloc;
 
+// Layering, lowest first (`layers.json` lists it and `just layers` holds it; a module imports its own layer or below):
+//   base            error, rng, testing
+//   leaves          json, crit (over error); key (the validated key material, over nothing)
+//   algorithms      alg: the markers, the registry and the sealed per-algorithm traits, over key
+//   implementations sig::*, jwe::{content, ecdh, kw, oaep} (each algorithm's operations), verify, claims
+//   jwk             jwk::{decode, thumbprint, set} and sign. `sign` sits here because its `Header` names a `Kid` and its
+//                   `SecretJwk::signing_key` reads a JWK's metadata, so it is above `jwk::decode`; the inherent impls of
+//                   `Jwk` and `SecretJwk` are spread to keep that one-way: decode.rs holds the JWK itself and its
+//                   `verify_key`, sign.rs holds `signing_key`, jwe/envelope.rs holds `encrypt_key` and `decrypt_key`
+//   formats         jws::{header, compact, json}, jwe::envelope, jwk::any
+//   tokens          jwt
 mod alg;
 mod claims;
 mod crit;
@@ -25,7 +36,9 @@ mod rng;
 mod sign;
 #[cfg(test)]
 mod testing;
+mod verify;
 mod jwk {
+    pub(crate) mod any;
     pub(crate) mod decode;
     pub(crate) mod set;
     pub(crate) mod thumbprint;
@@ -71,12 +84,11 @@ pub use jwe::envelope::{DecryptKey, EncryptKey, Jwe, Plaintext};
 pub use jwe::kw::{A128GcmKw, A128Kw, A192GcmKw, A192Kw, A256GcmKw, A256Kw, Dir};
 #[cfg(feature = "rsa-decrypt")]
 pub use jwe::oaep::{RsaOaep, RsaOaep256};
+pub use jwk::any::{AnySigningKey, AnyVerifyKey};
 pub use jwk::decode::{Jwk, Kid, Kty, SecretJwk};
 pub use jwk::set::{JwkEntry, JwkSet};
 pub use jws::compact::{Jws, Payload};
 pub use jwt::{Jwt, VerifiedJwt};
-pub use key::any::{AnySigningKey, AnyVerifyKey};
-pub use key::{Signer, VerifyKey};
 pub use sig::ecdsa::{Es256, Es384};
 #[cfg(feature = "es512")]
 pub use sig::ecdsa_p521::Es512;
@@ -84,7 +96,8 @@ pub use sig::eddsa::EdDsa;
 pub use sig::hmac::{Hs256, Hs384, Hs512};
 pub use sig::pss::{Ps256, Ps384, Ps512};
 pub use sig::rsa::{Rs256, Rs384, Rs512};
-pub use sign::{Compact, Header, SigningKey, Unsigned};
+pub use sign::{Compact, Header, Signer, SigningKey, Unsigned};
+pub use verify::VerifyKey;
 
 /// Bytes of compact JWS, JWT or JWE text a parser reads or an issuer writes; longer is `TooLarge`.
 pub const MAX_COMPACT_LEN: usize = 16_384;

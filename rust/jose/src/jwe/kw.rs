@@ -10,7 +10,7 @@ use aes_kw::{KwAes128, KwAes192, KwAes256};
 use base::{Entropy, SecretBytes};
 use expose::Expose as _;
 
-use crate::jwe::envelope::{Params, sealed};
+use crate::alg::{Params, sealed};
 use crate::key::{Private, Public};
 use crate::{Error, ErrorKind, JweAlg, JweEnc, KeyAlg, LocalKeyAlg};
 
@@ -290,7 +290,7 @@ mod tests {
     use testkit::vectors::{Outcome, wycheproof};
 
     use super::{A128GcmKw, A128Kw, A192GcmKw, A192Kw, A256GcmKw, A256Kw, Dir};
-    use crate::jwe::envelope::{Params, sealed::KeyAlg as _, sealed::Unwrap as _};
+    use crate::alg::{Params, sealed::KeyAlg as _, sealed::Unwrap as _};
     use crate::key::{Private, Public};
     use crate::testing::hex;
     use crate::{ErrorKind, JweEnc, SecretJwk};
@@ -446,7 +446,7 @@ mod tests {
         );
         let wrong = Public::Oct(SecretBytes::new(alloc::vec![0; 16]));
         let mut fixed = Fixed(alloc::vec![9; 32]);
-        let wrapped = <Dir as crate::jwe::envelope::sealed::KeyAlg>::wrap(
+        let wrapped = <Dir as crate::alg::sealed::KeyAlg>::wrap(
             &wrong,
             JweEnc::A256Gcm,
             &mut params(),

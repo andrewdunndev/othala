@@ -14,11 +14,10 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::alg::{CONTENT, SIGNING, registry_name};
 use crate::json::{named, object, scan};
-use crate::key::{Fam, Private, Public, dup, dup_private, private_info, public_info, public_of};
+use crate::key::{Fam, Private, Public, dup, private_info, public_info, public_of};
 use crate::{
-    Alg, DecryptKey, EncryptKey, Error, ErrorKind, JweAlg, KeyAlg, MAX_NAME_LEN, MAX_RSA_BITS,
-    MAX_RSA_EXPONENT, MIN_RSA_BITS, PublicAlg, PublicKeyAlg, SignAlg, SigningAlg, SigningKey,
-    VerifyKey,
+    Alg, Error, ErrorKind, JweAlg, MAX_NAME_LEN, MAX_RSA_BITS, MAX_RSA_EXPONENT, MIN_RSA_BITS,
+    PublicAlg, SigningAlg, VerifyKey,
 };
 
 /// A key id: an opaque lookup hint, compared byte for byte, never trusted.
@@ -575,17 +574,6 @@ impl Jwk {
             alg: PhantomData,
         })
     }
-
-    /// A key that encrypts for `K`.
-    pub fn encrypt_key<K: PublicKeyAlg>(&self) -> Result<EncryptKey<K>, Error> {
-        self.meta
-            .check_jwe(public_info(&self.material), K::ALG, false)?;
-        Ok(EncryptKey {
-            kid: self.meta.kid.clone(),
-            material: dup(&self.material),
-            alg: PhantomData,
-        })
-    }
 }
 
 impl Clone for Jwk {
@@ -666,37 +654,6 @@ impl SecretJwk {
             .check_sig(private_info(&self.material), A::ALG, VERIFY)?;
         Ok(VerifyKey {
             material: public_of(&self.material),
-            alg: PhantomData,
-        })
-    }
-
-    /// A key that signs `A`.
-    pub fn signing_key<A: SignAlg>(&self) -> Result<SigningKey<A>, Error> {
-        self.meta
-            .check_sig(private_info(&self.material), A::ALG, SIGN)?;
-        Ok(SigningKey {
-            material: dup_private(&self.material),
-            alg: PhantomData,
-        })
-    }
-
-    /// A key that encrypts for `K`.
-    pub fn encrypt_key<K: KeyAlg>(&self) -> Result<EncryptKey<K>, Error> {
-        self.meta
-            .check_jwe(private_info(&self.material), K::ALG, false)?;
-        Ok(EncryptKey {
-            kid: self.meta.kid.clone(),
-            material: public_of(&self.material),
-            alg: PhantomData,
-        })
-    }
-
-    /// A key that decrypts for `K`.
-    pub fn decrypt_key<K: KeyAlg>(&self) -> Result<DecryptKey<K>, Error> {
-        self.meta
-            .check_jwe(private_info(&self.material), K::ALG, true)?;
-        Ok(DecryptKey {
-            material: dup_private(&self.material),
             alg: PhantomData,
         })
     }

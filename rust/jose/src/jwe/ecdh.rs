@@ -8,7 +8,7 @@ use base::{Entropy, SecretBytes};
 use expose::Expose as _;
 use sha2::Sha256;
 
-use crate::jwe::envelope::{Params, sealed};
+use crate::alg::{Params, sealed};
 use crate::key::public_of;
 use crate::key::{Private, Public};
 use crate::{Error, ErrorKind, JweAlg, JweEnc, KeyAlg, LocalKeyAlg, PublicKeyAlg};
@@ -262,7 +262,7 @@ mod tests {
     use testkit::vectors::{Json, Vector, wycheproof};
 
     use super::{EcdhEs, EcdhEsA128Kw, EcdhEsA192Kw, EcdhEsA256Kw, agree, derive, unwrap_key};
-    use crate::jwe::envelope::{Params, sealed::KeyAlg as _, sealed::Unwrap as _};
+    use crate::alg::{Params, sealed::KeyAlg as _, sealed::Unwrap as _};
     use crate::jwk::decode::{Key, parse};
     use crate::key::{Private, Public};
     use crate::testing::hex;
@@ -511,7 +511,7 @@ mod tests {
         let public = secret.as_ref().map(|k| Public::P256(k.public_key()));
         let private = secret.map(Private::P256);
         // the wrapping key is re-derived here at the RFC 7518 4.6.2 length, so a wrong length cannot open the key
-        fn opens<A: crate::jwe::envelope::sealed::KeyAlg>(
+        fn opens<A: crate::alg::sealed::KeyAlg>(
             keys: Option<(&Private, &Public)>,
             name: &str,
             len: usize,
