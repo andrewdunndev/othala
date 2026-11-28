@@ -311,6 +311,11 @@ mod tests {
             .ok(),
             Some(SigningAlg::Hs256)
         );
-        assert!(serde_json::from_str::<SigningAlg>(r#""none""#).is_err());
+        assert_eq!(
+            serde_json::from_str::<SigningAlg>(r#""none""#)
+                .err()
+                .map(|e| alloc::format!("{e}")),
+            Some("algorithm, curve or compression is not supported; choose an implemented one or enable its feature".into())
+        );
     }
 }

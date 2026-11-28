@@ -313,7 +313,10 @@ mod tests {
         // a day and a second ahead is a fault; exactly a day ahead is not
         let edge = |d: u64| row(9, UnixTime::new(LAST.secs() + d));
         let day = edge(86_400);
-        assert!(t.check(Some(seen(&day)), LAST).is_err());
+        assert!(matches!(
+            t.check(Some(seen(&day)), LAST),
+            Err(Closed::Wait(until)) if until > LAST
+        ));
         let over = edge(86_401);
         assert!(
             t.check(Some(seen(&over)), LAST)

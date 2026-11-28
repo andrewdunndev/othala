@@ -121,13 +121,12 @@ pub(crate) fn check(c: &Case) -> Outcome {
     let Ok(done) = done else {
         return Outcome::NotApplicable;
     };
-    assert_eq!(
-        done.result.is_ok(),
-        c.expect.ok,
-        "{} {:?}",
-        c.id,
-        done.result.as_ref().err()
-    );
+    let refused = done.result.as_ref().err().map(|e| e.kind());
+    if c.expect.ok {
+        assert_eq!(refused, None, "{}", c.id);
+    } else {
+        assert_ne!(refused, None, "{}", c.id);
+    }
     let ceremonies = done
         .left
         .keys()

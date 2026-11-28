@@ -279,7 +279,8 @@ fn all_guards_or_nothing() -> Result<(), TestError<(Spec, BTreeSet<K>)>> {
                     b.create(k, 200, None)
                 });
             let created = b.build().map_err(fail)?;
-            prop_assert!(matches!(store.apply(&created, NOW), Ok(Ok(_))));
+            let receipt = store.apply(&created, NOW).map_err(fail)?.map_err(fail)?;
+            prop_assert_eq!(receipt.effect_id(), created.id());
         }
         let all = pool(6);
         let loaded = store.load(&all, NOW).map_err(fail)?;

@@ -93,7 +93,7 @@ mod tests {
         let accepted = |prefix: &str| -> String {
             ALPHABET
                 .chars()
-                .filter(|c| b64url_decode(&format!("{prefix}{c}")).is_ok())
+                .filter(|c| b64url_decode(&format!("{prefix}{c}")).map(drop) == Ok(()))
                 .collect()
         };
         assert_eq!(accepted("Z"), "AQgw");

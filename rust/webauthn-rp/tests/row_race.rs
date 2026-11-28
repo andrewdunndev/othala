@@ -217,8 +217,7 @@ fn sign_count(store: &Store2) -> Option<u32> {
 fn wins<T>(run: &Run<T>) -> Vec<usize> {
     run.outcomes
         .iter()
-        .filter(|(_, o)| o.is_ok())
-        .map(|(i, _)| *i)
+        .filter_map(|(i, o)| o.as_ref().ok().map(|_| *i))
         .collect()
 }
 
@@ -291,12 +290,12 @@ fn a_credential_id_registers_once_across_ceremonies() -> Setup<()> {
         // deciding again from what is now stored loses the same way: the id is taken
         let again = finish_registration(&run.store, if winner == 0 { 2 } else { 1 }, 60, NOW + 1)?;
         let mut store = run.store.clone();
-        assert!(
-            store
-                .apply(again.effect(), at(NOW))
-                .map_err(|_| "fault")?
-                .is_err()
-        );
+        let conflict = store
+            .apply(again.effect(), at(NOW))
+            .map_err(|_| "fault")?
+            .err()
+            .ok_or("conflict")?;
+        assert_eq!(failed(&conflict), vec![(credential()?, Failure::Present)]);
     }
     Ok(())
 }
@@ -380,8 +379,9 @@ fn an_assertion_replays_once() -> Setup<()> {
             .find_map(|(_, o)| o.as_ref().err())
             .ok_or("loser")?;
         assert!(failed(loser).contains(&(key_of(2), Failure::Missing)));
-        assert!(
-            finish_login(&run.store, 2, 1, 90, NOW + 1).is_err(),
+        assert_eq!(
+            finish_login(&run.store, 2, 1, 90, NOW + 1).err(),
+            Some("row"),
             "the consumed ceremony row cannot be loaded again"
         );
     }

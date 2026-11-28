@@ -1,0 +1,29 @@
+# check-rust: `just gate-rust` (the part of `just gate` that needs no node), on the
+# catalog's ci-rust image; the MSRV and pinned-nightly toolchains and cargo-deny are
+# added at job start. `just gate-slow` runs on a schedule and on main.
+.rust:
+  stage: verify
+  image: registry.gitlab.com/dunn.dev/pipeline/ci-rust:4.16.1@sha256:3ff8f71ade7e88629d3d1e24a7e6479b30c4d78dadac97ca6a9a4379c4a15ff4
+  variables:
+    CARGO_HOME: "$CI_PROJECT_DIR/.cargo-home"
+  cache:
+    key: rust-$CI_JOB_NAME
+    paths:
+      - .cargo-home/registry
+      - rust/target
+  before_script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - cd rust
+    - rustup toolchain install
+    - rustup toolchain install 1.89.0 nightly-2026-11-24 --profile minimal
+    - cargo install --locked cargo-deny@$(just deny-pin)
+
+# one shard of the slow gates; `just slow-plan` writes the jobs that extend it, each with CRATE and SHARD
+.slow:
+  extends: .rust
+  timeout: 3h
+  interruptible: false
+  script:
+    - cargo install --locked cargo-mutants@$(just mutants-pin) cargo-fuzz@0.13.1
+    - rustup toolchain install nightly --profile minimal
+    - just gate-slow "$CRATE" "$SHARD"

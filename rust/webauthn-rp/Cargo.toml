@@ -24,11 +24,11 @@ std = ["base/std"]
 base.workspace = true
 # oid: rsa's PKCS#1 v1.5 verifier names its digest by OID
 sha2 = { workspace = true, features = ["oid"] }
-sha1 = { version = "0.11", default-features = false, features = ["oid"], optional = true }
-p256 = { version = "0.14", default-features = false, features = ["ecdsa"] }
-p384 = { version = "0.14", default-features = false, features = ["ecdsa"] }
-ed25519-dalek = { version = "3", default-features = false }
-rsa = { version = "0.10", default-features = false, features = ["pkcs1v15"] }
+sha1 = { workspace = true, features = ["oid"], optional = true }
+p256 = { workspace = true, features = ["ecdsa"] }
+p384 = { workspace = true, features = ["ecdsa"] }
+ed25519-dalek.workspace = true
+rsa = { workspace = true, features = ["pkcs1v15"] }
 x509-cert = { version = "0.3.1", default-features = false, optional = true }
 der = { version = "0.8.3", default-features = false, features = ["alloc", "derive", "oid"], optional = true }
 spki = { version = "0.8.1", default-features = false, features = ["alloc"], optional = true }

@@ -6,6 +6,8 @@ disallowed-methods = [
   { path = "core::result::Result::expect", reason = "return the error; this lint reaches inside macro bodies, expect_used does not" },
   { path = "core::result::Result::unwrap_err", reason = "match the result; this lint reaches inside macro bodies, unwrap_used does not" },
   { path = "core::result::Result::expect_err", reason = "match the result; this lint reaches inside macro bodies, expect_used does not" },
+  { path = "core::result::Result::is_ok", reason = "assert the value or the error variant; a bare verdict hides which one" },
+  { path = "core::result::Result::is_err", reason = "assert the value or the error variant; a bare verdict hides which one" },
   { path = "std::time::SystemTime::now", reason = "take UnixTime as an argument; only the shells read the OS clock" },
   { path = "std::time::SystemTime::elapsed", reason = "take UnixTime as an argument; only the shells read the OS clock" },
   { path = "std::time::Instant::now", reason = "take UnixTime as an argument; only the shells read the OS clock" },

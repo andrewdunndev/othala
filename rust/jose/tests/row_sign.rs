@@ -59,7 +59,7 @@ fn round<A: LocalAlg>(
     let header =
         || Kid::new(kid).map_or_else(|_| Header::<A>::new(), |kid| Header::new().with_kid(kid));
     let signed = Unsigned::<A>::jws(header(), payload).and_then(|u| u.sign(&pair.signer));
-    prop_assert!(signed.is_ok());
+    prop_assert_eq!(signed.as_ref().err().map(|e| e.kind()), None);
     let token = signed.map_err(|_| TestCaseError::fail("sign"))?;
     // finish(signer.sign(signing_input)) is sign(signer)
     let unsigned = Unsigned::<A>::jws(header(), payload).map_err(|_| TestCaseError::fail("jws"))?;
@@ -83,10 +83,13 @@ fn round<A: LocalAlg>(
     if let Some(byte) = bytes.get_mut(place).filter(|b| **b != b'.') {
         *byte = if *byte == b'A' { b'B' } else { b'A' };
         let changed = String::from_utf8(bytes).map_err(|_| TestCaseError::fail("utf8"))?;
-        prop_assert!(
+        prop_assert_ne!(
             Jws::parse(&changed)
                 .and_then(|j| j.verify(&pair.verifier))
-                .is_err()
+                .err()
+                .map(|e| e.kind()),
+            None,
+            "a changed byte is refused, as whichever of the signature, the header or the encoding it hit"
         );
     }
     Ok(())
@@ -148,7 +151,7 @@ fn sign_round_trip() {
         }
         Ok(())
     });
-    assert!(outcome.is_ok(), "{outcome:?}");
+    assert_eq!(outcome, Ok(()));
 }
 
 #[cfg(feature = "es512")]
@@ -175,7 +178,7 @@ fn sign_round_trip_p521() {
         }
         Ok(())
     });
-    assert!(outcome.is_ok(), "{outcome:?}");
+    assert_eq!(outcome, Ok(()));
 }
 
 #[test]
@@ -223,7 +226,7 @@ fn serializations_agree() {
         // different payloads are not one general JWS
         let mixed = Compact::general(&[sign(&payload)?, sign(&other)?]);
         if payload == other {
-            prop_assert!(mixed.is_ok());
+            prop_assert_eq!(mixed.err().map(|e| e.kind()), None);
         } else {
             prop_assert_eq!(mixed.err().map(|e| e.kind()), Some(ErrorKind::Malformed));
         }
@@ -235,12 +238,17 @@ fn serializations_agree() {
             Compact::general(&many).err().map(|e| e.kind()),
             Some(ErrorKind::TooLarge)
         );
-        prop_assert!(Compact::general(many.get(..jose::MAX_ENTRIES).unwrap_or_default()).is_ok());
+        prop_assert_eq!(
+            Compact::general(many.get(..jose::MAX_ENTRIES).unwrap_or_default())
+                .err()
+                .map(|e| e.kind()),
+            None
+        );
         prop_assert_eq!(
             Compact::general(&[]).err().map(|e| e.kind()),
             Some(ErrorKind::Malformed)
         );
         Ok(())
     });
-    assert!(outcome.is_ok(), "{outcome:?}");
+    assert_eq!(outcome, Ok(()));
 }

@@ -278,8 +278,13 @@ mod tests {
         let text = d.to_b64url();
         assert_eq!(text.len(), 43);
         assert_eq!(Digest::from_b64url(&text), Ok(d));
-        assert!(Digest::from_b64url(&text[..42]).is_err());
-        assert!(Digest::from_b64url("AQIDBA").is_err());
+        for short in [&text[..42], "AQIDBA"] {
+            assert_eq!(
+                Digest::from_b64url(short).map(|_| ()),
+                Err(Error::new(ErrorKind::Malformed)),
+                "{short}"
+            );
+        }
     }
 
     #[cfg(feature = "serde")]
@@ -339,7 +344,14 @@ mod tests {
             .ok()
             .and_then(|j| serde_json::from_str::<BrowserBinding>(&j).ok());
         assert_eq!(back, Some(binding));
-        assert!(serde_json::from_str::<BrowserBinding>("\"AQIDBA\"").is_err());
+        assert_eq!(
+            serde_json::from_str::<BrowserBinding>("\"AQIDBA\"")
+                .err()
+                .map(|e| e.to_string()),
+            Some(alloc::string::String::from(
+                "not a SHA-256 digest as unpadded base64url at line 1 column 8"
+            ))
+        );
     }
 
     #[test]

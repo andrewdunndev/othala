@@ -38,7 +38,12 @@ pub(crate) fn cases() {
     let tally = run::<Case>(vector!("webauthn-rp-derived/cbor.json"), 21, |c| {
         let bytes = c.bound.as_deref().map_or_else(|| c.input.clone(), past);
         let decoded = decode(&bytes, Order::Canonical);
-        assert_eq!(decoded.is_ok(), c.expect.ok, "{}", c.id);
+        let seen = decoded.as_ref().err().map(|e| format!("{:?}", e.kind()));
+        if c.expect.ok {
+            assert_eq!(seen, None, "{}", c.id);
+        } else {
+            assert_ne!(seen, None, "{}", c.id);
+        }
         if let Err(err) = &decoded {
             c.expect
                 .refusal

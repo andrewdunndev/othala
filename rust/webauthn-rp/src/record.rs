@@ -910,7 +910,10 @@ mod tests {
             CredentialId::from_bytes(&[1]).map(|i| i.as_bytes().to_vec()),
             Ok(vec![1])
         );
-        assert!(CredentialId::from_bytes(&[0; MAX_CREDENTIAL_ID]).is_ok());
+        assert_eq!(
+            CredentialId::from_bytes(&[0; MAX_CREDENTIAL_ID]).map(|i| i.as_bytes().to_vec()),
+            Ok(vec![0; MAX_CREDENTIAL_ID])
+        );
         assert_eq!(
             CredentialId::from_bytes(&[0; MAX_CREDENTIAL_ID + 1])
                 .err()
@@ -958,7 +961,11 @@ mod tests {
             Ok(Version::new(7))
         );
         let wrapped = Row::new((1, credential(keys().remove(0))?), Version::new(3));
-        assert!(Credential::from_row(&wrapped, |(_, r)| Some(r)).is_ok());
+        assert_eq!(
+            Credential::from_row(&wrapped, |(_, r)| Some(r))
+                .map(|r| (Record::Credential(r.record().clone()), r.version())),
+            Ok((credential(keys().remove(0))?, Version::new(3)))
+        );
         assert_eq!(
             Credential::from_row(&wrapped, |_| None)
                 .err()
@@ -1088,16 +1095,17 @@ mod tests {
                 c.options.extensions.cred_props = flag;
             }
         }
+        let (on_record, off_record) = (on.clone(), off.clone());
         let (on, off) = (on.encode()?, off.encode()?);
         let flag = on
             .iter()
             .zip(&off)
             .position(|(a, b)| a != b)
             .ok_or_else(|| bad(()))?;
-        for byte in [0, 1] {
+        for (byte, expected) in [(0, off_record), (1, on_record)] {
             let mut row = on.clone();
             row[flag] = byte;
-            assert!(Record::decode(&row).is_ok());
+            assert_eq!(Record::decode(&row), Ok(expected));
         }
         let mut row = on.clone();
         row[flag] = 2;
@@ -1422,7 +1430,10 @@ mod tests {
                 .run(&rows, |record| {
                     let over_list = widest(&record) > 255;
                     let unbounded = record.encode_unbounded();
-                    prop_assert_eq!(unbounded.is_err(), over_list);
+                    prop_assert_eq!(
+                        unbounded.as_ref().err().map(|e| e.kind()),
+                        over_list.then_some(ErrorKind::TooLarge)
+                    );
                     let too_big = over_list || unbounded.is_ok_and(|b| b.len() > crate::MAX_RECORD);
                     match record.encode() {
                         Ok(bytes) => {

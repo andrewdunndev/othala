@@ -139,7 +139,13 @@ mod tests {
                 Some(ErrorKind::UnsupportedAlg),
                 "{name}"
             );
-            assert!(serde_json::from_str::<SigningAlg>(&format!("\"{name}\"")).is_err());
+            assert_eq!(
+                serde_json::from_str::<SigningAlg>(&format!("\"{name}\""))
+                    .err()
+                    .map(|e| format!("{e}")),
+                Some("algorithm, curve or compression is not supported; choose an implemented one or enable its feature".into()),
+                "{name}"
+            );
         }
     }
 }

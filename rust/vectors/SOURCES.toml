@@ -134,7 +134,7 @@ feeds = ["jose"]
 notes = "Derived, not published by the RFC: valid signatures under a header alg that does not match the key or the expectation, made once with Node crypto from throwaway keys. The generator is not committed because fresh keys make it non-reproducible; the file is frozen output. Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; "
 cases = 25
 files = [
-  { path = "rfc8725-derived/jws-alg.json", sha256 = "bdb0203a76b79f1f7e04ca9f62b5ccfa1694f7f881686056a44219e091acc9d6", cases = 25 },
+  { path = "rfc8725-derived/jws-alg.json", sha256 = "f6b8e180e3dd2abe5326c14b3556e00739f1182c03b23238601182763fe975dd", cases = 25 },
 ]
 
 [source."w3c-webauthn-3-exam-spike"]
@@ -350,13 +350,13 @@ feeds = ["jose"]
 notes = "Derived by tools/derive_jose.py and tools/derive_jose_jwe.mjs (deterministic, re-run byte-identical) from the specs and the pinned upstream keys only, never from crate code or drafts (ruling R-b). Each case names its spec section in `spec`. expect.kind is set only where the architecture contract or a ruling names the class (DuplicateMember, CriticalHeader, AlgMismatch, WeakKey, KeyUse, KeyAlgMissing, Issuer, Audience, MissingClaim, Expired, NotYetValid, ClaimType, Type, TooLarge; UnsupportedAlg for X25519 per R-e). Oracle choices beyond a MUST are stated in the case's spec text: duplicate names rejected (not last-wins), RFC 7797 not implemented, a duplicate-kid lookup refused, an iat beyond now plus leeway refused. limits.json names each bound as a crate constant (contract rule 5.7 states no numbers: jose::MAX_COMPACT_LEN, jose::MAX_JSON_DEPTH, jose::MAX_JWKS_KEYS) and carries the exact input at the bound (excess 0, accepted) and one past it (excess 1, TooLarge); a JWS is given as its header and payload text, not as a token, so the data does not read as a credential to the secret scan. Header MACs, EC/RSA key validity and every JWE (otherwise valid, so the refusal is for the header alone) were cross-checked with Node crypto; the Ed25519 thumbprint equals RFC 8037 A.3."
 cases = 109
 files = [
-  { path = "jose-derived/claims.json", sha256 = "708fe7fcd78b3463fae0ebe1ac7cb33823a518b6743bb76ca611798eda7f7696", cases = 23 },
-  { path = "jose-derived/header.json", sha256 = "25d515ff305dabcb4c672b4ad0116cc2f2071f36e471f90511e35c0d68612b24", cases = 23 },
-  { path = "jose-derived/jwe-header.json", sha256 = "2fa4106e5a755ccf2c5bd403d7feb49dbdb47d681268ab2134955cf37c645457", cases = 11 },
-  { path = "jose-derived/jwks.json", sha256 = "2e9135581fcda0c0bd8128ed3cc966d8c2a1bf574f3fd83ea248d82c40a1048c", cases = 8 },
-  { path = "jose-derived/keys.json", sha256 = "59ecabe434bd617484e98d6f299ac726f30b13624208a18559b0262f6da3ab3d", cases = 29 },
+  { path = "jose-derived/claims.json", sha256 = "e5eecd774966e5e4576f3b9e993eb3395bf673585206f4b168cd8551e1ab99da", cases = 23 },
+  { path = "jose-derived/header.json", sha256 = "9492f4bdea52555000f9274fc674016bdc5f1c6d92b8ed45a5b0654cf7c1fd65", cases = 23 },
+  { path = "jose-derived/jwe-header.json", sha256 = "b7a9cea064266055110dda580ec60430349bb986998d909ac6aa13425badb067", cases = 11 },
+  { path = "jose-derived/jwks.json", sha256 = "ca7888c0bde66f331c03cfa0b5e7a4f0173f46ab4c43a17f59d4b74c5908e990", cases = 8 },
+  { path = "jose-derived/keys.json", sha256 = "3a3996c0c1faa926b07baa35b06c7802f10f73d92cb8f79d0beb490ea223d4a2", cases = 29 },
   { path = "jose-derived/limits.json", sha256 = "68f727a22c03c2db3384e02f878b99855ef58180f74132897dfb43540e8e2748", cases = 8 },
-  { path = "jose-derived/thumbprint.json", sha256 = "6e0127398009b39c2a124711a5eadbdd189e8c0e7e49aa3934fe82945f6b6209", cases = 7 },
+  { path = "jose-derived/thumbprint.json", sha256 = "40ee2e96df446ba3a49185222f9dd77d5eaaeba1b47842b7370cf4b5aa7fd11a", cases = 7 },
 ]
 
 [source."factor-derived"]
