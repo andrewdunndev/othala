@@ -3,6 +3,9 @@
 # Tags run build, e2e, promote (sign and move :latest), sbom, release; promote,
 # sbom and release wait on e2e. Pipelines exist for MRs, main, tags and web/api
 # runs; a push to a feature branch with no open MR gets no pipeline.
+# CI is the fast tier: the slow tier (build-othala and build-e2e-tester images
+# for e2e, e2e, e2e-upgrade) runs on schedule, and on tags because promote,
+# sbom and release need it. Locally: `just e2e`.
 
 default:
   interruptible: true
@@ -122,10 +125,7 @@ include:
   - if: '$CI_COMMIT_TAG'
     variables:
       VERSION: $CI_COMMIT_TAG
-  - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    variables:
-      VERSION: $CI_COMMIT_SHORT_SHA
-  - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
+  - if: '$CI_PIPELINE_SOURCE == "schedule"'
     variables:
       VERSION: $CI_COMMIT_SHORT_SHA
 
@@ -157,19 +157,7 @@ e2e-upgrade:
     - if: '$CI_COMMIT_TAG'
       variables:
         AUTH_VERSION: "$CI_COMMIT_TAG"
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - deploy/**/*
-        - kratos/**/*
-        - hydra/**/*
-        - DEPLOY.md
-        - e2e/upgrade.sh
-        - e2e/smoke.sh
-        - e2e/lib.sh
-        - e2e/compose*.yml
-        - .gitlab-ci.yml
-        - portal/Containerfile
-    - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
   script:
     - cd e2e
     - bash upgrade.sh
@@ -383,5 +371,4 @@ e2e:
     - if: '$CI_COMMIT_TAG'
       variables:
         AUTH_VERSION: "$CI_COMMIT_TAG"
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
