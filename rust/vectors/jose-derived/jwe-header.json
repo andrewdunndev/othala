@@ -38,7 +38,8 @@
    "note": "must-refuse: JWE zip is a non-goal",
    "spec": "RFC 7516 4.1.3 (zip DEF; a non-goal, must-refuse)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "UnsupportedAlg"
    }
   },
   {
@@ -57,7 +58,8 @@
    "jwe": "eyJhbGciOiJBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIiwiemlwIjoiWFlaIn0.CBI6oDw8MydIx1IBntf_lQcw2MmJKIQx.Qx0pmsDa8KnJc9Jo.AwliP-KmWgsZ37BvzCefNen6VTbRK3QMA4TkvRkH0tP1bTdhtFJgJxeVmJkLD61A1hnWGetdg11c9ADsnWgL56NyxwSYjU1ZEHcGkd3EkU0vjHi9gTlb90qSYFfeF0LwkcTtjbYKCsiNJQkcIp1yeM03OmuiYSoYJVSpf7ej6zaYcMv3WwdxDFl8REwOhNImk2Xld2JXq6BR53TSFkyT7PwVLuq-1GwtGHlQeg7gDT6xW0JqHDPn_H-puQsmthc9Zg0ojmJfqqFvETUxLAF-KjcBTS5dNy6egwkYtOt8EIHK-oEsKYtZRaa8Z7MOZ7UGxGIMvEmxrGCPeJa14slv2-gaqK0kEThkaSqdYw0FkQZF.dYanPgoYLCeaqwNV7KyCyQ",
    "spec": "RFC 7516 4.1.3",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "UnsupportedAlg"
    }
   },
   {
@@ -116,7 +118,8 @@
    "jwe": "eyJhbGciOiJBMTI4S1cifQ.CBI6oDw8MydIx1IBntf_lQcw2MmJKIQx.Qx0pmsDa8KnJc9Jo.AwliP-KmWgsZ37BvzCefNen6VTbRK3QMA4TkvRkH0tP1bTdhtFJgJxeVmJkLD61A1hnWGetdg11c9ADsnWgL56NyxwSYjU1ZEHcGkd3EkU0vjHi9gTlb90qSYFfeF0LwkcTtjbYKCsiNJQkcIp1yeM03OmuiYSoYJVSpf7ej6zaYcMv3WwdxDFl8REwOhNImk2Xld2JXq6BR53TSFkyT7PwVLuq-1GwtGHlQeg7gDT6xW0JqHDPn_H-puQsmthc9Zg0ojmJfqqFvETUxLAF-KjcBTS5dNy6egwkYtOt8EIHK-oEsKYtZRaa8Z7MOZ7UGxGIMvEmxrGCPeJa14slv2-gaqK0kEThkaSqdYw0FkQZF.ybeRR40AaRKWNZaaKOJvlw",
    "spec": "RFC 7516 4.1.2 (enc is REQUIRED)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -135,7 +138,8 @@
    "jwe": "eyJhbGciOiJub25lIiwiZW5jIjoiQTEyOEdDTSJ9.CBI6oDw8MydIx1IBntf_lQcw2MmJKIQx.Qx0pmsDa8KnJc9Jo.AwliP-KmWgsZ37BvzCefNen6VTbRK3QMA4TkvRkH0tP1bTdhtFJgJxeVmJkLD61A1hnWGetdg11c9ADsnWgL56NyxwSYjU1ZEHcGkd3EkU0vjHi9gTlb90qSYFfeF0LwkcTtjbYKCsiNJQkcIp1yeM03OmuiYSoYJVSpf7ej6zaYcMv3WwdxDFl8REwOhNImk2Xld2JXq6BR53TSFkyT7PwVLuq-1GwtGHlQeg7gDT6xW0JqHDPn_H-puQsmthc9Zg0ojmJfqqFvETUxLAF-KjcBTS5dNy6egwkYtOt8EIHK-oEsKYtZRaa8Z7MOZ7UGxGIMvEmxrGCPeJa14slv2-gaqK0kEThkaSqdYw0FkQZF.7fYWOSAQaLEQYWl8QH1onQ",
    "spec": "RFC 7516 4.1.1 with RFC 7518 4.1 (none is not a key management alg)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    }
   },
   {
@@ -154,13 +158,21 @@
    "jwe": "eyJhbGciOiJkaXIiLCJlbmMiOiJBMTI4R0NNIn0..Qx0pmsDa8KnJc9Jo.rM7INDFc_XDGG1NTIPCvMCOYgawjTBitHyRDFc_qRVAK34--CYqxPELuRQgcpKu0H13k453xWZNkELQnnkDtFdvsz1Jo60FPOl4IoO15teSsFDGJoph75wZPYwUmsT00S90dE9bPplPJKJdlp5i1QbVnj39vupwKcLHwmZWQYRlimY99PG2rF2M_2Vsg4yqhgE5DSP8e016KR9wFS022e52jI-VKCHlv2KTwlCstPimfTBQwMXCSgOWCXVexCYk9hiW5PlEoFkf-FJdBA2DZ69pOZV72m6kLrydGJCh7uxh3K0uhYk5CaevkWnlE3b9uPcJCSzxbz6wPLNa6nBWNgv-xniaeGqIifSsg34AGdarw.tzfBdjNdaCgzGSJ16DAbYA",
    "spec": "RFC 8725 3.1 (expected A128KW, header says dir)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    }
   },
   {
    "id": "rsa1_5",
    "op": "jwe_decrypt",
    "serialization": "compact",
+   "token_jwk": {
+    "kty": "oct",
+    "kid": "81b20965-8332-43d9-a468-82160ad91ac8",
+    "use": "enc",
+    "alg": "A128KW",
+    "k": "GZy6sIZ6wl9NJOKB-jnmVQ"
+   },
    "alg": "RSA1_5",
    "enc": "A128CBC-HS256",
    "jwk": {
@@ -178,13 +190,21 @@
    "note": "must-refuse: RSA1_5 is a non-goal",
    "spec": "RFC 7516 A.2 (RSA1_5; a non-goal, must-refuse)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    }
   },
   {
    "id": "pbes2",
    "op": "jwe_decrypt",
    "serialization": "compact",
+   "token_jwk": {
+    "kty": "oct",
+    "kid": "81b20965-8332-43d9-a468-82160ad91ac8",
+    "use": "enc",
+    "alg": "A128KW",
+    "k": "GZy6sIZ6wl9NJOKB-jnmVQ"
+   },
    "alg": "PBES2-HS512+A256KW",
    "enc": "A128CBC-HS256",
    "password": "entrap_o\\xe2\\x80\\x93peter_long\\xe2\\x80\\x93credit_tun",
@@ -192,7 +212,8 @@
    "note": "must-refuse: PBES2 is a non-goal",
    "spec": "RFC 7520 5.3 (PBES2; a non-goal, must-refuse)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    }
   },
   {

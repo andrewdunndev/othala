@@ -1,4 +1,4 @@
-//! With every feature off (CONTRACT R50, R60): an ES512 token or key and an RSA-OAEP token, RFC 7520 section 6's included, are `UnsupportedAlg`, and the
+//! With every feature off (CONTRACT R50): an ES512 token or key and an RSA-OAEP token, RFC 7520 section 6's included, are `UnsupportedAlg`, and the
 //! registry names still parse.
 #![cfg(not(any(feature = "es512", feature = "rsa-decrypt", feature = "rsa-sign")))]
 
@@ -116,7 +116,7 @@ fn rsa_oaep_is_refused() {
         );
         Outcome::Checked
     });
-    assert_eq!(tally.checked(), 6);
+    assert_eq!((tally.total(), tally.checked()), (15, 6));
     let tally = run::<Case>(vector!("rfc7520/jwe-cases.json"), 1, |case| {
         if case.alg != "RSA-OAEP" {
             return Outcome::NotApplicable;

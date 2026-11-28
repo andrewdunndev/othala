@@ -33,6 +33,7 @@ impl Entropy for Counter {
 struct Expect {
     ok: bool,
     plaintext: Option<String>,
+    kind: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -111,6 +112,18 @@ fn row(file: Vector, total: usize, checked: usize) {
             case.id,
             outcome.as_ref().err().map(|e| e.kind())
         );
+        if let Some(named) = &case.expect.kind {
+            assert_eq!(
+                outcome
+                    .as_ref()
+                    .err()
+                    .map(|e| format!("{:?}", e.kind()))
+                    .as_ref(),
+                Some(named),
+                "{}",
+                case.id
+            );
+        }
         if let Some(want) = &case.expect.plaintext {
             assert_eq!(
                 outcome.ok().map(|p| b64url_encode(&p)).as_ref(),
@@ -133,7 +146,7 @@ fn row(file: Vector, total: usize, checked: usize) {
 
 #[test]
 fn rfc7516_a1_and_rfc7520_5_2() {
-    row(vector!("rfc7516/jwe.json"), 16, 6);
+    row(vector!("rfc7516/jwe.json"), 15, 6);
     row(vector!("rfc7520/jwe-cases.json"), 64, 8);
 }
 

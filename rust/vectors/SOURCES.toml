@@ -260,7 +260,7 @@ feeds = ["jose"]
 notes = "tools/extract_jwe.py on rfc7520.txt (sha256 14798c3b2d72e35375d5fb86d280a1e8df6109a6ee6cbfc091a0c57a8cc076c6), case shape of rfc7515/jws.json, op jwe_decrypt. Every compact, general and flattened serialization of 5.1-5.13 with the key the example names. In scope (RSA-OAEP behind rsa-decrypt, ECDH-ES and ECDH-ES+A128KW/A256KW, dir, A256GCMKW, A128KW; A128GCM, A256GCM, A128CBC-HS256) expect the Figure 72 plaintext; each in-scope compact form adds five derived refusals (tampered tag, ciphertext, IV and encrypted key, truncated tag; for dir and ECDH-ES a non-empty encrypted key, RFC 7516 5.2 step 10). Must-refuse (non-goals): 5.1 RSA1_5, 5.3 PBES2-HS512+A256KW, 5.9 zip DEF, and 5.13 recipient 1 (RSA1_5); 5.13 recipients 2 and 3 decrypt. All 95 cases of this file, rfc7516/jwe.json and rfc7518/*.json cross-checked against Node WebCrypto/OpenSSL before commit."
 cases = 64
 files = [
-  { path = "rfc7520/jwe-cases.json", sha256 = "7a2d93a97b578c4264eed5ca77955d6422b4af722a396076315527cdcf78d77b", cases = 64 },
+  { path = "rfc7520/jwe-cases.json", sha256 = "b742a3ba6558429004b5124d9e8a0cefd2e34ebc4d84767fa778ede9935471d2", cases = 64 },
 ]
 
 [source."rfc7516"]
@@ -270,9 +270,9 @@ retrieved = "2026-11-26"
 licence = "IETF Trust (RFC text; data values only)"
 feeds = ["jose"]
 notes = "tools/extract_jwe.py on rfc7516.txt (sha256 722cfcddc15f58e746891ba4b846853d3711153a774e4dd55ad6db100474a21f), case shape of rfc7515/jws.json, op jwe_decrypt. A.1 RSA-OAEP + A256GCM (behind rsa-decrypt) and A.3 A128KW + A128CBC-HS256 each valid plus five derived refusals (tampered tag, ciphertext, IV, encrypted key; truncated tag). A.2 RSA1_5 + A128CBC-HS256 is must-refuse (non-goal). A.4 (general JSON, RSA1_5 and A128KW recipients) and A.5 (flattened JSON, A128KW): each recipient's key is a case, the A128KW recipients open to the A.3 plaintext and the RSA1_5 recipient is must-refuse (UnsupportedAlg, CONTRACT R65); the must-refuse cases name that kind."
-cases = 16
+cases = 15
 files = [
-  { path = "rfc7516/jwe.json", sha256 = "2ec3e8875f820dff53c54a4b090a263eda8045b54ca3cfa61d264ac2d93f5146", cases = 16 },
+  { path = "rfc7516/jwe.json", sha256 = "c8b0d425d3e0017aa4ce5fc24391c107dd56adc325a69905f6918336a1e66e7d", cases = 15 },
 ]
 
 [source."rfc7518"]
@@ -364,7 +364,7 @@ cases = 109
 files = [
   { path = "jose-derived/claims.json", sha256 = "708fe7fcd78b3463fae0ebe1ac7cb33823a518b6743bb76ca611798eda7f7696", cases = 23 },
   { path = "jose-derived/header.json", sha256 = "25d515ff305dabcb4c672b4ad0116cc2f2071f36e471f90511e35c0d68612b24", cases = 23 },
-  { path = "jose-derived/jwe-header.json", sha256 = "2fa4106e5a755ccf2c5bd403d7feb49dbdb47d681268ab2134955cf37c645457", cases = 11 },
+  { path = "jose-derived/jwe-header.json", sha256 = "abffce55481a23fa6dc6c6517fcff4c9071dc03291a285d94592ba62fef214a3", cases = 11 },
   { path = "jose-derived/jwks.json", sha256 = "2e9135581fcda0c0bd8128ed3cc966d8c2a1bf574f3fd83ea248d82c40a1048c", cases = 8 },
   { path = "jose-derived/keys.json", sha256 = "59ecabe434bd617484e98d6f299ac726f30b13624208a18559b0262f6da3ab3d", cases = 29 },
   { path = "jose-derived/limits.json", sha256 = "68f727a22c03c2db3384e02f878b99855ef58180f74132897dfb43540e8e2748", cases = 8 },

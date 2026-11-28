@@ -27,12 +27,14 @@ struct Case {
     enc: String,
     serialization: String,
     jwk: Option<Json>,
+    token_jwk: Option<Json>,
     jwe: Json,
     expect: Expect,
 }
 
 /// Runs a file of `jwe_decrypt` cases: the algorithms this item owns decrypt or are refused as the vector says (the
-/// kind it names); ECDH-ES, RSA-OAEP and key types of later items are counted not applicable by name.
+/// kind it names); a non-goal algorithm is `UnsupportedAlg` by name and its token the named kind under an owned key;
+/// ECDH-ES, RSA-OAEP and key types of later items are counted not applicable by name.
 fn row(file: Vector, total: usize, applicable: usize) {
     let tally = run::<Case>(file, 1, |case| {
         let owned = common_jwe::LOCAL.contains(&case.alg.as_str());
@@ -57,42 +59,24 @@ fn row(file: Vector, total: usize, applicable: usize) {
                 Jwe::parse_json(wire.as_bytes())
             }
         };
-        let outcomes: Vec<Result<Vec<u8>, jose::Error>> = if refused {
-            common_jwe::LOCAL
-                .iter()
-                .map(|alg| common_jwe::decrypt(alg, &case.enc, jwk, parsed()?))
-                .collect()
-        } else {
-            vec![parsed().and_then(|jwe| common_jwe::decrypt(&case.alg, &case.enc, jwk, jwe))]
-        };
         if refused {
-            let kind = JweAlg::parse(&case.alg).err().map(|e| e.kind());
-            assert_eq!(kind, Some(ErrorKind::UnsupportedAlg), "{}", case.id);
-            let Some(named) = &case.expect.kind else {
-                assert!(outcomes.iter().all(Result::is_err), "{}", case.id);
-                return Outcome::Checked;
-            };
+            // R65: the name is refused, whatever the key
+            let parsed_alg = JweAlg::parse(&case.alg).err().map(|e| e.kind());
+            assert_eq!(parsed_alg, Some(ErrorKind::UnsupportedAlg), "{}", case.id);
+            // R52: the token under an owned oct key, whose `alg` the header's is not, is the kind the vector names
+            let key = case.token_jwk.as_ref().map_or("{}", Json::text);
+            let outcome =
+                parsed().and_then(|jwe| common_jwe::decrypt("A128KW", &case.enc, key, jwe));
+            assert!(!case.expect.ok, "{}", case.id);
             assert_eq!(
-                kind.map(|k| format!("{k:?}")).as_ref(),
-                Some(named),
+                outcome.err().map(|e| format!("{:?}", e.kind())),
+                case.expect.kind,
                 "{}",
                 case.id
             );
-            // the header's `alg` is not the key's under any algorithm this file owns (R52)
-            for outcome in &outcomes {
-                assert_eq!(
-                    outcome.as_ref().err().map(|e| e.kind()),
-                    Some(ErrorKind::AlgMismatch),
-                    "{}",
-                    case.id
-                );
-            }
             return Outcome::Checked;
         }
-        let outcome = outcomes
-            .into_iter()
-            .next()
-            .unwrap_or(Err(ErrorKind::Malformed.into()));
+        let outcome = parsed().and_then(|jwe| common_jwe::decrypt(&case.alg, &case.enc, jwk, jwe));
         assert_eq!(outcome.is_ok(), case.expect.ok, "{}", case.id);
         if let Some(want) = &case.expect.plaintext {
             assert_eq!(
@@ -117,7 +101,7 @@ fn row(file: Vector, total: usize, applicable: usize) {
 
 #[test]
 fn rfc7516_appendix_a() {
-    row(vector!("rfc7516/jwe.json"), 16, 10);
+    row(vector!("rfc7516/jwe.json"), 15, 9);
 }
 
 #[test]

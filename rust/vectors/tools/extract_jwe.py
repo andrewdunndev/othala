@@ -6,9 +6,10 @@ usage: python3 -I extract_jwe.py <rfc7516.txt> <rfc7518.txt> <rfc7520.txt> <out-
 writes <out-dir>/rfc7516/jwe.json, rfc7518/appendix-b.json, rfc7518/appendix-c.json, rfc7520/jwe-cases.json.
 Values are copied from the RFC text; byte arrays become hex or base64url. Cases whose id contains
 "tampered", "truncated", "nonempty" or "off-curve" are derived by one mechanical edit of an upstream
-value. "must-refuse" cases use a non-goal (RSA1_5, PBES2, zip) and expect ok false; those of RFC 7516 name the
-error kind the contract gives the algorithm (CONTRACT R65).
-RFC 7516 A.4 (general, two recipients) and A.5 (flattened) are cases for the key of one recipient each.
+value. "must-refuse" cases use a non-goal (RSA1_5, PBES2, zip) and expect ok false; the RFC 7516 one names
+the kind of its token-level refusal under token_jwk, the A.3 oct key (a header alg that is not the key's, R52).
+Tampered RFC 7516 cases name Decrypt (RFC 7516 11.4). RFC 7516 A.4 (general) and A.5 (flattened) are cases for
+the A128KW recipient's key; the RSA1_5 recipient of A.4 is the one A.2 refuses.
 Licence of this script: MIT OR Apache-2.0.
 """
 import base64, json, os, re, sys
@@ -134,13 +135,13 @@ def flip(seg):
     return ("B" if seg[0] == "A" else "A") + seg[1:]
 
 
-def compact_cases(cid, base, jwe):
+def compact_cases(cid, base, jwe, kind=None):
     """The upstream compact JWE, then one derived refusal per edited part."""
     h, k, iv, c, t = jwe.split(".")
     out = [dict(base, id=cid + "-valid", jwe=jwe)]
-    bad = {"ok": False}
+    bad = {"ok": False, **({"kind": kind} if kind else {})}
     edits = [("tampered-tag", [h, k, iv, c, flip(t)]), ("tampered-ciphertext", [h, k, iv, flip(c), t]),
-             ("tampered-iv", [h, k, flip(iv), c, t]), ("truncated-tag", [h, k, iv, c, t[:-4]])]
+             ("tampered-iv", [h, k, flip(iv), c, t]), ("truncated-tag", [h, k, iv, c, b64(unb64(t)[:-4])])]
     if k:
         edits.append(("tampered-encrypted-key", [h, flip(k), iv, c, t]))
     else:
@@ -151,7 +152,7 @@ def compact_cases(cid, base, jwe):
     return out
 
 
-REFUSED = {"ok": False, "kind": "UnsupportedAlg"}
+REFUSED = {"ok": False, "kind": "AlgMismatch"}
 
 
 def rfc7516(path):
@@ -165,10 +166,10 @@ def rfc7516(path):
         base = {"op": "jwe_decrypt", "alg": h["alg"], "enc": h["enc"], "serialization": "compact", "jwk": jwk(sec + ".3")}
         jwe = compact(sec + ".7")
         if refuse:
-            cases.append(dict(base, id=cid + "-must-refuse", jwe=jwe, expect=REFUSED, note=f"must-refuse: {refuse} is a non-goal"))
+            cases.append(dict(base, id=cid + "-must-refuse", jwe=jwe, expect=REFUSED, token_jwk=jwk("A.3.3"), note=f"must-refuse: {refuse} is a non-goal"))
         else:
             base["expect"] = {"ok": True, "plaintext": b64(octets(s[sec][1]))}
-            cases += compact_cases(cid, base, jwe)
+            cases += compact_cases(cid, base, jwe, "Decrypt")
     # A.4 and A.5 reuse the keys and plaintext of A.2 and A.3; each recipient's case carries that recipient's key
     plaintext = {"ok": True, "plaintext": b64(octets(s["A.3"][1]))}
     whole = lambda sec: next(v for p in s[sec] if (v := json_at(p, "{")) is not None)
@@ -176,12 +177,11 @@ def rfc7516(path):
     enc = hdr("A.3.1")["enc"]
     for cid, ser, doc, alg, key, expect, note in (
         ("a4-general-a128kw-valid", "general", general, "A128KW", jwk("A.3.3"), plaintext, "the RSA1_5 recipient is skipped and the A128KW one opens"),
-        ("a4-general-rsa1_5-must-refuse", "general", general, "RSA1_5", jwk("A.2.3"), REFUSED, "must-refuse: RSA1_5 is a non-goal; the other recipient is not for this key"),
         ("a5-flattened-a128kw-valid", "flattened", flattened, "A128KW", jwk("A.3.3"), plaintext, None),
     ):
         case = {"id": cid, "op": "jwe_decrypt", "alg": alg, "enc": enc, "serialization": ser, "jwk": key, "jwe": doc, "expect": expect}
         cases.append(dict(case, note=note) if note else case)
-    return {"source": "RFC 7516 appendix A.1 to A.5, keys, compact and JSON serializations as given there; tampered cases derived; A.2 and A.4's RSA1_5 recipient are must-refuse", "cases": cases}
+    return {"source": "RFC 7516 appendix A.1 to A.5, keys, compact and JSON serializations as given there; tampered cases derived; A.2 (RSA1_5) is must-refuse", "cases": cases}
 
 
 def rfc7518_b(path):
