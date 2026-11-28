@@ -34,7 +34,13 @@ fn appendix_a() {
             .unwrap_or_default()
             .as_bytes(),
     );
-    assert!(private.is_ok() && public.is_ok());
+    assert_eq!(
+        (
+            private.as_ref().err().map(|e| e.kind()),
+            public.as_ref().err().map(|e| e.kind())
+        ),
+        (None, None)
+    );
     let (private, public) = (private.ok(), public.ok());
     assert_eq!(
         private

@@ -62,7 +62,7 @@ mod tests {
             Some(u64::from_le_bytes([5, 6, 7, 8, 9, 10, 11, 12]))
         );
         let mut rest = [0; 3];
-        assert!(source.try_fill_bytes(&mut rest).is_ok());
+        assert_eq!(source.try_fill_bytes(&mut rest), Ok(()));
         assert_eq!(rest.to_vec(), Vec::from([13, 14, 15]));
     }
 }

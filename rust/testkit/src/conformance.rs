@@ -467,10 +467,16 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
         self.e = saved;
         assert_eq!(first.id(), second.id(), "{}", self.fail("one seed, one id"));
         self.applies(s, &first, "the first apply");
-        assert!(
-            !matches!(s.apply(&second, self.now), Ok(Ok(_))),
+        // a store refuses with its own error or a conflict; either way no receipt comes back
+        let receipt = match s.apply(&second, self.now) {
+            Ok(Ok(receipt)) => Some(receipt.effect_id()),
+            _ => None,
+        };
+        assert_eq!(
+            receipt,
+            None,
             "{}",
-            self.fail("a reused id with different keys is not Ok")
+            self.fail("a reused id with different keys settles no receipt")
         );
     }
 

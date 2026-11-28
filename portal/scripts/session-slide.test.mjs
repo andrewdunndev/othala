@@ -3,7 +3,8 @@
 import { test, expect, vi } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { slide, ABSOLUTE_CAP_MS } from '../src/lib/session-slide.ts';
+import { fileURLToPath } from 'node:url';
+import { slide, idleMs, ABSOLUTE_CAP_MS } from '../src/lib/session-slide.ts';
 import { session, whoamiIdentity, identity } from '../src/lib/test-builders.ts';
 
 const NOW = Date.UTC(2026, 10, 22);
@@ -12,6 +13,7 @@ const live = (over = {}) => session('aal1', ['passkey'], { identity: whoamiIdent
 
 function deps(fresh) {
   return {
+    idleMs: () => 90 * 86_400_000,
     extend: vi.fn(async () => ({})),
     whoami: vi.fn(async () => fresh ?? { session: live({ expires_at: new Date(NOW + 90 * 86_400_000) }), setCookie: ['ory_kratos_session=new; Max-Age=7776000'] }),
   };
@@ -89,4 +91,10 @@ test('only the landing and the OAuth login import the slide', () => {
   };
   walk(root);
   expect(users.sort()).toEqual(['lib/oauth2-handlers.ts', 'lib/session-slide.ts', 'pages/index.astro']);
+});
+
+// Pins: the idle window is read from the shipped kratos.yml (2160h there), not held as a second copy.
+test('idleMs reads session.lifespan from the shipped kratos.yml', () => {
+  const root = fileURLToPath(new URL('../../', import.meta.url));
+  expect(idleMs(root)).toBe(2160 * 3_600_000);
 });

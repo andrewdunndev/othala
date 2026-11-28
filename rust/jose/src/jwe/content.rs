@@ -254,7 +254,12 @@ mod tests {
                 &hex(case.ciphertext.as_deref().unwrap_or_default()),
                 &hex(case.tag.as_deref().unwrap_or_default()),
             );
-            assert_eq!(opened.is_ok(), case.expect.ok, "{}", case.id);
+            assert_eq!(
+                opened.as_ref().err().map(|e| e.kind()),
+                (!case.expect.ok).then_some(ErrorKind::Decrypt),
+                "{}",
+                case.id
+            );
             if let Some(want) = &case.expect.plaintext {
                 assert_eq!(
                     opened.ok().map(|p| p.expose().to_vec()),
@@ -339,7 +344,12 @@ mod tests {
                 );
                 let (msg, ct, tag) = (hex(&test.msg), hex(&test.ct), hex(&test.tag));
                 let opened = E::open(&cek, &iv, &aad, &ct, &tag);
-                assert_eq!(opened.is_ok(), test.result != "invalid", "{}", test.id);
+                assert_eq!(
+                    opened.as_ref().err().map(|e| e.kind()),
+                    (test.result == "invalid").then_some(ErrorKind::Decrypt),
+                    "{}",
+                    test.id
+                );
                 if test.result == "valid" {
                     assert_eq!(
                         opened.ok().map(|p| p.expose().to_vec()),
