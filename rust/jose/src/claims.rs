@@ -274,8 +274,6 @@ enum Audiences {
 //# application uses multiple issuers, collisions MUST be prevented among values produced by
 //# different issuers as well.
 //= https://www.rfc-editor.org/rfc/rfc7519#section-4
-//= type=todo
-//= reason=no test or vector carries a claim jose does not understand
 //# However, in the absence of such requirements, all claims that are not understood by
 //# implementations MUST be ignored.
 #[derive(Deserialize)]

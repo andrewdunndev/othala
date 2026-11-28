@@ -656,7 +656,9 @@ mod tests {
     use testkit::vector;
     use testkit::vectors::{Appendix, Example, Json, Outcome, figures, run, sections};
 
-    use super::{DECRYPT, DERIVE, ENCRYPT, Key, SIGN, SIGNING, UNWRAP, VERIFY, WRAP, parse};
+    use super::{
+        DECRYPT, DERIVE, ENCRYPT, Fam, Key, SIGN, SIGNING, UNWRAP, VERIFY, WRAP, parse, sig_fam,
+    };
     use crate::alg::registry_names;
     use crate::key::{private_info, public_info};
     use crate::{ErrorKind, Jwk, Kid, Kty, MAX_NAME_LEN, SecretJwk};
@@ -768,15 +770,22 @@ mod tests {
             else {
                 return Outcome::NotApplicable;
             };
-            let outcome = parse(jwk.text().as_bytes()).and_then(|(meta, key)| match key {
-                Key::Public(k) => meta.check_sig(public_info(&k), alg, VERIFY),
-                Key::Private(k) => meta.check_sig(private_info(&k), alg, VERIFY),
+            // R16: decode refuses first, with the decoder the algorithm family takes (an HS* key is a
+            // `SecretJwk`, so a non-oct key is `Malformed` there); only a decoded key reaches binding
+            let hmac = matches!(sig_fam(alg), Fam::Oct);
+            let decoded = if hmac {
+                SecretJwk::decode(jwk.text().as_bytes()).map(|_| ())
+            } else {
+                parse(jwk.text().as_bytes()).map(|_| ())
+            };
+            let outcome = decoded.and_then(|()| {
+                let (meta, key) = parse(jwk.text().as_bytes())?;
+                match key {
+                    Key::Public(k) => meta.check_sig(public_info(&k), alg, VERIFY),
+                    Key::Private(k) => meta.check_sig(private_info(&k), alg, VERIFY),
+                }
             });
-            // `SecretJwk::decode` refuses a non-oct key before any binding, so the vector names `Malformed`;
-            // this layer has no such step and binds the key type to the algorithm
-            let kind = if case.id == "hs256-rsa-key" {
-                Some("AlgMismatch")
-            } else if cfg!(feature = "es512") {
+            let kind = if cfg!(feature = "es512") {
                 case.expect.kind.as_deref()
             } else {
                 case.expect

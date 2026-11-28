@@ -110,13 +110,7 @@ struct Fields {
 //# be rejected in their entirety by JSON parsers.
 //= https://www.rfc-editor.org/rfc/rfc7515#section-10.12
 //# Implementations MUST consider JWSs containing such input to be invalid.
-//= https://www.rfc-editor.org/rfc/rfc7515#section-10.12
-//= type=todo
-//= reason=no test parses a header with characters after its JSON object
-//# Implementations MUST consider JWSs containing such input to be invalid.
 //= https://www.rfc-editor.org/rfc/rfc7515#section-10.13
-//= type=todo
-//= reason=no test compares a name escaped outside the Basic Multilingual Plane
 //# Ideally, JWS implementations SHOULD ensure that characters outside the Basic Multilingual Plane
 //# are preserved and compared correctly; alternatively, if this is not possible due to these
 //# characters exercising limitations present in the underlying JSON implementation, then input
@@ -175,16 +169,6 @@ impl Parsed {
         //# In the JWS JSON Serialization, one or both of the JWS Protected Header and JWS
         //# Unprotected Header MUST be present.
         //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
-        //# At least one of the "protected" and "header" members MUST be present for each
-        //# signature/MAC computation so that an "alg" Header Parameter value is conveyed.
-        //= https://www.rfc-editor.org/rfc/rfc7515#section-3.2
-        //= type=todo
-        //= reason=no test parses a JSON serialization signature with neither protected nor header
-        //# In the JWS JSON Serialization, one or both of the JWS Protected Header and JWS
-        //# Unprotected Header MUST be present.
-        //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
-        //= type=todo
-        //= reason=no test parses a JSON serialization signature with neither protected nor header
         //# At least one of the "protected" and "header" members MUST be present for each
         //# signature/MAC computation so that an "alg" Header Parameter value is conveyed.
         let alg = first.alg.or(second.alg).ok_or(ErrorKind::Malformed)?;
