@@ -48,7 +48,7 @@ Public signatures: `rust/webauthn-rp/public-api.txt`, generated and gated by `ju
   - Ceremony rows are written only to the store. puts() exposes the Record and encode is public, so a host could park them in a cookie; only review stops that.
 
 ### oidc-provider
-Unbuilt: no crate exists, and this block is the broad design of 2026-11-24. The operator ruling of 2026-11-26 narrows the first slice (M4) and wins where it differs: client authentication is client_secret_basic or none; userinfo waits for M5; the device grant, logout (end_session, the Sid index, LogoutDelivery) and revocation are out; secrets compare in constant time; code reuse follows the tombstone rule under Obligation.
+Unbuilt: no crate exists, and this block is the broad design of 2026-11-24. The operator ruling of 2026-11-26 narrows the first slice (M4) and wins where it differs: client authentication is client_secret_basic or none; userinfo waits for M5; the device grant, logout (end_session, the Sid index, LogoutDelivery) and the RFC 7009 revocation endpoint are out; secrets compare in constant time; code reuse follows the tombstone rule under Obligation.
 pub struct Provider;  // Provider::new(Issuer, Capabilities, Lifetimes, SigningKeys) is the single source for routing, refusals, metadata and JWKS. SigningKeys: a NonEmpty set of public Jwk with kid and alg.
 impl Provider { metadata() -> Metadata; jwks() -> JwkSet;  // both derive from the constructor arguments; there is no other constructor
   handle(&self, req: &HttpRequest, browser: Option<&Browser>, now, e) -> Step;
@@ -81,7 +81,7 @@ pub fn drive<S: Store<Key,Record>>(step, store: &mut S, signer: &impl Sign, retr
   - A row reported through Rows::corrupt answers Corrupt, never absent. That the host reports every decode failure that way is an Obligation.
   - An authorization request without S256 from any client, public or confidential, unless that client row carries Pkce::Exempt (RFC 9700 2.1.1).
 - Obligation (the base one):
-  - Every row a decision read appears in its Effect as Unchanged (found) or Absent (missing), and single-use rows as Consume (a code: Unchanged on the row its tombstone replaces). So a code or refresh token redeemed twice, a refresh racing a logout that deleted its family, and a ticket resumed twice all lose as Conflict.
+  - Every row a decision read appears in its Effect as Unchanged (found) or Absent (missing), and single-use rows as Consume (a code: Unchanged on the row its tombstone replaces). So a code or refresh token redeemed twice concurrently, a refresh racing a logout that deleted its family, and a ticket resumed twice all lose as Conflict.
   - Reuse rule: only a Missing failure on the Consume of the refresh token this request presented revokes its family. A code is never Consumed (ruling 2026-11-26): redeeming it rewrites its row as a tombstone that lives until the longest-lived token issued from it expires, so a replay reads the tombstone, is refused, and revokes those tokens (RFC 6749 4.1.2: MUST deny, SHOULD revoke). Every other failure re-loads and re-decides. A lost commit result is re-applied as the same effect, so within one host attempt it never reads as reuse.
   - Not claimed: when the host attempt ends after the commit, the client's resend of that refresh token reads Missing and revokes the family. That is the RFC 9700 4.14 rotation trade-off; no grace rule weakens reuse detection to hide it.
   - No decision reads a range: end_session finds families through the Sid index row.
