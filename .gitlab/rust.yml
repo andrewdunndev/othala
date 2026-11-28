@@ -25,7 +25,6 @@
   interruptible: false
   script:
     - cargo install --locked cargo-mutants@$(just mutants-pin)
-    - rustup toolchain install nightly --profile minimal
     - just gate-slow "$CRATE" "$SHARD"
 
 # one crate's fuzz targets, apart from its mutants shards so neither can run the other past the job limit
@@ -35,5 +34,4 @@
   interruptible: false
   script:
     - cargo install --locked cargo-fuzz@0.13.1
-    - rustup toolchain install nightly --profile minimal
     - just fuzz 600 "$CRATE"

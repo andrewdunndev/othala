@@ -11,7 +11,8 @@
 //! - `shape` (attestation_object): a `cbor.json` item that decodes but is not an attestation object, `Malformed` (R40).
 //! - `golden`, `golden-cut`, `golden-extra`, `golden-version`: a `tests/golden` row, whole (`ok`), without its last
 //!   byte, with an extra `00`, or with version byte 09 (`Corrupt`, R15).
-//! - `hand:<Kind>`: a minimal input written for the target, with the outcome it states.
+//! - `hand:<Kind>`: a minimal input written for the target, its hex after the id of the CONTRACT claim it probes, with
+//!   the outcome it states.
 //!
 //! The fixed raw id makes any other credential id `CredentialIdInvalid`, so the corpus does not prove the R51 bound
 //! (ids of 1023 and 1024 bytes both read so); `row:derived` does.
@@ -72,6 +73,7 @@ fn record_corpus() {
 }
 
 const SEEDS: &str = include_str!("../fuzz/seeds.tsv");
+const CONTRACT: &str = include_str!("../CONTRACT.md");
 
 fn unhex(text: &str) -> Option<Vec<u8>> {
     text.trim()
@@ -119,9 +121,16 @@ fn derive(
     files: &std::collections::BTreeMap<String, Vec<u8>>,
 ) -> Result<(Option<Vec<u8>>, String), String> {
     if let Some(kind) = rule.strip_prefix("hand:") {
-        return Ok((None, kind.to_owned()));
+        let (claim, hex) = source.split_once(':').ok_or("hand source")?;
+        if !CONTRACT.contains(&format!("\n- {claim} ")) {
+            return Err(format!("{source}: no such claim"));
+        }
+        return Ok((Some(unhex(hex).ok_or("hand hex")?), kind.to_owned()));
     }
     if let Some(name) = source.strip_prefix("golden:") {
+        if target != "record" {
+            return Err(format!("{source}: a golden row is a record"));
+        }
         let text = files.get(&format!("{name}.hex")).ok_or("no golden row")?;
         let row = unhex(&String::from_utf8_lossy(text)).ok_or("golden hex")?;
         let (bytes, outcome) = match rule {
@@ -156,7 +165,7 @@ fn derive(
     let kind = case.expect.kind.as_deref().unwrap_or("ok");
     let finish = !case.expect.ok && !matches!(kind, "Malformed" | "TooLarge");
     let outcome = match rule {
-        "oracle" => kind,
+        "oracle" if !finish => kind,
         "finish" if finish => "ok",
         "rawid" if target == "attestation_object" && (case.expect.ok || finish) => {
             "CredentialIdInvalid"
@@ -201,20 +210,17 @@ fn manifest_derives_every_seed() -> Result<(), String> {
         );
     }
     let mut named = 0;
-    for target in [
-        "attestation_object",
-        "authenticator_data",
-        "client_data",
-        "record",
-    ] {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("fuzz/corpus")
-            .join(target);
+    let corpus = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fuzz/corpus");
+    for dir in testkit::fixture::paths(&corpus) {
+        let target = dir
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .ok_or("corpus dir")?;
         for (name, _) in testkit::fixture::files(&dir) {
             if name.contains('-') {
                 named += 1;
                 assert!(
-                    listed.contains(&(target, name.as_str())),
+                    listed.contains(&(target.as_str(), name.as_str())),
                     "{target}/{name} is not in fuzz/seeds.tsv"
                 );
             }
