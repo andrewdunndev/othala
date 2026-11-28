@@ -8,8 +8,8 @@ use common::{
     Case, Mem, applied, attempts_row, count, rfc6238, seed_step, seen, stored, verify_once,
 };
 use factor::{
-    Digits, Key, OtpAlg, OtpCode, OtpKey, Period, Phc, Record, RecoveryCode, RecoveryCount, Skew,
-    Throttle, Totp, recovery_generate, recovery_verify,
+    Digits, Key, OtpAlg, OtpCode, OtpKey, Period, Phc, Record, RecoveryCode, RecoveryCount,
+    Rejected, Skew, Throttle, Totp, recovery_generate, recovery_verify,
 };
 use proptest::prelude::*;
 use proptest::test_runner::{RngSeed, TestError, TestRunner};
@@ -248,9 +248,13 @@ fn counted_sequences() -> Result<(), TestError<Plays>> {
                 let pending = recovery_verify(permit, code, hash, &mut e).map_err(fail)?;
                 let receipt =
                     applied(&mut store, pending.effect(), now).ok_or_else(|| fail("apply"))?;
-                let matched = pending.settle(receipt).map_err(fail)?.is_ok();
+                let verdict = pending.settle(receipt).map_err(fail)?;
                 // a code matches the first time and never again (R33)
-                prop_assert_eq!(matched, spent.insert(code.key()));
+                let first = spent.insert(code.key());
+                prop_assert_eq!(
+                    verdict.map(drop),
+                    if first { Ok(()) } else { Err(Rejected::Wrong) }
+                );
             } else {
                 let t = authenticator(c, Skew::One).map_err(fail)?;
                 let code = OtpCode::parse(&presented(c, corrupt)).map_err(fail)?;
@@ -322,7 +326,7 @@ fn no_internal_totp() -> Result<(), TestError<Constructed>> {
             .check(None, UnixTime::new(time))
             .map_err(|_| fail("permit"))?;
         let verdict = t.verify(permit, &OtpCode::parse(&code).map_err(fail)?, held, &mut e);
-        prop_assert!(verdict.is_ok());
+        let _pending = verdict.map_err(fail)?;
         Ok(())
     })
 }
@@ -351,7 +355,7 @@ fn no_internal_recovery() -> Result<(), TestError<(u8, u64, bool)>> {
             let permit = Throttle::unlimited()
                 .check(None, NOW)
                 .map_err(|_| fail("permit"))?;
-            prop_assert!(recovery_verify(permit, code, hash, &mut e).is_ok());
+            let _pending = recovery_verify(permit, code, hash, &mut e).map_err(fail)?;
             Ok(())
         },
     )

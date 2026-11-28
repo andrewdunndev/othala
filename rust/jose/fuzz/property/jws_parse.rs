@@ -18,7 +18,7 @@ fn verify<'a>(parse: &dyn Fn() -> Result<Jws<'a>, Error>) -> Result<(), Error> {
     parse()?.verify(&hs).map(drop).or_else(|refusal| {
         others
             .into_iter()
-            .find(Result::is_ok)
+            .find(|r| matches!(r, Ok(())))
             .unwrap_or(Err(refusal))
     })
 }

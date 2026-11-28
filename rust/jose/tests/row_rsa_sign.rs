@@ -89,10 +89,13 @@ fn round<A: BlindedAlg>(
     if let Some(byte) = bytes.get_mut(place).filter(|b| **b != b'.') {
         *byte = if *byte == b'A' { b'B' } else { b'A' };
         let changed = String::from_utf8(bytes).map_err(|_| TestCaseError::fail("utf8"))?;
-        prop_assert!(
+        prop_assert_ne!(
             Jws::parse(&changed)
                 .and_then(|j| j.verify(&verifier))
-                .is_err()
+                .err()
+                .map(|e| e.kind()),
+            None,
+            "a changed byte is refused, as whichever of the signature, the header or the encoding it hit"
         );
     }
     Ok(())
@@ -124,5 +127,5 @@ fn every_rs_and_ps_round_trips() {
         }
         Ok(())
     });
-    assert!(outcome.is_ok(), "{outcome:?}");
+    assert_eq!(outcome, Ok(()));
 }

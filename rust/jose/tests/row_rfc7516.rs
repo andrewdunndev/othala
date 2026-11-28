@@ -1,5 +1,6 @@
 //! RFC 7516 Appendix A.3, the header refusals and issuing round trips (CONTRACT R48, R51 to R53, R59).
 mod common_jwe;
+mod common_refusal;
 
 use base::{Entropy, SecretBytes, b64url_decode, b64url_encode};
 use jose::{
@@ -42,43 +43,42 @@ fn row(file: Vector, total: usize, applicable: usize) {
         if case.alg.starts_with("ECDH") || case.alg.starts_with("RSA-OAEP") {
             return Outcome::NotApplicable;
         }
-        let jwk = case.jwk.as_ref().map_or("{}", Json::text);
-        let outcomes: Vec<Result<Vec<u8>, jose::Error>> = if refused {
-            common_jwe::LOCAL
-                .iter()
-                .map(|alg| common_jwe::decrypt(alg, &case.enc, jwk, Jwe::parse(&case.jwe)?))
-                .collect()
-        } else {
-            vec![
-                Jwe::parse(&case.jwe)
-                    .and_then(|jwe| common_jwe::decrypt(&case.alg, &case.enc, jwk, jwe)),
-            ]
-        };
         if refused {
-            assert!(outcomes.iter().all(Result::is_err), "{}", case.id);
+            // RSA1_5 and PBES2 are refused by name, before any key is read: the kind the file names, else R51's
             assert_eq!(
-                JweAlg::parse(&case.alg).err().map(|e| e.kind()),
-                Some(ErrorKind::UnsupportedAlg)
+                JweAlg::parse(&case.alg)
+                    .err()
+                    .map(|e| format!("{:?}", e.kind())),
+                Some(
+                    case.expect
+                        .kind
+                        .clone()
+                        .unwrap_or_else(|| "UnsupportedAlg".into())
+                ),
+                "{}",
+                case.id
             );
             return Outcome::Checked;
         }
+        let jwk = case.jwk.as_ref().map_or("{}", Json::text);
+        let outcomes = vec![
+            Jwe::parse(&case.jwe)
+                .and_then(|jwe| common_jwe::decrypt(&case.alg, &case.enc, jwk, jwe)),
+        ];
         let outcome = outcomes
             .into_iter()
             .next()
             .unwrap_or(Err(ErrorKind::Malformed.into()));
-        assert_eq!(outcome.is_ok(), case.expect.ok, "{}", case.id);
+        common_refusal::assert_outcome(
+            &outcome,
+            case.expect.ok,
+            case.expect.kind.as_deref(),
+            &case.id,
+        );
         if let Some(want) = &case.expect.plaintext {
             assert_eq!(
                 outcome.as_ref().ok().map(|p| b64url_encode(p)).as_ref(),
                 Some(want),
-                "{}",
-                case.id
-            );
-        }
-        if let Some(kind) = &case.expect.kind {
-            assert_eq!(
-                outcome.err().map(|e| format!("{:?}", e.kind())).as_ref(),
-                Some(kind),
                 "{}",
                 case.id
             );
@@ -205,7 +205,7 @@ fn jwe_round_trip() {
         all_enc!(Dir, None::<usize>, &payload, seed, at);
         Ok(())
     });
-    assert!(outcome.is_ok(), "{outcome:?}");
+    assert_eq!(outcome, Ok(()));
     assert_eq!(cek_len("A128GCM"), 16);
 }
 
@@ -290,7 +290,7 @@ fn jwe_tamper_is_decrypt() {
         tamper::<Dir, A256CbcHs512>(64, &payload, seed)?;
         Ok(())
     });
-    assert!(outcome.is_ok(), "{outcome:?}");
+    assert_eq!(outcome, Ok(()));
     // a CEK of the wrong length: a direct key that is not the encryption's
     let token = key::<Dir>(16).and_then(|(k, _)| k.encrypt::<A128Gcm>(b"x", &mut Counter(1)).ok());
     let short = key::<Dir>(24).and_then(|(_, s)| s.decrypt_key::<Dir>().ok());
@@ -335,7 +335,7 @@ fn jwe_serializations_agree() {
         );
         Ok(())
     });
-    assert!(outcome.is_ok(), "{outcome:?}");
+    assert_eq!(outcome, Ok(()));
 }
 
 fn compact_again(token: &Compact, key: &jose::DecryptKey<A128Kw>) -> Option<Vec<u8>> {

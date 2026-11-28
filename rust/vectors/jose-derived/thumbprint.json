@@ -85,7 +85,8 @@
    },
    "spec": "RFC 7638 3.2 (required members must be present)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -97,7 +98,8 @@
    },
    "spec": "RFC 7638 3.2 (members are defined per kty)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "UnsupportedAlg"
    }
   }
  ]

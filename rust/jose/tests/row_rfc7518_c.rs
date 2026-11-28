@@ -66,7 +66,17 @@ fn appendix_c() {
         let key = SecretJwk::decode(case.private_jwk.text().as_bytes())
             .and_then(|k| k.decrypt_key::<EcdhEs>());
         let opened = key.and_then(|key| Jwe::parse(&token)?.decrypt::<EcdhEs, A128Gcm>(&key));
-        assert_eq!(opened.is_ok(), case.expect.ok, "{}", case.id);
+        // a token the parser or a key check refuses is Malformed; one the decryption refuses is Decrypt
+        assert_eq!(
+            opened
+                .as_ref()
+                .err()
+                .map(|e| e.kind() == jose::ErrorKind::Decrypt
+                    || e.kind() == jose::ErrorKind::Malformed),
+            (!case.expect.ok).then_some(true),
+            "{}",
+            case.id
+        );
         if case.expect.ok {
             assert_eq!(
                 opened.ok().map(|p| p.bytes().to_vec()),

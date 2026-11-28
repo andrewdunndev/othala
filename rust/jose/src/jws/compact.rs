@@ -87,10 +87,7 @@ impl<'a> Jws<'a> {
             }
             named = true;
             let input = [signature.protected, ".", self.payload].concat();
-            if key
-                .verify_signature(input.as_bytes(), &signature.bytes)
-                .is_ok()
-            {
+            if let Ok(()) = key.verify_signature(input.as_bytes(), &signature.bytes) {
                 let payload = b64url_decode(self.payload)
                     .map(Payload)
                     .map_err(|_| malformed())?;
@@ -219,7 +216,10 @@ mod tests {
     fn length_and_segments() {
         let long = |payload: usize| format!("eyJhbGciOiJIUzI1NiJ9.{}.AAAA", "A".repeat(payload));
         assert_eq!(long(MAX_COMPACT_LEN - 26).len(), MAX_COMPACT_LEN);
-        assert!(Jws::parse(&long(MAX_COMPACT_LEN - 26)).is_ok());
+        assert_eq!(
+            Jws::parse(&long(MAX_COMPACT_LEN - 26)).map(|j| j.kids().len()),
+            Ok(0)
+        );
         let over = long(MAX_COMPACT_LEN - 25);
         assert_eq!(
             Jws::parse(&over).err().map(|e| e.kind()),
@@ -237,7 +237,10 @@ mod tests {
                 "{text}"
             );
         }
-        assert!(Jws::parse(&format!("{head}..")).is_ok());
+        assert_eq!(
+            Jws::parse(&format!("{head}..")).map(|j| j.kids().len()),
+            Ok(0)
+        );
     }
 
     #[test]
