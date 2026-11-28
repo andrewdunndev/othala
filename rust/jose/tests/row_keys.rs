@@ -59,6 +59,8 @@ type Draw = (usize, String, usize, usize, usize);
 struct Expect {
     ok: bool,
     kind: Option<String>,
+    /// The refusal when `es512` is off and the case's P-521 key is refused whole (CONTRACT R16, R50).
+    kind_without_es512: Option<String>,
     keys: Option<usize>,
     kids: Option<Vec<String>>,
     kty: Option<String>,
@@ -80,10 +82,15 @@ struct Case {
 }
 
 fn named(expect: &Expect, outcome: Result<(), jose::Error>, id: &str) {
+    let kind = if cfg!(feature = "es512") {
+        None
+    } else {
+        expect.kind_without_es512.as_deref()
+    };
     testkit::vectors::assert_verdict(
         &outcome,
         expect.ok,
-        expect.kind.as_deref(),
+        kind.or(expect.kind.as_deref()),
         |e| e.kind(),
         id,
     );

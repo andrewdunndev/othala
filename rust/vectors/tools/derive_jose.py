@@ -7,6 +7,8 @@ writes <out-dir>/jose-derived/{header,keys,jwks,claims,thumbprint,limits}.json.
 Deterministic: HS256 MACs use the RFC 7515 A.1 key, short RSA moduli come from fixed seeds. Every case
 names the spec section it follows in `spec`. `expect.kind` appears only where the architecture contract
 or a ruling names the refusal class; elsewhere a refusal is only `ok: false`.
+`expect.kind_without_es512` is the refusal when the `es512` feature is off and the case's P-521 key cannot be
+parsed at all (CONTRACT R16, R50); a test built without `es512` takes it in place of `kind`.
 Licence of this script: MIT OR Apache-2.0.
 """
 import base64, hashlib, hmac, json, os, sys
@@ -114,7 +116,7 @@ def keys():
     c = [
         k("es256-p256", "RFC 7518 3.4", "ES256", P256, OK),
         k("es256-p384-key", "RFC 7518 3.4 (ES256 is P-256) and RFC 8725 3.1", "ES256", P384, kind("AlgMismatch")),
-        k("es256-p521-key", "RFC 7518 3.4 and RFC 8725 3.1", "ES256", P521, kind("AlgMismatch")),
+        k("es256-p521-key", "RFC 7518 3.4 and RFC 8725 3.1", "ES256", P521, {**kind("AlgMismatch"), "kind_without_es512": "UnsupportedAlg"}),
         k("es384-p256-key", "RFC 7518 3.4 (ES384 is P-384)", "ES384", P256, kind("AlgMismatch")),
         k("es256-rsa-key", "RFC 7518 3.4 and RFC 8725 3.1", "ES256", RSA, kind("AlgMismatch")),
         k("es256-okp-key", "RFC 7518 3.4 and RFC 8037 3.1", "ES256", ED, kind("AlgMismatch")),
