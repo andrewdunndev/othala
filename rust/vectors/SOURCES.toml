@@ -227,6 +227,18 @@ files = [
   { path = "rfc7520/jws.json", sha256 = "36da0568090a9e9585a3adf94653583f52aa733a1705d09768167ef9b51944c3", cases = 8 },
 ]
 
+[source."rfc7520-nesting"]
+url = "https://www.rfc-editor.org/rfc/rfc7520.txt"
+revision = "RFC 7520 section 6"
+retrieved = "2026-11-28"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+notes = "Extracted by tools/extract_rfc_figures.py rfc7520.txt rfc7520/nesting.json 6 (rfc7520.txt sha256 14798c3b2d72e35375d5fb86d280a1e8df6109a6ee6cbfc091a0c57a8cc076c6): every numbered figure of section 6 as text, joined (whitespace removed) and parsed json where it is JSON. RFC 7520 is Informational. Section 6.1-6.8: a PS256 JWT nested in an RSA-OAEP and A128GCM JWE with cty JWT; the encryption key is Figure 84 (rfc7520/jwe.json), the signing key Figure 224."
+cases = 7
+files = [
+  { path = "rfc7520/nesting.json", sha256 = "544c63fe76593a1afbcaad05bfd5a567a96fb065c32fd7c232dcf84b80200ddd", cases = 7 },
+]
+
 [source."rfc7520-jwe"]
 url = "https://www.rfc-editor.org/rfc/rfc7520.txt"
 revision = "RFC 7520 section 5"
@@ -245,7 +257,7 @@ revision = "RFC 7520 section 5"
 retrieved = "2026-11-26"
 licence = "IETF Trust (RFC text; data values only)"
 feeds = ["jose"]
-notes = "tools/extract_jwe.py on rfc7520.txt (sha256 14798c3b2d72e35375d5fb86d280a1e8df6109a6ee6cbfc091a0c57a8cc076c6), case shape of rfc7515/jws.json, op jwe_decrypt. Every compact, general and flattened serialization of 5.1-5.13 with the key the example names. In scope (RSA-OAEP behind rsa-decrypt, ECDH-ES and ECDH-ES+A128KW/A256KW, dir, A256GCMKW, A128KW; A128GCM, A256GCM, A128CBC-HS256) expect the Figure 72 plaintext; each in-scope compact form adds five derived refusals (tampered tag, ciphertext, IV and encrypted key, truncated tag; for dir and ECDH-ES a non-empty encrypted key, RFC 7516 5.2 step 10). Must-refuse (non-goals): 5.1 RSA1_5, 5.3 PBES2-HS512+A256KW, 5.9 zip DEF, and 5.13 recipient 1 (RSA1_5); 5.13 recipients 2 and 3 decrypt. All 95 cases of this file, rfc7516/jwe.json and rfc7518/*.json cross-checked against Node WebCrypto/OpenSSL before commit."
+notes = "tools/extract_jwe.py on rfc7520.txt (sha256 14798c3b2d72e35375d5fb86d280a1e8df6109a6ee6cbfc091a0c57a8cc076c6), case shape of rfc7515/jws.json, op jwe_decrypt. Every compact, general and flattened serialization of 5.1-5.13 with the key the example names. In scope (RSA-OAEP behind rsa-decrypt, ECDH-ES and ECDH-ES+A128KW/A256KW, dir, A256GCMKW, A128KW; A128GCM, A256GCM, A128CBC-HS256) expect the Figure 72 plaintext; each in-scope compact form adds five derived refusals (tampered tag, ciphertext, IV and encrypted key, truncated tag; for dir and ECDH-ES a non-empty encrypted key, RFC 7516 5.2 step 10). Must-refuse (non-goals): 5.1 RSA1_5, 5.3 PBES2-HS512+A256KW, 5.9 zip DEF, and 5.13 recipient 1 (RSA1_5); 5.13 recipients 2 and 3 decrypt. The 95 cases then in this file, the A.1 to A.3 cases of rfc7516/jwe.json and rfc7518/*.json were cross-checked against Node WebCrypto/OpenSSL when first committed; the A.4, A.5 and the RFC 7520 section 6 file are not cross-checked, only the RFC's own outputs decrypt and verify in our code."
 cases = 64
 files = [
   { path = "rfc7520/jwe-cases.json", sha256 = "7a2d93a97b578c4264eed5ca77955d6422b4af722a396076315527cdcf78d77b", cases = 64 },
@@ -253,14 +265,14 @@ files = [
 
 [source."rfc7516"]
 url = "https://www.rfc-editor.org/rfc/rfc7516.txt"
-revision = "RFC 7516 appendix A.1-A.3"
+revision = "RFC 7516 appendix A.1-A.5"
 retrieved = "2026-11-26"
 licence = "IETF Trust (RFC text; data values only)"
 feeds = ["jose"]
-notes = "tools/extract_jwe.py on rfc7516.txt (sha256 722cfcddc15f58e746891ba4b846853d3711153a774e4dd55ad6db100474a21f), case shape of rfc7515/jws.json, op jwe_decrypt. A.1 RSA-OAEP + A256GCM (behind rsa-decrypt) and A.3 A128KW + A128CBC-HS256 each valid plus five derived refusals (tampered tag, ciphertext, IV, encrypted key; truncated tag). A.2 RSA1_5 + A128CBC-HS256 is must-refuse (non-goal). A.4 and A.5 (general and flattened JSON, RSA1_5 plus A128KW recipients) not extracted; RFC 7520 section 5 covers both serializations."
-cases = 13
+notes = "tools/extract_jwe.py on rfc7516.txt (sha256 722cfcddc15f58e746891ba4b846853d3711153a774e4dd55ad6db100474a21f), case shape of rfc7515/jws.json, op jwe_decrypt. A.1 RSA-OAEP + A256GCM (behind rsa-decrypt) and A.3 A128KW + A128CBC-HS256 each valid plus five derived refusals (tampered tag, ciphertext, IV, encrypted key; truncated tag). A.2 RSA1_5 + A128CBC-HS256 is must-refuse (non-goal). A.4 (general JSON, RSA1_5 and A128KW recipients) and A.5 (flattened JSON, A128KW): the A128KW key is the case for each, opening to the A.3 plaintext with A.4's RSA1_5 recipient skipped; A.2 is must-refuse and its token is AlgMismatch under token_jwk, an owned oct key (CONTRACT R52)."
+cases = 15
 files = [
-  { path = "rfc7516/jwe.json", sha256 = "3e9147da581ab0b991cf36bc9f04afefdfa5520e77c33fda9fe381bb9d4a5c8a", cases = 13 },
+  { path = "rfc7516/jwe.json", sha256 = "e20ec4b54126e13fe6292268889348ac1b09b16d612aa34548eb1fbe449c317d", cases = 15 },
 ]
 
 [source."rfc7518"]
@@ -352,7 +364,7 @@ cases = 109
 files = [
   { path = "jose-derived/claims.json", sha256 = "e5eecd774966e5e4576f3b9e993eb3395bf673585206f4b168cd8551e1ab99da", cases = 23 },
   { path = "jose-derived/header.json", sha256 = "9492f4bdea52555000f9274fc674016bdc5f1c6d92b8ed45a5b0654cf7c1fd65", cases = 23 },
-  { path = "jose-derived/jwe-header.json", sha256 = "b7a9cea064266055110dda580ec60430349bb986998d909ac6aa13425badb067", cases = 11 },
+  { path = "jose-derived/jwe-header.json", sha256 = "abffce55481a23fa6dc6c6517fcff4c9071dc03291a285d94592ba62fef214a3", cases = 11 },
   { path = "jose-derived/jwks.json", sha256 = "ca7888c0bde66f331c03cfa0b5e7a4f0173f46ab4c43a17f59d4b74c5908e990", cases = 8 },
   { path = "jose-derived/keys.json", sha256 = "3a3996c0c1faa926b07baa35b06c7802f10f73d92cb8f79d0beb490ea223d4a2", cases = 29 },
   { path = "jose-derived/limits.json", sha256 = "68f727a22c03c2db3384e02f878b99855ef58180f74132897dfb43540e8e2748", cases = 8 },

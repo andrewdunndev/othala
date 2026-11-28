@@ -50,7 +50,7 @@ function concatKdf(z, alg, bits, apu = Buffer.alloc(0), apv = Buffer.alloc(0)) {
 }
 const hexOf = (t) => Buffer.from(t.replace(/\s+/g, ""), "hex");
 
-const OK = { ok: true, plaintext: b64(PT) }, NO = { ok: false };
+const OK = { ok: true, plaintext: b64(PT) };
 const c = (id, spec, expect, f) => ({ id, op: "jwe_decrypt", serialization: "compact", ...f, spec, expect });
 const kwk = (hdr, pt = PT) => compact(hdr, kw(ub(KEY.k), CEK), pt);
 const cases = [
@@ -64,9 +64,9 @@ const cases = [
   c("alg-mismatch", "RFC 8725 3.1 (expected A128KW, header says dir)", { ok: false, kind: "AlgMismatch" }, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: compact('{"alg":"dir","enc":"A128GCM"}', Buffer.alloc(0), PT, ub(KEY.k)) }),
 ];
 const a2 = load("rfc7516/jwe.json").cases.find((x) => x.id.startsWith("a2-"));
-cases.push(c("rsa1_5", "RFC 7516 A.2 (RSA1_5; a non-goal, must-refuse)", { ok: false, kind: "UnsupportedAlg" }, { alg: "RSA1_5", enc: a2.enc, jwk: a2.jwk, jwe: a2.jwe, note: "must-refuse: RSA1_5 is a non-goal" }));
+cases.push(c("rsa1_5", "RFC 7516 A.2 (RSA1_5; a non-goal, must-refuse)", { ok: false, kind: "AlgMismatch" }, { token_jwk: KEY, alg: "RSA1_5", enc: a2.enc, jwk: a2.jwk, jwe: a2.jwe, note: "must-refuse: RSA1_5 is a non-goal" }));
 const s53 = load("rfc7520/jwe-cases.json").cases.find((x) => x.id === "s5_3-compact-must-refuse");
-cases.push(c("pbes2", "RFC 7520 5.3 (PBES2; a non-goal, must-refuse)", { ok: false, kind: "UnsupportedAlg" }, { alg: s53.alg, enc: s53.enc, password: s53.password, jwe: s53.jwe, note: "must-refuse: PBES2 is a non-goal" }));
+cases.push(c("pbes2", "RFC 7520 5.3 (PBES2; a non-goal, must-refuse)", { ok: false, kind: "AlgMismatch" }, { token_jwk: KEY, alg: s53.alg, enc: s53.enc, password: s53.password, jwe: s53.jwe, note: "must-refuse: PBES2 is a non-goal" }));
 
 // RFC 8037 A.6: Z = X25519(ephemeral secret, Bob's public); reversing the roles makes the A.6 ephemeral key the
 // recipient, Bob's public the epk, and the same published Z
