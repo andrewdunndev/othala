@@ -35,6 +35,7 @@ enum Lie {
     ExpectBumps,
     TableVersion,
     ConsumeSweepsSibling,
+    UpdateRewritesSibling,
     NoAppliedId,
     IdAfterGuards,
     RecordsConflictedId,
@@ -52,7 +53,7 @@ enum Lie {
     WrongReceipt,
 }
 
-const CAUGHT_IN: [(Lie, &str); 23] = [
+const CAUGHT_IN: [(Lie, &str); 24] = [
     (Lie::SkipWrites, "atomic: "),
     (Lie::ConflictAsError, "atomic: "),
     (Lie::EagerPuts, "atomic: "),
@@ -61,6 +62,7 @@ const CAUGHT_IN: [(Lie, &str); 23] = [
     (Lie::ExpectBumps, "expect_shared: "),
     (Lie::TableVersion, "disjoint: "),
     (Lie::ConsumeSweepsSibling, "isolated: "),
+    (Lie::UpdateRewritesSibling, "isolated: "),
     (Lie::NoAppliedId, "reapply: "),
     (Lie::IdAfterGuards, "reapply: "),
     (Lie::RecordsConflictedId, "conflict_not_applied: "),
@@ -296,6 +298,13 @@ impl Store<K, u16> for Liar {
                 self.rows.remove(&K(k.0 ^ 1));
             }
         }
+        if lie == Lie::UpdateRewritesSibling
+            && puts.contains(&K(0))
+            && !creates.contains(&K(0))
+            && let Some(row) = self.rows.get_mut(&K(1))
+        {
+            row.0 = u16::MAX;
+        }
         if lie != Lie::NoAppliedId {
             self.applied.insert(effect.id(), keys);
         }
@@ -359,7 +368,7 @@ struct Table {
 type SharedTable = Arc<Mutex<Table>>;
 
 // holds each arrival until RACERS have come, or gives up after a while so a stray early conflict fails the
-// test instead of hanging it; arrivals add up across rounds
+// test instead of hanging it; arrivals add up across the rounds of one test
 #[derive(Default)]
 struct Window {
     arrived: Mutex<usize>,
