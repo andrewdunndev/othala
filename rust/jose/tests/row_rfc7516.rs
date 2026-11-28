@@ -140,16 +140,6 @@ impl Entropy for Counter {
     }
 }
 
-fn cek_len(enc: &str) -> usize {
-    match enc {
-        "A128GCM" => 16,
-        "A192GCM" => 24,
-        "A256GCM" | "A128CBC-HS256" => 32,
-        "A192CBC-HS384" => 48,
-        _ => 64,
-    }
-}
-
 /// `decrypt(encrypt(x)) = x`, one seed gives one token, and a changed byte of any later segment is `Decrypt`.
 fn round<K: LocalKeyAlg, E: Enc>(
     len: usize,
@@ -202,13 +192,6 @@ macro_rules! all_enc {
     }};
 }
 
-//= https://www.rfc-editor.org/rfc/rfc7518#section-5.3
-//= type=test
-//# The requested size of the Authentication Tag output MUST be 128 bits, regardless of the key
-//# size.
-//= https://www.rfc-editor.org/rfc/rfc7518#section-5.3
-//= type=test
-//# Use of an IV of size 96 bits is REQUIRED with this algorithm.
 //= https://www.rfc-editor.org/rfc/rfc7518#section-5.2.2.1
 //= type=test
 //# The number of octets in the input key K MUST be the sum of MAC_KEY_LEN and ENC_KEY_LEN.
@@ -239,7 +222,6 @@ fn jwe_round_trip() {
         Ok(())
     });
     assert_eq!(outcome, Ok(()));
-    assert_eq!(cek_len("A128GCM"), 16);
 }
 
 /// Every failure after the header is `Decrypt`: a wrong key, a changed key, IV, ciphertext, tag or AAD, a CEK of the wrong length.

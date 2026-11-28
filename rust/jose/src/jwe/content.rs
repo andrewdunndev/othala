@@ -470,4 +470,48 @@ mod tests {
         tag_first_for::<A192CbcHs384, Sha384>();
         tag_first_for::<A256CbcHs512, Sha512>();
     }
+
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-5.3
+    //= type=test
+    //# The requested size of the Authentication Tag output MUST be 128 bits, regardless of the
+    //# key size.
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-5.3
+    //= type=test
+    //# Use of an IV of size 96 bits is REQUIRED with this algorithm.
+    #[test]
+    fn gcm_tag_and_iv_are_exactly_128_and_96_bits() {
+        fn check<E: Sealed>() {
+            let cek = SecretBytes::new(vec![7; E::CEK_LEN]);
+            let (iv, aad) = (vec![9; E::IV_LEN], b"aad".to_vec());
+            let (ciphertext, tag) = E::seal(&cek, &iv, &aad, b"attack at dawn").unwrap_or_default();
+            assert_eq!(tag.len(), 16);
+            let open = |tag: &[u8]| {
+                E::open(&cek, &iv, &aad, &ciphertext, tag)
+                    .err()
+                    .map(|e| e.kind())
+            };
+            assert_eq!(open(&tag), None);
+            assert_eq!(open(&tag[..15]), Some(ErrorKind::Decrypt));
+            assert_eq!(
+                open(&[tag.clone(), vec![0]].concat()),
+                Some(ErrorKind::Decrypt)
+            );
+            assert_eq!(open(&[]), Some(ErrorKind::Decrypt));
+            assert_eq!(iv.len(), 12);
+            let with_iv = |iv: &[u8]| {
+                E::open(&cek, iv, &aad, &ciphertext, &tag)
+                    .err()
+                    .map(|e| e.kind())
+            };
+            assert_eq!(with_iv(&iv), None);
+            assert_eq!(with_iv(&iv[..11]), Some(ErrorKind::Decrypt));
+            assert_eq!(
+                with_iv(&[iv.clone(), vec![0]].concat()),
+                Some(ErrorKind::Decrypt)
+            );
+        }
+        check::<A128Gcm>();
+        check::<A192Gcm>();
+        check::<A256Gcm>();
+    }
 }

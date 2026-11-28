@@ -165,7 +165,7 @@ fn wrap(
     let eph = ephemeral(key, e)?;
     //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6.2
     //= type=exception
-    //= reason=encrypt never sets apu or apv, and decrypt does not check them for distinctness since the Concat KDF is sound either way
+    //= reason=encrypt never sets apu or apv and decrypt does not check them for distinctness; non-goal NC9
     //# The "apu" and "apv" values MUST be distinct, when used.
     let z = agree(&eph, key)?;
     params.epk = Some(alloc::sync::Arc::new(public_of(&eph)));

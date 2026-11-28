@@ -8,7 +8,7 @@ Checks:
 - `vec:f#id` is a case of `rust/vectors/f`; `vec:f` is the whole file. A refusal's error kind is always compared: the file names it, and for a pinned external file the row test holds it by vector id. Rows read files through testkit's typed readers (`testkit::vectors::{wycheproof, sections, figures}`), which check each file's SHA-256 and count against `SOURCES.toml`.
 - `row:x` is `tests/row_x.rs`, one file per family. `lib:m::x` is a row run as a `--lib` filter over a `#[cfg(test)]` module of `src/m.rs`, where the inputs are raw primitive values no public item takes (ruling R-l). `prop:t` is a fixed-seed proptest in a row file; `unit:m::t` a test in `src/m.rs`.
 - `gate:x` is `just x` with jose's `gates.json`.
-- `spec:rfcN` is every requirement sentence of the pinned RFC (`rust/spec/rfcN.json`, `just spec-extract`) mapped by a `//=` citation in this crate: an implementation under `src/` and a test above a `#[test]` fn, an exception with its reason, or a counted todo; `spec:rfcN#s` is section s mapped with no todo. The citation quotes the sentence, so a claim here names the section and never restates it.
+- `spec:rfcN` is every requirement sentence of the pinned RFC (`rust/spec/rfcN.json`, `just spec-extract`) mapped by a `//=` citation in this crate: an implementation under `src/` and a test above a `#[test]` fn, an exception with its reason, or a counted todo; `spec:rfcN#s` is section s mapped with no todo. The citation quotes the sentence, so a claim here names the section and never restates it. Scope: a requirement sentence is one holding MUST, MUST NOT, REQUIRED, SHALL or SHALL NOT in capitals (`spec/extract.mjs`); a sentence holding only SHOULD, SHOULD NOT or RECOMMENDED is out of scope and unmapped: 9 in RFC 7515, 1 in RFC 7516, 10 in RFC 7517, 10 in RFC 7518, 9 in RFC 7519.
 - `fuzz:t` is the cargo-fuzz target `fuzz/fuzz_targets/t.rs` (`just fuzz`) with its committed `fuzz/corpus/t` replayed by `tests/fuzz_corpus.rs`, each seed's outcome named in its file name.
 
 ## Type
@@ -160,6 +160,7 @@ Checks:
 - NC6 The timing of RFC 7516 11.4 is not measured (NC2); AES key-wrap failures return `Decrypt` without a substituted CEK, since a symmetric unwrap is no padding oracle.
 - NC7 `Error` has no source chain by design: a cause would be an oracle (R53, R54), so `Error::source` is `None` and the kind is all a caller gets.
 - NC8 An escaped secret JWK member (`d`, `p`, `q`, `dp`, `dq`, `qi`, `k`) is `Malformed` although RFC 8259 7 allows escapes: it is read borrowed so no unwiped copy of a secret is made; the public members accept them (R28): unit:jwk::decode::escaped_and_null_members.
+- NC9 Distinctness of `apu` and `apv` (RFC 7518 4.6.2) is not checked on decrypt, and `encrypt` sets neither, so an ECDH-ES token this crate issues has both empty; a received pair is fed to the Concat KDF as given, which is sound whether or not they differ; spec:rfc7518#4.6.2.
 
 ## RFC 8725 section 3
 - P3.1 Algorithm verification, the key's type picking the algorithm and the header only compared: T8, T9, T11, R4, R16, R21, R52.
