@@ -91,7 +91,7 @@ fn named(expect: &Expect, outcome: Result<(), jose::Error>, id: &str) {
 
 #[test]
 fn key_cases() {
-    let tally = run::<Case>(vector!("jose-derived/keys.json"), 29, |case| {
+    let tally = run::<Case>(vector!("jose-derived/keys.json"), 40, |case| {
         let (alg, jwk) = (
             case.alg.as_deref().unwrap_or_default(),
             case.jwk

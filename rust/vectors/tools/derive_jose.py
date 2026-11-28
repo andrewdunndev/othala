@@ -165,7 +165,6 @@ def jwks():
     d = lambda cid, spec, ks, expect: case(cid, spec, expect, op="jwks_decode", jwks=ks)
     f = lambda cid, spec, ks, kid, expect: case(cid, spec, expect, op="jwks_find", jwks=ks, kid=kid)
     two = {"keys": [HS_KID, RSA_KID]}
-    dup = {"keys": [HS_KID, dict(HS_KID, k=b64(bytes(range(32))))]}
     bad = lambda **kw: {"keys": [HS_KID, dict(HS_KID, kid="skipped", **kw), RSA_KID]}
     kept = lambda *ks: {"ok": True, "keys": len(ks), "kids": [k["kid"] for k in ks]}
     return [
@@ -178,7 +177,7 @@ def jwks():
         d("keys-missing", "RFC 7517 5.1 (keys is REQUIRED)", {"kids": []}, kind("Malformed")),
         d("keys-not-array", "RFC 7517 5.1 (an array of JWKs)", {"keys": HS_KID}, kind("Malformed")),
         d("member-not-object", "RFC 7517 5.1 (an array of JWKs) with 4 (a JWK is a JSON object)", {"keys": [HS_KID, 1]}, kind("Malformed")),
-        d("dup-kid", "RFC 7517 4.5 (kids SHOULD be distinct; a set with an ambiguous lookup is refused, never a pick)", dup, kind("DuplicateMember")),
+        d("dup-kid-skipped", "RFC 7517 4.5 (equal kids are allowed across key types) with 5 (SHOULD ignore what cannot be used): members that share a kid are skipped, since a lookup could not choose; house rule", {"keys": [HS_KID, dict(HS_KID, k=b64(bytes(range(32)))), RSA_KID]}, kept(RSA_KID)),
         case("dup-keys-member", "RFC 8259 4 with RFC 7517 5 (this oracle rejects duplicate names)", kind("DuplicateMember"), op="jwks_decode", jwks_json='{"keys":[],"keys":[]}'),
         f("find-by-kid", "RFC 7517 4.5", two, HS_KID["kid"], {"ok": True, "kty": "oct"}),
         f("find-absent-kid", "RFC 7517 4.5 (a kid the set lacks is no key, not an error)", two, "absent", {"ok": True, "found": False}),

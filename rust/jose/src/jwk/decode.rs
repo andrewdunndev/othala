@@ -1263,11 +1263,18 @@ mod tests {
             Some(Kty::Rsa)
         );
         // a secret member is read borrowed: an escaped one is refused, so no unwiped copy is made
-        let secret = text(&oct()).replacen("\"k\":\"", "\"k\":\"\\u0041", 1);
-        assert_eq!(
-            SecretJwk::decode(secret.as_bytes()).err().map(|e| e.kind()),
-            Some(ErrorKind::Malformed)
-        );
+        for (key, member) in [(oct(), "k"), (ec_private(), "d")] {
+            let secret = text(&key).replacen(
+                &format!("\"{member}\":\""),
+                &format!("\"{member}\":\"\\u0041"),
+                1,
+            );
+            assert_eq!(
+                SecretJwk::decode(secret.as_bytes()).err().map(|e| e.kind()),
+                Some(ErrorKind::Malformed),
+                "{member}"
+            );
+        }
         let rsa = figure("3.3");
         let oth = |value: &str| {
             let json = text(&rsa).replacen('{', &format!("{{\"oth\":{value},"), 1);
@@ -1461,13 +1468,16 @@ mod tests {
             for (decrypt, served) in [false, true].into_iter().zip(served) {
                 for op in ops {
                     let member = with(key, "key_ops", &format!("[\"{op}\"]"));
-                    let got = parse(text(&member).as_bytes()).ok().and_then(|(m, k)| {
-                        let info = match &k {
-                            Key::Private(k) => private_info(k),
-                            Key::Public(k) => public_info(k),
-                        };
-                        m.check_jwe(info, alg, decrypt).err().map(|e| e.kind())
-                    });
+                    let got = match parse(text(&member).as_bytes()) {
+                        Err(e) => Some(e.kind()),
+                        Ok((m, k)) => {
+                            let info = match &k {
+                                Key::Private(k) => private_info(k),
+                                Key::Public(k) => public_info(k),
+                            };
+                            m.check_jwe(info, alg, decrypt).err().map(|e| e.kind())
+                        }
+                    };
                     let want = (!served.contains(&op)).then_some(ErrorKind::KeyUse);
                     assert_eq!(got, want, "{alg:?} decrypt={decrypt} {op}");
                 }

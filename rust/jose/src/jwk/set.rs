@@ -67,8 +67,8 @@ struct Document<'a> {
 impl JwkSet {
     /// Decodes `{"keys": [...]}`: a member object that is not a supported key (an unknown `kty`, a missing or
     /// out-of-range value, a weak modulus; RFC 7517 5) is skipped and not counted. A document without a `keys` array, a
-    /// member that is not an object, a name used twice, a `kid` shared by two kept keys or more than `MAX_JWKS_KEYS`
-    /// kept keys is refused.
+    /// member that is not an object, a name used twice or more than `MAX_JWKS_KEYS` kept keys is refused. Members that
+    /// share a `kid` are all skipped, since a lookup could not choose between them.
     /// For a document fetched from a remote `jwks_uri`, use [`Self::decode_public`].
     pub fn decode(json: &[u8]) -> Result<Self, Error> {
         Self::read(json, false)
@@ -104,11 +104,19 @@ impl JwkSet {
                 return Err(ErrorKind::TooLarge.into());
             }
         }
-        distinct(keys.iter().filter_map(Member::kid))?;
+        // `find` could not choose between members that share a `kid`, so none of them is kept (house rule, R27)
+        let mut seen = BTreeSet::new();
+        let shared: BTreeSet<Kid> = keys
+            .iter()
+            .filter_map(Member::kid)
+            .filter(|kid| !seen.insert(*kid))
+            .cloned()
+            .collect();
+        keys.retain(|key| key.kid().is_none_or(|kid| !shared.contains(kid)));
         Ok(Self { keys })
     }
 
-    /// A set of public keys; more than `MAX_JWKS_KEYS` is `TooLarge`, a `kid` repeated `DuplicateMember`, as in [`Self::decode`].
+    /// A set of public keys; more than `MAX_JWKS_KEYS` is `TooLarge`, a `kid` repeated `DuplicateMember`.
     pub fn new(keys: Vec<Jwk>) -> Result<Self, Error> {
         if keys.len() > MAX_JWKS_KEYS {
             return Err(ErrorKind::TooLarge.into());
@@ -119,8 +127,8 @@ impl JwkSet {
         })
     }
 
-    /// The key whose `kid` is `kid`, byte for byte, or none: the host decides whether an unknown `kid` means fetching
-    /// the set again (RFC 7517 4.5). A set never holds two keys with one `kid`, so a match is never a pick.
+    /// The key whose `kid` is `kid`, byte for byte, or none: an unknown `kid` is the host's cue to fetch the set
+    /// again (OpenID Connect Core 10.1.1). A set never holds two keys with one `kid`, so a match is never a pick.
     pub fn find(&self, kid: &Kid) -> Option<JwkEntry<'_>> {
         self.keys
             .iter()
@@ -242,12 +250,30 @@ mod tests {
             let text = format!(r#"{{"keys":[{},{member}]}}"#, oct(0));
             assert_eq!(refused(&text), Some(ErrorKind::Malformed), "{member}");
         }
-        let twice = format!(r#"{{"keys":[{},{}]}}"#, oct(0), oct(0));
-        assert_eq!(refused(&twice), Some(ErrorKind::DuplicateMember));
         let named_twice = r#"{"keys":[{"kty":"oct","kty":"oct"}]}"#;
         assert_eq!(refused(named_twice), Some(ErrorKind::DuplicateMember));
         let skipped = format!(r#"{{"keys":[{0},{0}]}}"#, r#"{"kty":"other","kid":"k0"}"#);
         assert_eq!(kids(&skipped), Ok(Vec::new()));
+    }
+
+    #[test]
+    fn members_that_share_a_kid_are_all_skipped() {
+        let text = format!(
+            r#"{{"keys":[{},{},{},{}]}}"#,
+            oct(0),
+            oct(1),
+            oct(0),
+            oct(0)
+        );
+        assert_eq!(kids(&text), Ok(vec!["k1".to_owned()]));
+        let all = format!(r#"{{"keys":[{0},{0}]}}"#, oct(0));
+        assert_eq!(kids(&all), Ok(Vec::new()));
+        // a wrong-typed kid is a member that is skipped, not a refusal of the set
+        let typed = format!(
+            r#"{{"keys":[{},{{"kty":"oct","kid":5,"k":"{K}"}}]}}"#,
+            oct(0)
+        );
+        assert_eq!(kids(&typed), Ok(vec!["k0".to_owned()]));
     }
 
     #[test]
