@@ -37,7 +37,6 @@ impl Error {
 impl From<jose::Error> for Error {
     fn from(e: jose::Error) -> Self {
         Self::new(match e.kind() {
-            jose::ErrorKind::TooLarge => ErrorKind::TooLarge,
             jose::ErrorKind::DuplicateMember => ErrorKind::Duplicate,
             _ => ErrorKind::Malformed,
         })
