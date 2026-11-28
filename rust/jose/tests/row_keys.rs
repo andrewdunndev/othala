@@ -58,14 +58,13 @@ struct Case {
 }
 
 fn named(expect: &Expect, outcome: Result<(), jose::Error>, id: &str) {
-    assert_eq!(outcome.is_ok(), expect.ok, "{id}");
-    if let Some(kind) = &expect.kind {
-        assert_eq!(
-            outcome.err().map(|e| format!("{:?}", e.kind())).as_ref(),
-            Some(kind),
-            "{id}"
-        );
-    }
+    testkit::vectors::assert_verdict(
+        &outcome,
+        expect.ok,
+        expect.kind.as_deref(),
+        |e| e.kind(),
+        id,
+    );
 }
 
 #[test]
@@ -213,7 +212,7 @@ fn jwk_round_trip() -> Result<(), TestError<Draw>> {
             };
             let written = serde_json::to_string(&first).unwrap_or_default();
             let second = Jwk::decode(written.as_bytes());
-            prop_assert!(second.is_ok(), "{written}");
+            prop_assert_eq!(second.as_ref().err().map(|e| e.kind()), None, "{}", written);
             let second = second.map_err(|_| TestCaseError::fail("decode"))?;
             prop_assert_eq!(first.kid(), second.kid());
             prop_assert_eq!(first.sig_alg(), second.sig_alg());

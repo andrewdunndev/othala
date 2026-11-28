@@ -10,6 +10,7 @@ use testkit::vectors::{Json, Outcome, Vector, run};
 struct Expect {
     out: Option<String>,
     ok: Option<bool>,
+    kind: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -46,7 +47,20 @@ fn row(file: Vector, floor: usize, total: usize) {
                     Some(out)
                 );
             }
-            (None, ok) => assert_eq!((ok, digest.is_err()), (Some(false), true), "{}", case.id),
+            (None, ok) => {
+                assert_eq!(ok, Some(false), "{}", case.id);
+                assert!(
+                    case.expect.kind.is_some(),
+                    "{}: a refusing vector names no kind",
+                    case.id
+                );
+                assert_eq!(
+                    digest.err().map(|e| format!("{:?}", e.kind())),
+                    case.expect.kind,
+                    "{}",
+                    case.id
+                );
+            }
         }
         Outcome::Checked
     });

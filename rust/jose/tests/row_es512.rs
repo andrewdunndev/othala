@@ -39,14 +39,26 @@ fn wycheproof_file(file: Vector, p1363: bool, total: usize) {
             coordinate(67..133)
         );
         let key = Jwk::decode(jwk.as_bytes()).and_then(|jwk| jwk.verify_key::<Es512>());
-        assert!(key.is_ok(), "{}", case.tc_id);
+        assert_eq!(key.as_ref().err().map(|e| e.kind()), None, "{}", case.tc_id);
         let message = hex(case.msg.as_deref().unwrap_or_default());
         let signature = hex(case.sig.as_deref().unwrap_or_default());
         let outcome = key.and_then(|key| key.verify_signature(&message, &signature));
         match (p1363, case.result) {
             (_, Expected::Acceptable) => return Outcome::NotApplicable,
-            (true, Expected::Valid) => assert!(outcome.is_ok(), "{}: {}", case.tc_id, case.comment),
-            _ => assert!(outcome.is_err(), "{}: {}", case.tc_id, case.comment),
+            (true, Expected::Valid) => assert_eq!(
+                outcome.err().map(|e| e.kind()),
+                None,
+                "{}: {}",
+                case.tc_id,
+                case.comment
+            ),
+            _ => assert_eq!(
+                outcome.err().map(|e| e.kind()),
+                Some(jose::ErrorKind::BadSignature),
+                "{}: {}",
+                case.tc_id,
+                case.comment
+            ),
         }
         Outcome::Checked
     });
@@ -91,13 +103,18 @@ fn rfc7515_a4() {
     let key = serde_json::to_string(&public).unwrap_or_default();
     let token = block(&file, "A.4.1", "eyJhbGciOiJFUzUxMiJ9.UGF5bG9hZA.");
     let verified = common::verify("ES512", &key, &token);
-    assert!(verified.is_ok(), "{token}");
+    assert_eq!(verified, Ok(()), "{token}");
     let (head, tail) = token.split_at(token.len() - 3);
     let tampered = format!(
         "{head}{}",
         if tail.starts_with('A') { "BBB" } else { "AAA" }
     );
-    assert!(common::verify("ES512", &key, &tampered).is_err());
+    assert_eq!(
+        common::verify("ES512", &key, &tampered)
+            .err()
+            .map(|e| e.kind()),
+        Some(jose::ErrorKind::BadSignature)
+    );
 }
 
 fn example(file: &testkit::vectors::Figures, number: &str, figure: u32) -> String {
@@ -114,7 +131,13 @@ fn rfc7520_p521() {
         Jwk::decode(public.as_bytes()),
         SecretJwk::decode(private.as_bytes()),
     );
-    assert!(public.is_ok() && private.is_ok());
+    assert_eq!(
+        (
+            public.as_ref().err().map(|e| e.kind()),
+            private.as_ref().err().map(|e| e.kind())
+        ),
+        (None, None)
+    );
     let (public, private) = (public.ok(), private.ok());
     assert_eq!(public.as_ref().map(Jwk::kty), Some(Kty::Ec));
     assert_eq!(private.as_ref().map(SecretJwk::kty), Some(Kty::Ec));

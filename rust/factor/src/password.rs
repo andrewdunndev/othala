@@ -192,6 +192,23 @@ struct Parsed {
     tag: usize,
 }
 
+impl Parsed {
+    /// The one reading of a hash's parameters and sizes, for `parse` and `hash` alike.
+    fn read(hash: PasswordHash) -> Option<(Self, Params)> {
+        let params = Params::try_from(&hash).ok()?;
+        let (salt, tag) = (hash.salt.as_ref()?.len(), hash.hash.as_ref()?.len());
+        let shape = Self {
+            memory: Memory(params.m_cost()),
+            passes: Passes(params.t_cost()),
+            lanes: Lanes(params.p_cost()),
+            salt,
+            tag,
+            hash,
+        };
+        Some((shape, params))
+    }
+}
+
 impl Phc {
     /// The canonical PHC text, for the host to store.
     pub fn as_str(&self) -> &str {
@@ -221,16 +238,11 @@ fn hash(password: &Password, cost: Cost, e: &mut impl Entropy) -> Result<Phc, Er
     let hash = argon
         .hash_password_with_salt(password.0.expose(), &salt)
         .map_err(hashing)?;
+    let text = hash.to_string();
+    let (parsed, _) = Parsed::read(hash).ok_or(err(ErrorKind::Internal))?;
     Ok(Phc {
-        text: hash.to_string(),
-        parsed: Box::new(Parsed {
-            hash,
-            memory: cost.memory,
-            passes: cost.passes,
-            lanes: cost.lanes,
-            salt: SALT_LEN,
-            tag: TAG_LEN,
-        }),
+        text,
+        parsed: Box::new(parsed),
     })
 }
 
@@ -249,31 +261,21 @@ impl Phc {
         {
             return Err(unsupported);
         }
-        let params = Params::try_from(&hash).map_err(|_| malformed)?;
+        let (parsed, params) = Parsed::read(hash).ok_or(malformed)?;
         // `phc` itself bounds the salt to 8 to 48 bytes and the tag to 10 to 64
-        let (Some(salt), Some(tag)) = (&hash.salt, &hash.hash) else {
-            return Err(malformed);
-        };
         let ranged = (1..=MAX_PASSES_AND_LANES).contains(&params.t_cost())
             && (1..=MAX_PASSES_AND_LANES).contains(&params.p_cost())
             && params.m_cost() <= MAX_MEMORY_KIB;
         let canonical = PasswordHash {
             params: ParamsString::try_from(&params).map_err(|_| malformed)?,
-            ..hash.clone()
+            ..parsed.hash.clone()
         };
-        if !(ranged && tag.len() >= MIN_PARSED_TAG && canonical.to_string() == text) {
+        if !(ranged && parsed.tag >= MIN_PARSED_TAG && canonical.to_string() == text) {
             return Err(malformed);
         }
         Ok(Self {
             text: text.to_string(),
-            parsed: Box::new(Parsed {
-                memory: Memory(params.m_cost()),
-                passes: Passes(params.t_cost()),
-                lanes: Lanes(params.p_cost()),
-                salt: salt.len(),
-                tag: tag.len(),
-                hash,
-            }),
+            parsed: Box::new(parsed),
         })
     }
 }

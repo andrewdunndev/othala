@@ -100,15 +100,13 @@ fn hash_is_argon2id_v19_with_fresh_salt() -> Result<(), Box<dyn std::error::Erro
     assert_eq!(fields.next().map(str::len), Some(43));
     assert_eq!(fields.next().map(str::len), Some(22));
     let argon = Argon2::default();
-    assert!(
-        argon
-            .verify_password(b"correct horse battery", a.as_str())
-            .is_ok()
+    assert_eq!(
+        argon.verify_password(b"correct horse battery", a.as_str()),
+        Ok(())
     );
-    assert!(
-        argon
-            .verify_password(b"correct horse batterz", a.as_str())
-            .is_err()
+    assert_eq!(
+        argon.verify_password(b"correct horse batterz", a.as_str()),
+        Err(argon2::password_hash::Error::PasswordInvalid)
     );
     let again = password_hash(&pw, cost, &mut testkit::seeded(1))?;
     assert_eq!(again.as_str(), a.as_str());
@@ -152,7 +150,10 @@ fn presented_passwords() -> Result<(), Boxed> {
         cost(7_168, 5, 1)?,
         &mut testkit::seeded(9),
     )?;
-    assert!(verify(&stored, &a, cost(7_168, 5, 1)?)?.0.is_ok());
+    assert!(matches!(
+        verify(&stored, &a, cost(7_168, 5, 1)?)?.0,
+        Ok(hit) if matches!(hit.rehash(), Rehash::Current)
+    ));
     assert!(matches!(
         verify(&stored, &b, cost(7_168, 5, 1)?)?.0,
         Err(Rejected::Wrong)
@@ -308,6 +309,21 @@ fn hashed(password: &str, c: Cost) -> Result<Phc, Boxed> {
 fn verify_matches_and_counts_either_way() -> Result<(), Boxed> {
     let c = cost(7_168, 5, 1)?;
     let stored = hashed("correct horse battery", c)?;
+    // R25: the fresh hash carries the exact cost, a 16-byte salt and a 32-byte tag, and verifies as current at it
+    assert!(
+        stored
+            .as_str()
+            .starts_with("$argon2id$v=19$m=7168,t=5,p=1$")
+    );
+    assert_eq!(
+        stored
+            .as_str()
+            .rsplit('$')
+            .map(str::len)
+            .take(2)
+            .collect::<Vec<_>>(),
+        [43, 22]
+    );
     let (hit, mut store) = verify(&stored, "correct horse battery", c)?;
     let Ok(hit) = hit else {
         return Err("rejected".into());
@@ -384,10 +400,9 @@ fn rehash_only_when_below_the_cost_given() -> Result<(), Boxed> {
             (Rehash::Current, None) => {}
             (Rehash::Needed(new), Some(prefix)) => {
                 assert!(new.as_str().starts_with(prefix), "{}", new.as_str());
-                assert!(
-                    Argon2::default()
-                        .verify_password(b"pw-for-rehash", new.as_str())
-                        .is_ok()
+                assert_eq!(
+                    Argon2::default().verify_password(b"pw-for-rehash", new.as_str()),
+                    Ok(())
                 );
                 assert_ne!(new.as_str(), stored.as_str());
             }
@@ -490,7 +505,10 @@ fn reference_string_rejects_another_password() -> Result<(), Boxed> {
         "$argon2id$v=19$m=256,t=2,p=1$c29tZXNhbHQ$nf65EOgLrQMR/uIPnA4rEsF5h7TKyQwu9U1bMCHGi/4",
     )?;
     let (hit, _) = verify(&stored, "password", cost(7_168, 5, 1)?)?;
-    assert!(hit.is_ok());
+    // the reference's 8-byte salt is short of 16, so the match is rehashed at the larger of each cost
+    assert!(
+        matches!(hit, Ok(m) if matches!(m.rehash(), Rehash::Needed(n) if n.as_str().starts_with("$argon2id$v=19$m=7168,t=5,p=1$")))
+    );
     let (miss, _) = verify(&stored, "passwore", cost(7_168, 5, 1)?)?;
     assert!(matches!(miss, Err(Rejected::Wrong)));
     Ok(())

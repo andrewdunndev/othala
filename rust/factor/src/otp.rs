@@ -79,7 +79,7 @@ fn mac<M: Mac + KeyInit>(key: &[u8], counter: u64) -> Option<Zeroizing<Vec<u8>>>
     Some(tag)
 }
 
-/// RFC 4226 5.3 dynamic truncation: the 31 bits at the offset the tag's last nibble names; `None` when the tag is too short for it.
+/// RFC 4226 5.3 dynamic truncation, with RFC 6238 appendix A's last-nibble offset for longer tags: the 31 bits at the offset the tag's last nibble names; `None` when the tag is too short for it.
 fn truncate(tag: &[u8]) -> Option<u32> {
     let offset = usize::from(tag.last()? & 0x0f);
     let bytes = tag.get(offset..)?.first_chunk::<4>()?;

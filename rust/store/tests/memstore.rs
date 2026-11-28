@@ -33,10 +33,11 @@ fn a_lost_result_commits_and_a_reapply_settles() -> Result<(), Box<dyn std::erro
         return Err("a re-apply after a lost result settles".into());
     };
     assert_eq!(a.settle(receipt).ok(), Some('a'));
-    assert!(
-        matches!(s.apply(&create(3, 3)?, NOW), Ok(Ok(_))),
-        "losses spent"
-    );
+    let third = create(3, 3)?;
+    let Ok(Ok(receipt)) = s.apply(&third, NOW) else {
+        return Err("losses spent".into());
+    };
+    assert_eq!(receipt.effect_id(), third.id());
     assert_eq!(s.contents(NOW).len(), 3);
     Ok(())
 }

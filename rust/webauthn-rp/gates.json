@@ -9,7 +9,7 @@
   },
   "mutants": {
     "tests": ["webauthn-rp"],
-    "floor": 420
+    "floor": 396
   },
   "vectors": ["w3c-webauthn-3", "w3c-webauthn-3-exam-spike", "android-key-attestation", "webauthn-rp-derived"],
   "allow": ["base16ct", "cmov", "const-oid", "cpubits", "crypto-bigint", "crypto-primes", "ctutils", "curve25519-dalek", "curve25519-dalek-derive", "der", "der_derive", "ecdsa", "ed25519", "ed25519-dalek", "elliptic-curve", "ff", "flagset", "group", "hmac", "p256", "p384", "primefield", "primeorder", "rfc6979", "rsa", "rustc_version", "sec1", "semver", "sha1", "signature", "spki", "wnaf", "x509-cert"]

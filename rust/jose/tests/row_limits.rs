@@ -112,8 +112,12 @@ fn kind_name(kind: ErrorKind) -> String {
 fn bounds() {
     let tally = run::<Case>(vector!("jose-derived/limits.json"), 4, |case| {
         let jwk = case.jwk.text();
-        assert!(
-            SecretJwk::decode(jwk.as_bytes()).is_ok() && Jwk::decode(jwk.as_bytes()).is_err(),
+        assert_eq!(
+            (
+                SecretJwk::decode(jwk.as_bytes()).err().map(|e| e.kind()),
+                Jwk::decode(jwk.as_bytes()).err().map(|e| e.kind())
+            ),
+            (None, Some(ErrorKind::Malformed)),
             "{}",
             case.id
         );

@@ -22,6 +22,8 @@ fn every_listed_path_is_rejected() {
     let _ = |x: Result<u8, u8>| x.expect("canary");
     let _ = |x: Result<u8, u8>| x.unwrap_err();
     let _ = |x: Result<u8, u8>| x.expect_err("canary");
+    let _ = |x: Result<u8, u8>| x.is_ok();
+    let _ = |x: Result<u8, u8>| x.is_err();
     let _ = || panic!("canary");
     let _ = || core::panic!("canary");
     let _ = || -> u8 { unreachable!() };
