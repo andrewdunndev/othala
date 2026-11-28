@@ -202,6 +202,12 @@ mod tests {
             .map_err(|e| e.kind())
     }
 
+    fn set_text(text: &str) -> Result<usize, ErrorKind> {
+        JwkSet::decode(text.as_bytes())
+            .map(|s| s.entries().len())
+            .map_err(|e| e.kind())
+    }
+
     fn set(members: &[String]) -> Result<usize, ErrorKind> {
         let text = format!(r#"{{"keys":[{}]}}"#, members.join(","));
         JwkSet::decode(text.as_bytes())
@@ -273,7 +279,15 @@ mod tests {
             r#"{{"keys":[{},{{"kty":"oct","kid":5,"k":"{K}"}}]}}"#,
             oct(0)
         );
-        assert_eq!(kids(&typed), Ok(vec!["k0".to_owned()]));
+        assert_eq!(set_text(&typed), Ok(1));
+        // a member skipped for another reason does not make a usable key's kid shared
+        let other = r#"{"kty":"other","kid":"k0"}"#;
+        let text = format!(r#"{{"keys":[{other},{},{}]}}"#, oct(0), oct(1));
+        assert_eq!(kids(&text), Ok(vec!["k0".to_owned(), "k1".to_owned()]));
+        let public = r#"{"kty":"OKP","kid":"k0","crv":"Ed25519","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}"#;
+        let text = format!(r#"{{"keys":[{},{public}]}}"#, oct(0));
+        let remote = JwkSet::decode_public(text.as_bytes()).map(|s| s.entries().len());
+        assert_eq!(remote.map_err(|e| e.kind()), Ok(1));
     }
 
     #[test]
