@@ -32,162 +32,198 @@
    "id": "extra-member",
    "op": "attestation_object",
    "input": "a463666d74646e6f6e65656578747261016761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
-   "spec": "contract R40 (exactly fmt, attStmt, authData) with ruling R-n",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with contract R40 (exactly fmt, attStmt, authData) with ruling R-n",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {
    "id": "fmt-missing",
    "op": "attestation_object",
    "input": "a26761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
-   "spec": "contract R40 (exactly fmt, attStmt, authData) with ruling R-n",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with contract R40 (exactly fmt, attStmt, authData) with ruling R-n",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {
    "id": "attstmt-missing",
    "op": "attestation_object",
    "input": "a263666d74646e6f6e6568617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
-   "spec": "contract R40 (exactly fmt, attStmt, authData) with ruling R-n",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with contract R40 (exactly fmt, attStmt, authData) with ruling R-n",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {
    "id": "authdata-missing",
    "op": "attestation_object",
    "input": "a263666d74646e6f6e656761747453746d74a0",
-   "spec": "contract R40 (exactly fmt, attStmt, authData) with ruling R-n",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with contract R40 (exactly fmt, attStmt, authData) with ruling R-n",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {
    "id": "fmt-bytes",
    "op": "attestation_object",
    "input": "a363666d74446e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
-   "spec": "contract R40 (exactly fmt, attStmt, authData) with ruling R-n (fmt is text)",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with contract R40 (exactly fmt, attStmt, authData) with ruling R-n (fmt is text)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {
    "id": "attstmt-array",
    "op": "attestation_object",
    "input": "a363666d74646e6f6e656761747453746d748068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
-   "spec": "contract R40 (exactly fmt, attStmt, authData) with ruling R-n (attStmt is a map)",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with contract R40 (exactly fmt, attStmt, authData) with ruling R-n (attStmt is a map)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {
    "id": "attstmt-null",
    "op": "attestation_object",
    "input": "a363666d74646e6f6e656761747453746d74f668617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
-   "spec": "contract R40 (exactly fmt, attStmt, authData) with ruling R-n (attStmt is a map)",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with contract R40 (exactly fmt, attStmt, authData) with ruling R-n (attStmt is a map)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {
    "id": "authdata-text",
    "op": "attestation_object",
    "input": "a363666d74646e6f6e656761747453746d74a0686175746844617461782578787878787878787878787878787878787878787878787878787878787878787878787878",
-   "spec": "contract R40 (exactly fmt, attStmt, authData) with ruling R-n (authData is a byte string)",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with contract R40 (exactly fmt, attStmt, authData) with ruling R-n (authData is a byte string)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {
    "id": "authdata-array-of-ints",
    "op": "attestation_object",
    "input": "a363666d74646e6f6e656761747453746d74a0686175746844617461982500000000000000000000000000000000000000000000000000000000000000000000000000",
-   "spec": "contract R40 (exactly fmt, attStmt, authData) with ruling R-n (authData is a byte string, not an array of integers)",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with contract R40 (exactly fmt, attStmt, authData) with ruling R-n (authData is a byte string, not an array of integers)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {
    "id": "duplicate-fmt",
    "op": "attestation_object",
    "input": "a463666d74646e6f6e6563666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
-   "spec": "RFC 8949 5.6 (duplicate keys, even under an order-tolerant outer map)",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with RFC 8949 5.6 (duplicate keys, even under an order-tolerant outer map)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {
    "id": "duplicate-key-three-members",
    "op": "attestation_object",
    "input": "a363666d74646e6f6e6563666d74646e6f6e6568617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
-   "spec": "RFC 8949 5.6 (a map of three entries with a repeated key is not exactly fmt, attStmt, authData)",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with RFC 8949 5.6 (a map of three entries with a repeated key is not exactly fmt, attStmt, authData)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {
    "id": "indefinite-length-map",
    "op": "attestation_object",
    "input": "bf63666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10ff",
-   "spec": "RFC 8949 4.2.1 (no indefinite length, in the outer map too)",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with RFC 8949 4.2.1 (no indefinite length, in the outer map too)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {
    "id": "map-length-not-shortest",
    "op": "attestation_object",
    "input": "b80363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
-   "spec": "RFC 8949 4.2.1 (shortest-form heads)",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with RFC 8949 4.2.1 (shortest-form heads)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {
    "id": "key-integer",
    "op": "attestation_object",
    "input": "a301646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
-   "spec": "contract R40 (exactly fmt, attStmt, authData) with ruling R-n",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with contract R40 (exactly fmt, attStmt, authData) with ruling R-n",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {
    "id": "trailing-byte",
    "op": "attestation_object",
    "input": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa1000",
-   "spec": "RFC 8949 5.1 with contract R2 (nothing after the top item)",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with RFC 8949 5.1 with contract R2 (nothing after the top item)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {
    "id": "not-a-map",
    "op": "attestation_object",
    "input": "83646e6f6e65a058a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
-   "spec": "contract R40 (exactly fmt, attStmt, authData) with ruling R-n",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with contract R40 (exactly fmt, attStmt, authData) with ruling R-n",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {
    "id": "empty",
    "op": "attestation_object",
    "input": "",
-   "spec": "RFC 8949 5.1 (an item is required)",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with RFC 8949 5.1 (an item is required)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {
    "id": "attstmt-noncanonical-order-refused",
    "op": "attestation_object",
    "input": "a363666d74667061636b65646761747453746d74a263736967410163616c672668617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
-   "spec": "ruling R-n (attStmt is authenticator-produced and read strict: its keys must be in canonical order; 'alg' then 'sig')",
+   "spec": "WebAuthn L3 7.1 step 13 \"Perform CBOR decoding on the attestationObject field\" with ruling R-n (attStmt is authenticator-produced and read strict: its keys must be in canonical order; 'alg' then 'sig')",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed",
+    "step": 13
    }
   },
   {

@@ -44,7 +44,8 @@
    "finish_binding": "1aa63be39597fb795e1a0cf1fb8645047de4035cde72fd6c3ed5048b2e70acbd",
    "spec": "ruling R-d and contract R58 (BrowserMismatch): the ceremony was started in another browser",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "BrowserMismatch"
    }
   },
   {
@@ -64,7 +65,8 @@
    "finish_binding": "741b188a27fcad7718ef2b7d3b30d6eb8fe3f7f32ed5dfad08a99b1d544fdd7e",
    "spec": "ruling R-d and contract R58 (BrowserMismatch): one bit of the binding differs",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "BrowserMismatch"
    }
   },
   {
@@ -84,7 +86,8 @@
    "finish_binding": "0000000000000000000000000000000000000000000000000000000000000000",
    "spec": "ruling R-d and contract R58 (BrowserMismatch): an all-zero binding does not match a real one",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "BrowserMismatch"
    }
   },
   {
@@ -136,7 +139,8 @@
    "finish_binding": "1aa63be39597fb795e1a0cf1fb8645047de4035cde72fd6c3ed5048b2e70acbd",
    "spec": "ruling R-d and contract R63 (BrowserMismatch): the login was started in another browser (login CSRF)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "BrowserMismatch"
    }
   },
   {
@@ -161,7 +165,8 @@
    "finish_binding": "741b188a27fcad7718ef2b7d3b30d6eb8fe3f7f32ed5dfad08a99b1d544fdd7e",
    "spec": "ruling R-d and contract R63 (BrowserMismatch): one bit of the binding differs",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "BrowserMismatch"
    }
   },
   {
@@ -186,7 +191,8 @@
    "finish_binding": "0000000000000000000000000000000000000000000000000000000000000000",
    "spec": "ruling R-d and contract R63 (BrowserMismatch): an all-zero binding does not match a real one",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "BrowserMismatch"
    }
   }
  ]

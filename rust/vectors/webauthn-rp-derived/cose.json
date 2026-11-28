@@ -19,7 +19,8 @@
    "expect": {
     "ok": true,
     "alg": -35
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "eddsa-valid",
@@ -29,7 +30,8 @@
    "expect": {
     "ok": true,
     "alg": -8
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "eddsa-rfc8032-key",
@@ -39,7 +41,8 @@
    "expect": {
     "ok": true,
     "alg": -8
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "rs256-valid",
@@ -49,7 +52,8 @@
    "expect": {
     "ok": true,
     "alg": -257
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "rsa-4096-bit-n",
@@ -60,6 +64,7 @@
     "ok": true,
     "alg": -257
    },
+   "unbuilt": "webauthn-08",
    "bound": "webauthn_rp::MAX_RSA_BITS",
    "excess": 0
   },
@@ -89,7 +94,8 @@
    "input": "a501020326200121581fa521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
    "spec": "contract R5 (x is 32 bytes)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -98,7 +104,8 @@
    "input": "a50102032620012158210066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
    "spec": "contract R5 (x is 32 bytes)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -107,7 +114,8 @@
    "input": "a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22581f913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
    "spec": "contract R5 (y is 32 bytes)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -116,7 +124,8 @@
    "input": "a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa11",
    "spec": "contract R5 (the point is on the curve)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -125,7 +134,8 @@
    "input": "a501020326200121582000000000000000000000000000000000000000000000000000000000000000002258200000000000000000000000000000000000000000000000000000000000000000",
    "spec": "contract R5 (the point is on the curve: (0, 0) is not on P-256)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -134,7 +144,8 @@
    "input": "a401020326200122582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
    "spec": "contract R5 (x is required)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -143,7 +154,8 @@
    "input": "a401020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
    "spec": "contract R5 (y is required)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -152,7 +164,8 @@
    "input": "a40102032621582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
    "spec": "contract R5 (crv is required)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -162,7 +175,8 @@
    "spec": "contract R5 (crv 2 needs 48-byte coordinates)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "es256-alg-p384",
@@ -171,7 +185,8 @@
    "spec": "contract R5 (alg fits kty and crv: -35 is ES384, crv 1 is P-256)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "es384-alg-es256",
@@ -180,7 +195,8 @@
    "spec": "contract R5 (alg -7 is ES256, crv 2 is P-384)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "ec2-crv-ed25519",
@@ -189,7 +205,8 @@
    "spec": "contract R5 (kty 2 with crv 6 is not an EC2 curve)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "okp-crv-p256",
@@ -198,7 +215,8 @@
    "spec": "contract R5 (kty 1 with crv 1 is not an OKP curve)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "alg-missing",
@@ -206,7 +224,8 @@
    "input": "a40102200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
    "spec": "contract R5 (alg is present)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -216,7 +235,8 @@
    "spec": "contract R5 (alg fits kty)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "alg-es256-on-rsa",
@@ -225,7 +245,8 @@
    "spec": "contract R5 (alg fits kty)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "kty-text",
@@ -233,7 +254,8 @@
    "input": "a501634543320326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
    "spec": "contract R5 (a defined label of the wrong type is Malformed)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -242,7 +264,8 @@
    "input": "a5010203654553323536200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
    "spec": "contract R5 (a defined label of the wrong type is Malformed)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -251,7 +274,8 @@
    "input": "a5010203262001210122582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
    "spec": "contract R5 (a defined label of the wrong type is Malformed)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -260,7 +284,8 @@
    "input": "a5010203262065502d32353621582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
    "spec": "contract R5 (a defined label of the wrong type is Malformed)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -269,7 +294,8 @@
    "input": "a501040326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
    "spec": "RFC 9053 7.1 (kty 4 is not a public key type this crate reads)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Algorithm"
    }
   },
   {
@@ -279,7 +305,8 @@
    "spec": "contract R5 (a 32-byte valid point; the encoded y has no x on the curve)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "eddsa-31-bytes",
@@ -288,7 +315,8 @@
    "spec": "contract R5 (a 32-byte point)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "eddsa-33-bytes",
@@ -297,7 +325,8 @@
    "spec": "contract R5 (a 32-byte point)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "eddsa-y-not-reduced",
@@ -306,7 +335,8 @@
    "spec": "RFC 8032 5.1.3 (y must be below p; this is y = p, whose encoding is not canonical)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "rsa-1024-bit-n",
@@ -315,7 +345,8 @@
    "spec": "contract R5 and RFC 8725 3.5 (n below MIN_RSA_BITS, taken as 2048; n is an odd 1024-bit integer)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "rsa-4097-bit-n",
@@ -327,7 +358,8 @@
     "kind": "TooLarge"
    },
    "bound": "webauthn_rp::MAX_RSA_BITS",
-   "excess": 1
+   "excess": 1,
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "rsa-2047-bit-n",
@@ -336,7 +368,8 @@
    "spec": "contract R5 (n below MIN_RSA_BITS 2048 by one bit; n is an odd 2047-bit integer)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "rsa-e-3",
@@ -345,7 +378,8 @@
    "spec": "contract R5 (e is 65537)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "rsa-e-65537-padded",
@@ -354,7 +388,8 @@
    "spec": "contract R5 (e is 65537; a leading zero byte is not the integer's minimal form)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "rsa-n-missing",
@@ -363,7 +398,8 @@
    "spec": "contract R5 (n is required)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "es512-p521",
@@ -371,7 +407,8 @@
    "input": "a501020338232003215842010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101225842020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202",
    "spec": "N2 (ES512 is never offered; P-521 is outside the crate's curves)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Algorithm"
    }
   },
   {
@@ -381,7 +418,8 @@
    "spec": "N2 (Ed448 is never offered)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "x25519-ecdh",
@@ -390,7 +428,8 @@
    "spec": "contract R5 and ruling R-e (an OKP key for ECDH, crv 4, is not a signature key)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "ps256-alg",
@@ -399,7 +438,8 @@
    "spec": "N2 (PS256 is never offered)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "rs1-alg",
@@ -408,7 +448,8 @@
    "spec": "N2 (RS1 is never offered as a credential algorithm)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "fully-specified-esp256",
@@ -416,7 +457,8 @@
    "input": "a501020328200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
    "spec": "N2 (the fully-specified -9 is never offered)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Algorithm"
    }
   },
   {
@@ -426,7 +468,8 @@
    "spec": "N2 (the fully-specified -19 is never offered)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "fully-specified-esp384",
@@ -435,7 +478,8 @@
    "spec": "N2 (the fully-specified -51 is never offered)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-08"
   },
   {
    "id": "fully-specified-esp512",
@@ -443,7 +487,8 @@
    "input": "a50102033833200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
    "spec": "N2 (the fully-specified -52 is never offered)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Algorithm"
    }
   },
   {
@@ -452,7 +497,8 @@
    "input": "820102",
    "spec": "RFC 9052 7 (a COSE_Key is a map)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -461,7 +507,8 @@
    "input": "a0",
    "spec": "contract R5 (kty is required)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   }
  ]

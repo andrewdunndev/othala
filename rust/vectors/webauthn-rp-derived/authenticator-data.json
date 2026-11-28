@@ -21,7 +21,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 15 \"rpIdHash in authData is the SHA-256 hash of the RP ID expected by the Relying Party\"",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "RpIdHash",
+    "step": 15
    }
   },
   {
@@ -44,7 +46,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 15 \"rpIdHash in authData is the SHA-256 hash of the RP ID expected by the Relying Party\" (the hash is of the RP ID, not the origin)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "RpIdHash",
+    "step": 15
    }
   },
   {
@@ -67,7 +71,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 16 \"Verify that the UP bit of the flags in authData is set\" (UP MUST be set)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "UserNotPresent",
+    "step": 16
    }
   },
   {
@@ -90,7 +96,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 17 \"If user verification was determined to be required, verify that the UV bit of the flags in authData is set\" (UV required)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "UserNotVerified",
+    "step": 17
    }
   },
   {
@@ -163,7 +171,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 6.1 (BS MUST be 0 when BE is 0) and 7.2 step 18 \"If the BE bit of the flags in authData is not set, verify that the BS bit is not set\"",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "BackupStateWithoutEligibility",
+    "step": 18
    }
   },
   {
@@ -186,7 +196,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 19 \"If credentialRecord.backupEligible is not set, verify that currentBe is not set\" (backupEligible MUST NOT change; the condition holds because the credential record stores BE, so this is a policy of the crate: oracle choice)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "BackupEligibilityChanged",
+    "step": 19
    }
   },
   {
@@ -209,7 +221,9 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 7.2 step 19 \"If credentialRecord.backupEligible is set, verify that currentBe is set\" (the stored BE is set and the response clears it; same condition: the credential record stores BE, oracle choice)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "BackupEligibilityChanged",
+    "step": 19
    }
   },
   {
@@ -283,7 +297,8 @@
    "spec": "WebAuthn L3 7.2 step 22 \"This is a signal, but not proof, that the authenticator may be cloned\" with the contract (Reject)",
    "expect": {
     "ok": false,
-    "kind": "CounterRegressed"
+    "kind": "CounterRegressed",
+    "step": 22
    }
   },
   {
@@ -307,7 +322,8 @@
    "spec": "WebAuthn L3 7.2 step 22 \"This is a signal, but not proof, that the authenticator may be cloned\" with the contract (Reject)",
    "expect": {
     "ok": false,
-    "kind": "CounterRegressed"
+    "kind": "CounterRegressed",
+    "step": 22
    }
   },
   {
@@ -331,7 +347,8 @@
    "spec": "WebAuthn L3 7.2 step 22 \"This is a signal, but not proof, that the authenticator may be cloned\" with the contract (Reject)",
    "expect": {
     "ok": false,
-    "kind": "CounterRegressed"
+    "kind": "CounterRegressed",
+    "step": 22
    }
   },
   {
@@ -409,7 +426,8 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 6.1 (37 bytes at least)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -432,7 +450,8 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 6.1 (AT set needs attested credential data)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -455,7 +474,8 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 6.1 (ED set needs extensions)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -478,7 +498,8 @@
    "cross_origin": "deny",
    "spec": "WebAuthn L3 6.1 (no bytes after the declared parts: oracle choice, a strict reader refuses what the layout does not account for)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   }
  ]

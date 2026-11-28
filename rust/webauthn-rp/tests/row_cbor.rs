@@ -17,6 +17,8 @@ pub mod error;
 mod hex;
 #[path = "support/cbor.rs"]
 mod oracle;
+#[path = "support/refusal.rs"]
+mod refusal;
 
 #[test]
 fn cbor() {

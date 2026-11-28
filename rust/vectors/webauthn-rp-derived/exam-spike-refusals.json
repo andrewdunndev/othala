@@ -1,0 +1,68 @@
+{
+ "source": "the kind and step each refusal of the carried exam-spike assertion file must report, keyed by its case id; that file states only ok",
+ "cases": [
+  {
+   "id": "wrong-origin",
+   "spec": "WebAuthn L3 7.2 step 12 \"C.origin is an origin expected by the Relying Party\"",
+   "expect": {
+    "ok": false,
+    "kind": "OriginMismatch",
+    "step": 12
+   }
+  },
+  {
+   "id": "wrong-origin-suffix",
+   "spec": "WebAuthn L3 7.2 step 12 \"C.origin is an origin expected by the Relying Party\"",
+   "expect": {
+    "ok": false,
+    "kind": "OriginMismatch",
+    "step": 12
+   }
+  },
+  {
+   "id": "wrong-challenge",
+   "spec": "WebAuthn L3 7.2 step 11 \"C.challenge equals the base64url encoding of pkOptions.challenge\"",
+   "expect": {
+    "ok": false,
+    "kind": "ChallengeMismatch",
+    "step": 11
+   }
+  },
+  {
+   "id": "wrong-rp-id",
+   "spec": "WebAuthn L3 7.2 step 15 \"rpIdHash in authData is the SHA-256 hash of the RP ID expected by the Relying Party\"",
+   "expect": {
+    "ok": false,
+    "kind": "RpIdHash",
+    "step": 15
+   }
+  },
+  {
+   "id": "tampered-signature",
+   "spec": "WebAuthn L3 7.2 step 21 \"verify that sig is a valid signature\"",
+   "expect": {
+    "ok": false,
+    "kind": "Signature",
+    "step": 21
+   }
+  },
+  {
+   "id": "tampered-client-data",
+   "spec": "WebAuthn L3 7.2 step 10 \"C.type is the string webauthn.get\" (the tampered clientDataJSON carries webauthn.create, refused before the signature is read)",
+   "expect": {
+    "ok": false,
+    "kind": "Type",
+    "step": 10
+   }
+  },
+  {
+   "id": "tampered-authenticator-data",
+   "spec": "WebAuthn L3 7.2 step 21 \"verify that sig is a valid signature\"",
+   "expect": {
+    "ok": false,
+    "kind": "Signature",
+    "step": 21
+   }
+  }
+ ]
+}
