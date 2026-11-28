@@ -6,8 +6,8 @@
 
 default:
   interruptible: true
-  # the estate's group runner; a job with its own tags (e2e) keeps them. No job may run on the shared SaaS runners.
-  tags: [anvil]
+  # the estate group runner, same tags as e2e (E2E_RUNNER_TAG is a project variable); a job with its own tags (e2e) keeps them. No job may run on the shared SaaS runners.
+  tags: ["$E2E_RUNNER_TAG", qemu]
 
 workflow:
   rules:

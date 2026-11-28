@@ -53,7 +53,7 @@ slow-plan:
     declare -A shards=([jose]=8)
     echo "include: [{local: .gitlab/rust.yml}]"
     echo "stages: [verify]"
-    echo "default: {tags: [anvil]}"
+    echo 'default: {tags: ["$E2E_RUNNER_TAG", qemu]}'
     just slow-units | while read -r c; do
         n=${shards[$c]:-1}
         for ((k = 0; k < n; k++)); do
