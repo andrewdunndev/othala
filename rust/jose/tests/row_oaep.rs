@@ -133,7 +133,7 @@ fn row(file: Vector, total: usize, checked: usize) {
 
 #[test]
 fn rfc7516_a1_and_rfc7520_5_2() {
-    row(vector!("rfc7516/jwe.json"), 13, 6);
+    row(vector!("rfc7516/jwe.json"), 16, 6);
     row(vector!("rfc7520/jwe-cases.json"), 64, 8);
 }
 

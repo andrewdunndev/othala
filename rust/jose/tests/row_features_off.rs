@@ -1,4 +1,4 @@
-//! With every feature off (CONTRACT R50): an ES512 token or key and an RSA-OAEP token are `UnsupportedAlg`, and the
+//! With every feature off (CONTRACT R50, R60): an ES512 token or key and an RSA-OAEP token, RFC 7520 section 6's included, are `UnsupportedAlg`, and the
 //! registry names still parse.
 #![cfg(not(any(feature = "es512", feature = "rsa-decrypt", feature = "rsa-sign")))]
 
@@ -142,4 +142,24 @@ fn rsa_oaep_is_refused() {
     });
     assert_eq!(tally.checked(), 8);
     assert_eq!(JweAlg::parse("RSA-OAEP").ok(), Some(JweAlg::RsaOaep));
+}
+
+#[test]
+fn nested_jwt_is_refused() {
+    let file = common_figures::all(vector!("rfc7520/nesting.json"));
+    let visited = std::cell::Cell::new(0);
+    for number in [236, 237, 238] {
+        let wire = visit(&file, "6.8", number, &visited);
+        let outcome = if number == 236 {
+            Jwe::parse(&wire)
+        } else {
+            Jwe::parse_json(wire.as_bytes())
+        };
+        assert_eq!(
+            kind(outcome),
+            Some(ErrorKind::UnsupportedAlg),
+            "figure {number}"
+        );
+    }
+    assert_eq!(visited.get(), 3);
 }

@@ -227,6 +227,18 @@ files = [
   { path = "rfc7520/jws.json", sha256 = "36da0568090a9e9585a3adf94653583f52aa733a1705d09768167ef9b51944c3", cases = 8 },
 ]
 
+[source."rfc7520-nesting"]
+url = "https://www.rfc-editor.org/rfc/rfc7520.txt"
+revision = "RFC 7520 section 6"
+retrieved = "2026-11-28"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+notes = "Extracted by tools/extract_rfc_figures.py rfc7520.txt rfc7520/nesting.json 6 (rfc7520.txt sha256 14798c3b2d72e35375d5fb86d280a1e8df6109a6ee6cbfc091a0c57a8cc076c6): every numbered figure of section 6 as text, joined (whitespace removed) and parsed json where it is JSON. RFC 7520 is Informational. Section 6.1-6.8: a PS256 JWT nested in an RSA-OAEP and A128GCM JWE with cty JWT; the encryption key is Figure 84 (rfc7520/jwe.json), the signing key Figure 224."
+cases = 7
+files = [
+  { path = "rfc7520/nesting.json", sha256 = "544c63fe76593a1afbcaad05bfd5a567a96fb065c32fd7c232dcf84b80200ddd", cases = 7 },
+]
+
 [source."rfc7520-jwe"]
 url = "https://www.rfc-editor.org/rfc/rfc7520.txt"
 revision = "RFC 7520 section 5"
@@ -253,14 +265,14 @@ files = [
 
 [source."rfc7516"]
 url = "https://www.rfc-editor.org/rfc/rfc7516.txt"
-revision = "RFC 7516 appendix A.1-A.3"
+revision = "RFC 7516 appendix A.1-A.5"
 retrieved = "2026-11-26"
 licence = "IETF Trust (RFC text; data values only)"
 feeds = ["jose"]
-notes = "tools/extract_jwe.py on rfc7516.txt (sha256 722cfcddc15f58e746891ba4b846853d3711153a774e4dd55ad6db100474a21f), case shape of rfc7515/jws.json, op jwe_decrypt. A.1 RSA-OAEP + A256GCM (behind rsa-decrypt) and A.3 A128KW + A128CBC-HS256 each valid plus five derived refusals (tampered tag, ciphertext, IV, encrypted key; truncated tag). A.2 RSA1_5 + A128CBC-HS256 is must-refuse (non-goal). A.4 and A.5 (general and flattened JSON, RSA1_5 plus A128KW recipients) not extracted; RFC 7520 section 5 covers both serializations."
-cases = 13
+notes = "tools/extract_jwe.py on rfc7516.txt (sha256 722cfcddc15f58e746891ba4b846853d3711153a774e4dd55ad6db100474a21f), case shape of rfc7515/jws.json, op jwe_decrypt. A.1 RSA-OAEP + A256GCM (behind rsa-decrypt) and A.3 A128KW + A128CBC-HS256 each valid plus five derived refusals (tampered tag, ciphertext, IV, encrypted key; truncated tag). A.2 RSA1_5 + A128CBC-HS256 is must-refuse (non-goal). A.4 (general JSON, RSA1_5 and A128KW recipients) and A.5 (flattened JSON, A128KW): each recipient's key is a case, the A128KW recipients open to the A.3 plaintext and the RSA1_5 recipient is must-refuse (UnsupportedAlg, CONTRACT R65); the must-refuse cases name that kind."
+cases = 16
 files = [
-  { path = "rfc7516/jwe.json", sha256 = "3e9147da581ab0b991cf36bc9f04afefdfa5520e77c33fda9fe381bb9d4a5c8a", cases = 13 },
+  { path = "rfc7516/jwe.json", sha256 = "2ec3e8875f820dff53c54a4b090a263eda8045b54ca3cfa61d264ac2d93f5146", cases = 16 },
 ]
 
 [source."rfc7518"]

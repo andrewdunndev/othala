@@ -1,4 +1,4 @@
-//! RFC 7516 Appendix A.3, the header refusals and issuing round trips (CONTRACT R48, R51 to R53, R59).
+//! RFC 7516 Appendix A.3 to A.5, the header refusals and issuing round trips (CONTRACT R48, R51 to R53, R59).
 mod common_jwe;
 
 use base::{Entropy, SecretBytes, b64url_decode, b64url_encode};
@@ -25,13 +25,14 @@ struct Case {
     id: String,
     alg: String,
     enc: String,
+    serialization: String,
     jwk: Option<Json>,
-    jwe: String,
+    jwe: Json,
     expect: Expect,
 }
 
-/// Runs a file of compact `jwe_decrypt` cases: the algorithms this item owns decrypt or are refused as the vector
-/// says; ECDH-ES, RSA-OAEP and key types of later items are counted not applicable by name.
+/// Runs a file of `jwe_decrypt` cases: the algorithms this item owns decrypt or are refused as the vector says (the
+/// kind it names); ECDH-ES, RSA-OAEP and key types of later items are counted not applicable by name.
 fn row(file: Vector, total: usize, applicable: usize) {
     let tally = run::<Case>(file, 1, |case| {
         let owned = common_jwe::LOCAL.contains(&case.alg.as_str());
@@ -43,23 +44,49 @@ fn row(file: Vector, total: usize, applicable: usize) {
             return Outcome::NotApplicable;
         }
         let jwk = case.jwk.as_ref().map_or("{}", Json::text);
+        let compact = case.serialization == "compact";
+        let wire = if compact {
+            case.jwe.parse::<String>()
+        } else {
+            case.jwe.text().to_owned()
+        };
+        let parsed = || {
+            if compact {
+                Jwe::parse(&wire)
+            } else {
+                Jwe::parse_json(wire.as_bytes())
+            }
+        };
         let outcomes: Vec<Result<Vec<u8>, jose::Error>> = if refused {
             common_jwe::LOCAL
                 .iter()
-                .map(|alg| common_jwe::decrypt(alg, &case.enc, jwk, Jwe::parse(&case.jwe)?))
+                .map(|alg| common_jwe::decrypt(alg, &case.enc, jwk, parsed()?))
                 .collect()
         } else {
-            vec![
-                Jwe::parse(&case.jwe)
-                    .and_then(|jwe| common_jwe::decrypt(&case.alg, &case.enc, jwk, jwe)),
-            ]
+            vec![parsed().and_then(|jwe| common_jwe::decrypt(&case.alg, &case.enc, jwk, jwe))]
         };
         if refused {
-            assert!(outcomes.iter().all(Result::is_err), "{}", case.id);
+            let kind = JweAlg::parse(&case.alg).err().map(|e| e.kind());
+            assert_eq!(kind, Some(ErrorKind::UnsupportedAlg), "{}", case.id);
+            let Some(named) = &case.expect.kind else {
+                assert!(outcomes.iter().all(Result::is_err), "{}", case.id);
+                return Outcome::Checked;
+            };
             assert_eq!(
-                JweAlg::parse(&case.alg).err().map(|e| e.kind()),
-                Some(ErrorKind::UnsupportedAlg)
+                kind.map(|k| format!("{k:?}")).as_ref(),
+                Some(named),
+                "{}",
+                case.id
             );
+            // the header's `alg` is not the key's under any algorithm this file owns (R52)
+            for outcome in &outcomes {
+                assert_eq!(
+                    outcome.as_ref().err().map(|e| e.kind()),
+                    Some(ErrorKind::AlgMismatch),
+                    "{}",
+                    case.id
+                );
+            }
             return Outcome::Checked;
         }
         let outcome = outcomes
@@ -90,7 +117,7 @@ fn row(file: Vector, total: usize, applicable: usize) {
 
 #[test]
 fn rfc7516_appendix_a() {
-    row(vector!("rfc7516/jwe.json"), 13, 7);
+    row(vector!("rfc7516/jwe.json"), 16, 10);
 }
 
 #[test]
