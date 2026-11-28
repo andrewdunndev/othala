@@ -17,7 +17,7 @@ use serde_json::value::RawValue;
 
 use crate::alg::{Params, sealed};
 use crate::crit::refuse_crit;
-use crate::json::{Capped, named, scan};
+use crate::json::{Capped, Object, named, object, scan};
 use crate::jwk::decode::{Key, parse};
 use crate::jwk::thumbprint::members;
 use crate::key::{Private, Public, dup, dup_private, private_info, public_info, public_of};
@@ -103,17 +103,25 @@ impl SecretJwk {
 
 #[derive(Default, Deserialize)]
 struct Fields<'a> {
+    #[serde(default, deserialize_with = "named")]
     alg: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     enc: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     kid: Option<String>,
     #[serde(default, deserialize_with = "named")]
     zip: Option<String>,
     #[serde(default, deserialize_with = "named")]
     crit: Option<Vec<String>>,
+    #[serde(default, deserialize_with = "named")]
     apu: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     apv: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     iv: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     tag: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     #[serde(borrow)]
     epk: Option<&'a RawValue>,
 }
@@ -327,7 +335,9 @@ fn empty() -> Header {
 
 #[derive(Deserialize)]
 struct Entry<'a> {
+    #[serde(default, deserialize_with = "named")]
     header: Option<&'a RawValue>,
+    #[serde(default, deserialize_with = "named")]
     encrypted_key: Option<&'a str>,
 }
 
@@ -336,17 +346,19 @@ struct Entry<'a> {
 //# implementations encountering them, they MUST be ignored.
 #[derive(Deserialize)]
 struct Document<'a> {
+    #[serde(default, deserialize_with = "named")]
     protected: Option<&'a str>,
+    #[serde(default, deserialize_with = "named")]
     unprotected: Option<&'a RawValue>,
+    #[serde(default, deserialize_with = "named")]
     header: Option<&'a RawValue>,
+    #[serde(default, deserialize_with = "named")]
     encrypted_key: Option<&'a str>,
     //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
-    //= type=todo
-    //= reason=a recipients member of null is read as absent, so it is not refused as a non-array; every other non-array shape is Malformed, tested
     //# recipients The "recipients" member value MUST be an array of JSON objects.
-    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
-    //# recipients The "recipients" member value MUST be an array of JSON objects.
-    recipients: Option<Capped<Entry<'a>>>,
+    #[serde(default, deserialize_with = "named")]
+    recipients: Option<Capped<Object<Entry<'a>>>>,
+    #[serde(default, deserialize_with = "named")]
     aad: Option<&'a str>,
     iv: &'a str,
     ciphertext: &'a str,
@@ -393,12 +405,12 @@ impl<'a> Jwe<'a> {
         //# The Header Parameter names within the JOSE Header MUST be unique, just as described in
         //# Section 4 of [JWS].
         scan(json)?;
-        let document: Document<'a> = serde_json::from_slice(json).map_err(|_| malformed())?;
+        let document: Document<'a> = object(json).map_err(|_| malformed())?;
         let entries = match document.recipients {
             //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.2
             //# The "recipients" member MUST NOT be present when using this syntax.
             Some(entries) if document.header.is_none() && document.encrypted_key.is_none() => {
-                entries.0
+                entries.0.into_iter().map(|Object(entry)| entry).collect()
             }
             None => vec![Entry {
                 header: document.header,
@@ -985,6 +997,121 @@ mod tests {
 
     fn json_kind(json: &str) -> Option<ErrorKind> {
         Jwe::parse_json(json.as_bytes()).err().map(|e| e.kind())
+    }
+
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //= type=test
+    //# recipients The "recipients" member value MUST be an array of JSON objects.
+    #[test]
+    fn a_document_or_entry_written_as_an_array_is_malformed() {
+        let protected = b64url_encode(br#"{"enc":"A128GCM"}"#);
+        // a document by position: protected, unprotected, header, encrypted_key, recipients, aad, iv, ciphertext, tag
+        let document =
+            format!(r#"["{protected}",null,{{"alg":"dir"}},null,null,null,"AA","AA","AA"]"#);
+        assert_eq!(json_kind(&document), Some(ErrorKind::Malformed));
+        // an entry by position: header, encrypted_key
+        let entry = r#"[{"alg":"dir"},"AA"]"#;
+        let body = r#""iv":"AA","ciphertext":"AA","tag":"AA""#;
+        assert_eq!(
+            json_kind(&format!(
+                r#"{{"protected":"{protected}","recipients":[{entry}],{body}}}"#
+            )),
+            Some(ErrorKind::Malformed)
+        );
+        let object = r#"{"header":{"alg":"dir"},"encrypted_key":"AA"}"#;
+        assert_eq!(
+            json_kind(&format!(
+                r#"{{"protected":"{protected}","recipients":[{object}],{body}}}"#
+            )),
+            None
+        );
+    }
+
+    #[test]
+    fn a_null_member_is_malformed_not_absent() {
+        let protected = b64url_encode(br#"{"enc":"A128GCM"}"#);
+        let body = r#""iv":"AA","ciphertext":"AA","tag":"AA""#;
+        let flat = |extra: &str| {
+            format!(r#"{{"protected":"{protected}","header":{{"alg":"dir"}}{extra},{body}}}"#)
+        };
+        let general = |entry: &str, extra: &str| {
+            format!(r#"{{"protected":"{protected}"{extra},"recipients":[{entry}],{body}}}"#)
+        };
+        // positive controls: the same shapes with the member omitted or holding a value
+        assert_eq!(json_kind(&flat("")), None);
+        assert_eq!(
+            json_kind(&flat(
+                r#","encrypted_key":"AA","aad":"AA","unprotected":{}"#
+            )),
+            None
+        );
+        assert_eq!(json_kind(&general(r#"{"header":{"alg":"dir"}}"#, "")), None);
+        let mut nulls = vec![
+            // the member as null beside the flattened members: never the general form's absence
+            flat(r#","encrypted_key":null"#),
+            flat(r#","aad":null"#),
+            flat(r#","unprotected":null"#),
+            flat(r#","recipients":null"#),
+            format!(
+                r#"{{"protected":"{protected}","header":{{"alg":"dir"}},"recipients":null,"encrypted_key":"AA",{body}}}"#
+            ),
+            format!(r#"{{"protected":null,"header":{{"alg":"dir"}},{body}}}"#),
+            format!(r#"{{"protected":"{protected}","header":null,{body}}}"#),
+            general(r#"{"header":null}"#, ""),
+            general(r#"{"header":{"alg":"dir"},"encrypted_key":null}"#, ""),
+            general(r#"{"header":{"alg":"dir"}}"#, r#","aad":null"#),
+            general(r#"{"header":{"alg":"dir"}}"#, r#","unprotected":null"#),
+            general(r#"{"header":{"alg":"dir"}}"#, r#","encrypted_key":null"#),
+        ];
+        // a header member of null, in the protected header and in a per-recipient header. alg and enc are also
+        // given by another header, so were null read as absent the document would be DuplicateMember or valid, never
+        // Malformed; the same document with the member omitted is the positive control
+        let header_doc = |name: &str, value: Option<&str>, own: bool| {
+            let given = |n: &str| match n {
+                "alg" => r#""alg":"dir""#,
+                _ => r#""enc":"A128GCM""#,
+            };
+            let member = value.map(|v| format!(r#""{name}":{v}"#));
+            let (mut protected, mut unprotected, mut header) = (vec![], vec![], vec![]);
+            if own {
+                protected.extend([given("alg").to_owned(), given("enc").to_owned()]);
+                header.extend(member);
+            } else {
+                for n in ["alg", "enc"] {
+                    match n == name {
+                        true => unprotected.push(given(n).to_owned()),
+                        false => protected.push(given(n).to_owned()),
+                    }
+                }
+                protected.extend(member);
+            }
+            let protected = b64url_encode(format!("{{{}}}", protected.join(",")).as_bytes());
+            let mut doc = format!(r#"{{"protected":"{protected}""#);
+            if !unprotected.is_empty() {
+                doc += &format!(r#","unprotected":{{{}}}"#, unprotected.join(","));
+            }
+            if own {
+                doc += &format!(r#","header":{{{}}}"#, header.join(","));
+            }
+            format!("{doc},{body}}}")
+        };
+        for name in [
+            "alg", "enc", "kid", "zip", "crit", "apu", "apv", "iv", "tag", "epk",
+        ] {
+            for own in [false, true] {
+                assert_eq!(
+                    json_kind(&header_doc(name, None, own)),
+                    None,
+                    "{name} omitted, own {own}"
+                );
+                nulls.push(header_doc(name, Some("null"), own));
+            }
+        }
+        assert_eq!(json_kind(&header_doc("kid", Some(r#""k""#), false)), None);
+        assert_eq!(json_kind(&header_doc("kid", Some(r#""k""#), true)), None);
+        for json in nulls {
+            assert_eq!(json_kind(&json), Some(ErrorKind::Malformed), "{json}");
+        }
     }
 
     //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.2

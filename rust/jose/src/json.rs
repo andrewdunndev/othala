@@ -145,6 +145,35 @@ pub(crate) fn scan(json: &[u8]) -> Result<(), Error> {
     .map_err(|_| why.get().into())
 }
 
+/// A `T` read from a JSON object only: serde's struct-from-array form is refused, so an array never fills the members
+/// of an all-optional struct with defaults.
+pub(crate) struct Object<T>(pub(crate) T);
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Object<T> {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct Map<T>(core::marker::PhantomData<T>);
+
+        impl<'de, T: Deserialize<'de>> Visitor<'de> for Map<T> {
+            type Value = Object<T>;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("an object")
+            }
+
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Object<T>, A::Error> {
+                T::deserialize(serde::de::value::MapAccessDeserializer::new(map)).map(Object)
+            }
+        }
+
+        d.deserialize_map(Map(core::marker::PhantomData))
+    }
+}
+
+/// `json` read as one `T` from a JSON object: an array never stands in for the members of a struct.
+pub(crate) fn object<'de, T: Deserialize<'de>>(json: &'de [u8]) -> Result<T, serde_json::Error> {
+    serde_json::from_slice::<Object<T>>(json).map(|Object(value)| value)
+}
+
 /// A member that must hold a `T` when it is named: JSON `null` is an ill-typed member, never an absent one.
 pub(crate) fn named<'de, T: Deserialize<'de>, D: Deserializer<'de>>(
     d: D,
@@ -161,6 +190,25 @@ mod tests {
 
     use super::{Capped, Scan, scan};
     use crate::{ErrorKind, MAX_ENTRIES, MAX_JSON_DEPTH, MAX_JSON_LEN};
+
+    #[test]
+    fn an_object_reads_from_a_map_only() {
+        #[derive(serde::Deserialize)]
+        struct Open {
+            #[serde(default)]
+            #[expect(dead_code, reason = "read only to prove the shape")]
+            a: Option<u8>,
+        }
+        let read = |json: &str| {
+            serde_json::from_str::<super::Object<Open>>(json)
+                .err()
+                .map(|e| e.to_string())
+        };
+        assert_eq!(read(r#"{"a":1}"#), None);
+        assert_eq!(read("{}"), None);
+        let refused = read("[]").unwrap_or_default();
+        assert!(refused.contains("expected an object"), "{refused}");
+    }
 
     #[test]
     fn capped_arrays_keep_one_past_the_bound() {

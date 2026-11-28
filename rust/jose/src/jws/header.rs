@@ -79,11 +79,15 @@ pub(crate) struct Parsed {
 //# defined by this specification MUST be ignored when not understood.
 #[derive(Default, Deserialize)]
 struct Fields {
+    #[serde(default, deserialize_with = "named")]
     alg: Option<String>,
     //= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.4
     //# Its value MUST be a case-sensitive string.
+    #[serde(default, deserialize_with = "named")]
     kid: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     typ: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     cty: Option<String>,
     #[serde(default, deserialize_with = "named")]
     crit: Option<Vec<String>>,
