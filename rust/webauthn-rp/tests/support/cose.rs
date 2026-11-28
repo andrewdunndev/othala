@@ -30,7 +30,7 @@ pub(crate) fn cases() {
         if c.unbuilt.is_some() {
             // a case that must be accepted proves its marker true: the reader still refuses it
             assert!(
-                !c.expect.ok || key.is_err(),
+                !c.expect.ok || key.as_ref().err().is_some(),
                 "{}: built, drop the marker",
                 c.id
             );
