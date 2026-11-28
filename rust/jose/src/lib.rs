@@ -14,12 +14,14 @@
 extern crate alloc;
 
 // Layering, lowest first (`layers.json` lists it and `just layers` holds it; a module imports its own layer or below):
-//   base            error, rng
+//   base            error, rng, testing
 //   leaves          json, crit (over error); key (the validated key material, over nothing)
 //   algorithms      alg: the markers, the registry and the sealed per-algorithm traits, over key
 //   implementations sig::*, jwe::{content, ecdh, kw, oaep} (each algorithm's operations), verify, claims
-//   jwk             jwk::{decode, thumbprint, set} and sign: a JWK is read over the algorithms and key material, and
-//                   each key a JWK makes (`SigningKey`, `EncryptKey`) is built by an `impl` beside that key's own type
+//   jwk             jwk::{decode, thumbprint, set} and sign. `sign` sits here because its `Header` names a `Kid` and its
+//                   `SecretJwk::signing_key` reads a JWK's metadata, so it is above `jwk::decode`; the inherent impls of
+//                   `Jwk` and `SecretJwk` are spread to keep that one-way: decode.rs holds the JWK itself and its
+//                   `verify_key`, sign.rs holds `signing_key`, jwe/envelope.rs holds `encrypt_key` and `decrypt_key`
 //   formats         jws::{header, compact, json}, jwe::envelope, jwk::any
 //   tokens          jwt
 mod alg;

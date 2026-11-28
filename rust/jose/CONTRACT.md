@@ -40,7 +40,7 @@ Checks:
 - T26 MSRV 1.89 against the committed lock: gate:msrv.
 - T27 The direct runtime dependencies are `deps.txt`'s (base, serde, serde_json without `arbitrary_precision` or `preserve_order`, sha2, hmac, p256, p384, ecdsa, ed25519-dalek, rsa, aes, aes-gcm, cbc, aes-kw, one-step-kdf; `es512` adds p521, `rsa-decrypt` sha1 and rand_core, `rsa-sign` rand_core); curve crates without `std`; the `Entropy`-to-`rand_core` adapter rsa needs is private to jose: gate:deps, gate:deny.
 - T28 Three features, all off by default: `es512`, `rsa-decrypt`, `rsa-sign`; every other algorithm is always built: `Cargo.toml`, gate:test with every feature and with none (R-i).
-- T29 The modules sit in the layers `layers.json` lists and import only from their own layer or below, so no import cycle exists between modules (`alg` does not reach JWE internals, `key` does not reach `jwk`): gate:layers.
+- T29 The modules sit in the layers `layers.json` lists and import only from their own layer or below, so no import cycle exists between modules (`alg` does not reach JWE internals, `key` does not reach `jwk`): gate:layers, whose self-test plants each form of bad import (`super::`, `super::super::`, a module-namespace import, an aliased re-export, code after an inner `cfg(test)`, an inline `crate::` path after a URL string, a same-layer cycle, an unplaced module, an unresolved path) in a temporary copy and requires its exact error.
 
 ## Runtime: JWS
 - R1 RFC 7515 A.1 (HS256), A.2 (RS256) and A.3 (ES256) verify under their keys, and each tampered, truncated or signature-less case is refused: vec:rfc7515/jws.json, row:rfc7515.
