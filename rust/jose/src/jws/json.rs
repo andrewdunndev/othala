@@ -6,7 +6,7 @@ use base::b64url_decode;
 use serde::Deserialize;
 use serde_json::value::RawValue;
 
-use crate::jwk::decode::{Capped, scan};
+use crate::json::{Capped, scan};
 use crate::jws::compact::Signature;
 use crate::jws::header::Parsed;
 use crate::{Compact, Error, ErrorKind, Jws, MAX_ENTRIES};

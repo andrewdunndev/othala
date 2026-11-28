@@ -11,7 +11,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Number;
 use sha2::{Digest as _, Sha256, Sha384, Sha512};
 
-use crate::jwk::decode::scan;
+use crate::json::scan;
 use crate::{Error, ErrorKind, MAX_LEEWAY, MAX_NAME_LEN, SigningAlg};
 
 /// A kind of JWT: its `typ` and its claims. One per kind, so a policy never crosses kinds.

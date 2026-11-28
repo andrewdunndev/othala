@@ -84,7 +84,7 @@ fn row(file: Vector, total: usize) {
 //# that member value.
 #[test]
 fn header_cases() {
-    row(vector!("jose-derived/header.json"), 23);
+    row(vector!("jose-derived/header.json"), 25);
 }
 
 #[test]

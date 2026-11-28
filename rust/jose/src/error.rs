@@ -113,70 +113,27 @@ impl core::error::Error for Error {}
 
 #[cfg(test)]
 mod tests {
-    use alloc::collections::BTreeSet;
+    use alloc::collections::{BTreeMap, BTreeSet};
+    use alloc::format;
     use alloc::string::ToString;
 
     use crate::{Error, ErrorKind};
 
-    /// The exact text of every kind. The match has no `_` arm, so a new kind fails to compile here; `ErrorKind::ALL` comes
-    /// from the `kind_texts!` list, whose exhaustive lookups refuse a kind the list leaves out, so none escapes the loop below.
-    fn expected(kind: ErrorKind) -> &'static str {
-        match kind {
-            ErrorKind::Malformed => "input is not well-formed; reject it, it cannot be repaired",
-            ErrorKind::TooLarge => {
-                "input exceeds a size bound; reject it, or raise the bound if the input is trusted"
-            }
-            ErrorKind::DuplicateMember => {
-                "a member appears twice; reject the input, it is ambiguous"
-            }
-            ErrorKind::UnsupportedAlg => {
-                "algorithm, curve or compression is not supported; choose an implemented one or enable its feature"
-            }
-            ErrorKind::AlgMismatch => {
-                "algorithm does not match the key; use a key of the type and curve the algorithm takes"
-            }
-            ErrorKind::KeyAlgMissing => {
-                "key has no alg; set the algorithm on the key or pass it explicitly"
-            }
-            ErrorKind::CriticalHeader => {
-                "token requires a critical header extension this crate does not understand; reject the token"
-            }
-            ErrorKind::WeakKey => "key is below the algorithm's minimum size; use a larger key",
-            ErrorKind::KeyUse => {
-                "key does not permit this operation; use a key whose use and key_ops allow it"
-            }
-            ErrorKind::BadSignature => {
-                "no signature verified; reject the token, or check that the verification key is the issuer's"
-            }
-            ErrorKind::Decrypt => "decryption failed; reject the token, no cause is given",
-            ErrorKind::Expired => "token has expired; obtain a fresh token",
-            ErrorKind::NotYetValid => {
-                "token is not valid yet; retry later or check the clocks and leeway"
-            }
-            ErrorKind::Issuer => {
-                "issuer is not the expected one; reject the token or check the policy's issuer"
-            }
-            ErrorKind::Audience => {
-                "audience does not include this recipient; reject the token or check the policy's audience"
-            }
-            ErrorKind::Type => {
-                "token type is not the expected one; reject the token or check the policy's type"
-            }
-            ErrorKind::MissingClaim => {
-                "a required claim is absent; reject the token or check the policy's required claims"
-            }
-            ErrorKind::ClaimType => "a registered claim has the wrong JSON type; reject the token",
-            ErrorKind::Signer => "the signer failed; check the HSM or KMS and retry",
-        }
-    }
-
     #[test]
     fn each_kind_reads_distinctly() {
+        let golden: BTreeMap<&str, &str> = include_str!("../tests/golden/error_texts.txt")
+            .lines()
+            .filter_map(|line| line.split_once('\t'))
+            .collect();
+        assert_eq!(golden.len(), ErrorKind::ALL.len());
         for &kind in ErrorKind::ALL {
-            let text = expected(kind);
             let error = Error::from(kind);
             assert_eq!(error.kind(), kind);
-            assert_eq!(error.to_string(), text);
+            let text = golden
+                .get(format!("{kind:?}").as_str())
+                .copied()
+                .unwrap_or_default();
+            assert_eq!(error.to_string(), text, "{kind:?}");
             // fixed prose: no quoting, bracketing or digits that could carry input or a Debug form
             assert!(
                 text.chars()

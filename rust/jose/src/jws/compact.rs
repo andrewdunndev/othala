@@ -5,8 +5,8 @@ use core::fmt;
 
 use base::b64url_decode;
 
-use crate::jwk::decode::dup;
 use crate::jws::header::Parsed;
+use crate::key::dup;
 use crate::{
     Alg, AnyVerifyKey, EdDsa, Error, ErrorKind, Es256, Es384, Kid, MAX_COMPACT_LEN, Ps256, Ps384,
     Ps512, Rs256, Rs384, Rs512, SigningAlg, VerifyKey,

@@ -1,5 +1,5 @@
 //! The JOSE header a JWS carries (RFC 7515 section 4): the duplicate pre-scan, `crit`, and the `alg` comparison.
-use alloc::collections::BTreeMap;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -7,7 +7,8 @@ use base::b64url_decode;
 use serde::Deserialize;
 use serde::de::IgnoredAny;
 
-use crate::jwk::decode::scan;
+use crate::crit::refuse_crit;
+use crate::json::{named, scan};
 use crate::{Error, ErrorKind, Kid};
 
 /// One signature's protected and unprotected headers, merged after the duplicate check.
@@ -18,12 +19,6 @@ pub(crate) struct Parsed {
     pub(crate) typ: Option<String>,
     pub(crate) cty: Option<String>,
 }
-
-/// Every header name a registry defines (RFC 7515 4.1, RFC 7516 4.1, RFC 7518 4, RFC 7797): `crit` may not name one.
-pub(crate) const REGISTERED: [&str; 22] = [
-    "alg", "jku", "jwk", "kid", "x5u", "x5c", "x5t", "x5t#S256", "typ", "cty", "crit", "b64",
-    "enc", "zip", "epk", "apu", "apv", "iv", "tag", "p2s", "p2c", "ppt",
-];
 
 //= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.2
 //= type=exception
@@ -90,7 +85,9 @@ struct Fields {
     kid: Option<String>,
     typ: Option<String>,
     cty: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     crit: Option<Vec<String>>,
+    #[serde(default, deserialize_with = "named")]
     b64: Option<IgnoredAny>,
 }
 
@@ -125,11 +122,12 @@ struct Fields {
 //# characters exercising limitations present in the underlying JSON implementation, then input
 //# containing them MUST be rejected.
 /// A header object: its known members, and every name it holds.
-fn read(json: &[u8]) -> Result<(Fields, BTreeMap<String, IgnoredAny>), Error> {
+fn read(json: &[u8]) -> Result<(Fields, BTreeSet<String>), Error> {
     scan(json)?;
     let fields = serde_json::from_slice(json).map_err(|_| ErrorKind::Malformed)?;
-    let names = serde_json::from_slice(json).map_err(|_| ErrorKind::Malformed)?;
-    Ok((fields, names))
+    let names: BTreeMap<String, IgnoredAny> =
+        serde_json::from_slice(json).map_err(|_| ErrorKind::Malformed)?;
+    Ok((fields, names.into_keys().collect()))
 }
 
 impl Parsed {
@@ -162,36 +160,13 @@ impl Parsed {
         //# the JOSE Header.
         //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
         //# The Header Parameter names in the two locations MUST be disjoint.
-        if held.keys().any(|name| other.contains_key(name)) {
+        if held.intersection(&other).next().is_some() {
             return Err(ErrorKind::DuplicateMember.into());
         }
-        //= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.11
-        //# When used, this Header Parameter MUST be integrity protected; therefore, it MUST occur
-        //# only within the JWS Protected Header.
-        if first.b64.is_some() || second.b64.is_some() || second.crit.is_some() {
+        if first.b64.is_some() || second.b64.is_some() {
             return Err(ErrorKind::Malformed.into());
         }
-        //= https://www.rfc-editor.org/rfc/rfc7515#section-4
-        //# Implementations are required to understand the specific Header Parameters defined by
-        //# this specification that are designated as "MUST be understood" and process them in the
-        //# manner defined in this specification.
-        //= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.11
-        //# The "crit" (critical) Header Parameter indicates that extensions to this specification
-        //# and/or [JWA] are being used that MUST be understood and processed.
-        //= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.11
-        //# This Header Parameter MUST be understood and processed by implementations.
-        if let Some(crit) = &first.crit {
-            let usable = !crit.is_empty()
-                && crit
-                    .iter()
-                    .all(|name| !REGISTERED.contains(&name.as_str()) && held.contains_key(name));
-            return Err(if usable {
-                ErrorKind::CriticalHeader
-            } else {
-                ErrorKind::Malformed
-            }
-            .into());
-        }
+        refuse_crit(first.crit.as_deref(), &held, second.crit.is_some())?;
         let kid = first.kid.or(second.kid);
         //= https://www.rfc-editor.org/rfc/rfc7515#section-4.1.1
         //# This Header Parameter MUST be present and MUST be understood and processed by

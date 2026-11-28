@@ -9,7 +9,7 @@ use expose::Expose as _;
 use sha2::Sha256;
 
 use crate::jwe::envelope::{Params, sealed};
-use crate::jwk::decode::public_of;
+use crate::key::public_of;
 use crate::key::{Private, Public};
 use crate::{Error, ErrorKind, JweAlg, JweEnc, KeyAlg, LocalKeyAlg, PublicKeyAlg};
 

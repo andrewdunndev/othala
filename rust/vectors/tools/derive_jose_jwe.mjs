@@ -59,6 +59,7 @@ const cases = [
   c("zip-unknown", "RFC 7516 4.1.3", { ok: false, kind: "UnsupportedAlg" }, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM","zip":"XYZ"}') }),
   c("zip-null", "RFC 7516 4.1.3 (zip is a string; null is not an absent member)", { ok: false, kind: "Malformed" }, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM","zip":null}') }),
   c("crit-unknown", "RFC 7516 4.1.13 with RFC 7515 4.1.11", { ok: false, kind: "CriticalHeader" }, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM","crit":["exp-x"],"exp-x":1}') }),
+  c("crit-null", "RFC 7516 4.1.13 with RFC 7515 4.1.11 (crit is an array; null is not an absent member)", { ok: false, kind: "Malformed" }, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM","crit":null}') }),
   c("dup-enc", "RFC 7516 4 (names MUST be unique; this oracle rejects)", { ok: false, kind: "DuplicateMember" }, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW","enc":"A128GCM","enc":"A256GCM"}') }),
   c("enc-missing", "RFC 7516 4.1.2 (enc is REQUIRED)", { ok: false, kind: "Malformed" }, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"A128KW"}') }),
   c("alg-none", "RFC 7516 4.1.1 with RFC 7518 4.1 (none is not a key management alg)", { ok: false, kind: "AlgMismatch" }, { alg: "A128KW", enc: "A128GCM", jwk: KEY, jwe: kwk('{"alg":"none","enc":"A128GCM"}') }),
