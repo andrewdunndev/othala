@@ -12,7 +12,7 @@ gate: gate-rust claims vectors
 # the gates that run on CI's ci-rust image, which has no node or python3; claims and vectors run on theirs
 gate-rust: (tool-pins "jq") lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api
 
-# the slow gates, run on a schedule and on main: the per-crate mutation floors, the scoreboard they feed, the features-off jose run and the fuzz targets; `just gate-slow <crate> <k>/<n>` runs shard k of n (cargo-mutants' own, k from 0) of one crate's mutants and, in shard 0, the rest of its share (CI runs the jobs `slow-plan` lists): a shard proves 0 missed and 0 timed out and at least one caught, and the gates.json floor is held by the unsharded runs, which is `just gate-slow` with no argument and the pre-merge `mutants-changed`
+# the slow gates, run on a schedule and on main: the per-crate mutation floors, the scoreboard they feed, the features-off jose run and the fuzz targets; `just gate-slow <crate> <k>/<n>` runs shard k of n (cargo-mutants' own, k from 0) of one crate's mutants and, in shard 0, the rest of its share but the fuzz targets, which CI runs as one job per crate with `fuzz/` (the jobs `slow-plan` lists): a shard proves 0 missed and 0 timed out and at least one caught, and the gates.json floor is held by the unsharded runs, which is `just gate-slow` with no argument and the pre-merge `mutants-changed`
 gate-slow crate="" shard="": (tool-pins)
     #!/usr/bin/env bash
     set -euo pipefail
@@ -27,7 +27,7 @@ gate-slow crate="" shard="": (tool-pins)
     [ -z "$shard" ] || [ "${shard%%/*}" = 0 ] || exit 0
     just rows "$c"
     if [ -z "$c" ] || [ "$c" = jose ]; then just mutants-off; fi
-    just fuzz 600 "$c"
+    [ -n "$c" ] || just fuzz 600
 
 # a shard is empty or k/n with 0 <= k < n, cargo-mutants' own numbering; the one place its shape is typed
 shard-check shard:
@@ -43,7 +43,7 @@ slow-units:
         if ./crates.sh | jq -e --arg c "$c" 'select(.name == $c and .mutants)' > /dev/null || [ -d "$c/fuzz" ]; then echo "$c"; fi
     done
 
-# the child pipeline of CI's check-rust-scheduled: one job per crate shard, each `just gate-slow <crate> <k>/<n>`. A crate's shard count is the one number below; size it so a shard fits well under the job's 3h at CI speed (about 7x a local MUTANTS_JOBS=6 run)
+# the child pipeline of CI's check-rust-scheduled: one job per crate shard, each `just gate-slow <crate> <k>/<n>`, and one `just fuzz` job per crate with `fuzz/`. A crate's shard count is the one number below; size it so a shard fits well under the job's 3h at CI speed (about 7x a local MUTANTS_JOBS=6 run)
 slow-plan:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -55,6 +55,9 @@ slow-plan:
         for ((k = 0; k < n; k++)); do
             printf '\nslow-%s-%sof%s:\n  extends: .slow\n  variables:\n    CRATE: %s\n    SHARD: %s/%s\n' "$c" "$k" "$n" "$c" "$k" "$n"
         done
+        if [ -d "$c/fuzz" ]; then
+            printf '\nslow-%s-fuzz:\n  extends: .slow-fuzz\n  variables:\n    CRATE: %s\n' "$c" "$c"
+        fi
     done
 
 # a manifest change without its lock change fails here, before anything builds

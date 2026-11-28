@@ -1,5 +1,6 @@
 //! `attestation_object`: the input as the attestation object of a registration response, with the control
-//! registration's client data and the credential id it attests.
+//! registration's client data and its attested credential id as the raw id, so any other credential id reads
+//! `CredentialIdInvalid`.
 use webauthn_rp::{ErrorKind, RegistrationResponse};
 
 const RAW_ID: [u8; 32] = [
