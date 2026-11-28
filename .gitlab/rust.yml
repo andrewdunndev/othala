@@ -24,6 +24,14 @@
   timeout: 3h
   interruptible: false
   script:
-    - cargo install --locked cargo-mutants@$(just mutants-pin) cargo-fuzz@0.13.1
-    - rustup toolchain install nightly --profile minimal
+    - cargo install --locked cargo-mutants@$(just mutants-pin)
     - just gate-slow "$CRATE" "$SHARD"
+
+# one crate's fuzz targets, apart from its mutants shards so neither can run the other past the job limit
+.slow-fuzz:
+  extends: .rust
+  timeout: 3h
+  interruptible: false
+  script:
+    - cargo install --locked cargo-fuzz@0.13.1
+    - just fuzz 600 "$CRATE"

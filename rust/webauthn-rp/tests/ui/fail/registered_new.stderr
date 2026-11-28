@@ -1,5 +1,0 @@
-error[E0599]: no associated function or constant named `new` found for struct `Registered` in the current scope
- --> tests/ui/fail/registered_new.rs:5:25
-  |
-5 |     let _ = Registered::new;
-  |                         ^^^ associated function or constant not found in `Registered`
