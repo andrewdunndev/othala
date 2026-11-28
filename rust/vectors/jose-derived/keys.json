@@ -279,6 +279,21 @@
    }
   },
   {
+   "id": "ps256-2047",
+   "op": "jwk_verify_key",
+   "alg": "PS256",
+   "jwk": {
+    "kty": "RSA",
+    "n": "auxwzBXcd6WIYy2F62YBfhUjv7x-9Mk37f0C-EsN-mL7iLXvr4qk2YPzRj0ZdDc03_1tggnL9VNgx1-JASk4Xewk-xNJONINf4Ne9EeCbOuq1xtHlKMhbtORvBm3RHZY3MFANuLm_0F7E3erdZCionWwyQ0fek2KRlwYqm1ft6JD-IWCXI-xkvFo3Dufp-9aiEgz7BjQQG-NbTdj6f8B9nNcQF7C4YRe9djDhHGZuaO9boYmjfkUVBqi2tMz48P7gr_7OykzVyr6SKrNQ4uD7PKU2GEDIeg4p9h-Qn3IhgCSI7YXj4Up9v64khYVfU42J7sqm3hKvB01DiGxx7Ovew",
+    "e": "AQAB"
+   },
+   "spec": "RFC 7518 3.5 (MUST be 2048 bits or larger)",
+   "expect": {
+    "ok": false,
+    "kind": "WeakKey"
+   }
+  },
+  {
    "id": "hs256-32-bytes",
    "op": "jwk_verify_key",
    "alg": "HS256",
@@ -568,6 +583,22 @@
    "expect": {
     "ok": false,
     "kind": "KeyUse"
+   }
+  },
+  {
+   "id": "rsa-oaep-2047",
+   "op": "jwk_encrypt_key",
+   "alg": "RSA-OAEP",
+   "jwk": {
+    "kty": "RSA",
+    "n": "auxwzBXcd6WIYy2F62YBfhUjv7x-9Mk37f0C-EsN-mL7iLXvr4qk2YPzRj0ZdDc03_1tggnL9VNgx1-JASk4Xewk-xNJONINf4Ne9EeCbOuq1xtHlKMhbtORvBm3RHZY3MFANuLm_0F7E3erdZCionWwyQ0fek2KRlwYqm1ft6JD-IWCXI-xkvFo3Dufp-9aiEgz7BjQQG-NbTdj6f8B9nNcQF7C4YRe9djDhHGZuaO9boYmjfkUVBqi2tMz48P7gr_7OykzVyr6SKrNQ4uD7PKU2GEDIeg4p9h-Qn3IhgCSI7YXj4Up9v64khYVfU42J7sqm3hKvB01DiGxx7Ovew",
+    "e": "AQAB"
+   },
+   "direction": "encrypt",
+   "spec": "RFC 7518 4.3 (MUST be 2048 bits or larger)",
+   "expect": {
+    "ok": false,
+    "kind": "WeakKey"
    }
   },
   {

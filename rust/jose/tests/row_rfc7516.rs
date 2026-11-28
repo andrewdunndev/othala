@@ -370,3 +370,250 @@ fn compact_again(token: &Compact, key: &jose::DecryptKey<A128Kw>) -> Option<Vec<
         .map(|p| p.bytes().to_vec())
         .ok()
 }
+
+/// The members of a flattened JWE JSON serialization for `A128KW` and `A128GCM` under the `key` helper's key.
+#[derive(Deserialize)]
+struct Flat {
+    protected: String,
+    encrypted_key: String,
+    iv: String,
+    ciphertext: String,
+    tag: String,
+}
+
+fn flat() -> Option<(Flat, jose::DecryptKey<A128Kw>)> {
+    let (encrypt, secret) = key::<A128Kw>(16)?;
+    let token = encrypt
+        .encrypt::<A128Gcm>(b"payload", &mut Counter(1))
+        .ok()?;
+    let members = serde_json::from_str(&token.flattened()).ok()?;
+    Some((members, secret.decrypt_key::<A128Kw>().ok()?))
+}
+
+/// A JSON object of `members`, each a name and the JSON text of its value.
+fn object(members: &[(&str, &str)]) -> String {
+    let body: Vec<String> = members
+        .iter()
+        .map(|(name, value)| format!(r#""{name}":{value}"#))
+        .collect();
+    format!("{{{}}}", body.join(","))
+}
+
+fn quoted(text: &str) -> String {
+    format!(r#""{text}""#)
+}
+
+/// What opening `json` as a JWE JSON serialization gives: the plaintext, or the kind that refused it.
+fn open_json(json: &str, decrypt: &jose::DecryptKey<A128Kw>) -> Result<Vec<u8>, ErrorKind> {
+    Jwe::parse_json(json.as_bytes())
+        .and_then(|jwe| jwe.decrypt::<A128Kw, A128Gcm>(decrypt))
+        .map(|p| p.bytes().to_vec())
+        .map_err(|e| e.kind())
+}
+
+//= https://www.rfc-editor.org/rfc/rfc7516#section-3.2
+//= type=test
+//# In the JWE JSON Serialization, one or more of the JWE Protected Header, JWE Shared
+//# Unprotected Header, and JWE Per-Recipient Unprotected Header MUST be present.
+#[test]
+fn a_json_jwe_needs_one_of_the_three_headers() {
+    let made = flat();
+    assert_eq!(made.as_ref().map(|_| ()), Some(()));
+    let Some((f, decrypt)) = made else { return };
+    let (p, k) = (quoted(&f.protected), quoted(&f.encrypted_key));
+    let (iv, ct, tag) = (quoted(&f.iv), quoted(&f.ciphertext), quoted(&f.tag));
+    let rest = [
+        ("encrypted_key", k.as_str()),
+        ("iv", iv.as_str()),
+        ("ciphertext", ct.as_str()),
+        ("tag", tag.as_str()),
+    ];
+    let with = |lead: &[(&str, &str)]| object(&[lead, &rest].concat());
+    assert_eq!(
+        open_json(&with(&[("protected", &p)]), &decrypt),
+        Ok(b"payload".to_vec())
+    );
+    // none of the three: refused as Malformed, whatever else the object holds
+    assert_eq!(open_json(&with(&[]), &decrypt), Err(ErrorKind::Malformed));
+    assert_eq!(
+        open_json(&with(&[("protected", r#""""#)]), &decrypt),
+        Err(ErrorKind::Malformed)
+    );
+    // each of the other two alone conveys `alg` and `enc` (the protected header's bytes are the AAD, so only
+    // the parse is compared here)
+    let header = b64url_decode(&f.protected)
+        .ok()
+        .and_then(|h| String::from_utf8(h).ok())
+        .unwrap_or_default();
+    for place in ["unprotected", "header"] {
+        let doc = with(&[(place, &header)]);
+        assert_eq!(
+            Jwe::parse_json(doc.as_bytes()).err().map(|e| e.kind()),
+            None,
+            "{place}"
+        );
+    }
+}
+
+// Not cited as a test of RFC 7516 7.2.1 "recipients": `"recipients":null` is read as an absent member (the
+// requirement stays a todo in src/jwe/envelope.rs until it is refused); every other non-array shape is Malformed.
+#[test]
+fn recipients_that_is_not_an_array_of_objects_is_malformed() {
+    let made = flat();
+    assert_eq!(made.as_ref().map(|_| ()), Some(()));
+    let Some((f, decrypt)) = made else { return };
+    let (p, k) = (quoted(&f.protected), quoted(&f.encrypted_key));
+    let (iv, ct, tag) = (quoted(&f.iv), quoted(&f.ciphertext), quoted(&f.tag));
+    let with = |recipients: &str| {
+        object(&[
+            ("protected", &p),
+            ("recipients", recipients),
+            ("iv", &iv),
+            ("ciphertext", &ct),
+            ("tag", &tag),
+        ])
+    };
+    let one = format!(r#"{{"encrypted_key":{k}}}"#);
+    assert_eq!(
+        open_json(&with(&format!("[{one}]")), &decrypt),
+        Ok(b"payload".to_vec())
+    );
+    for bad in [
+        "5".to_owned(),
+        r#""x""#.to_owned(),
+        "true".to_owned(),
+        one.clone(),
+        "[5]".to_owned(),
+        "[[]]".to_owned(),
+        format!("[{one},7]"),
+    ] {
+        assert_eq!(
+            open_json(&with(&bad), &decrypt),
+            Err(ErrorKind::Malformed),
+            "{bad}"
+        );
+    }
+}
+
+//= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+//= type=test
+//# Additional members can be present in both the JSON objects defined above; if not understood by
+//# implementations encountering them, they MUST be ignored.
+#[test]
+fn a_json_jwe_ignores_members_it_does_not_know() {
+    let made = flat();
+    assert_eq!(made.as_ref().map(|_| ()), Some(()));
+    let Some((f, decrypt)) = made else { return };
+    let (p, k) = (quoted(&f.protected), quoted(&f.encrypted_key));
+    let (iv, ct, tag) = (quoted(&f.iv), quoted(&f.ciphertext), quoted(&f.tag));
+    let flattened = |extra: &[(&str, &str)]| {
+        object(
+            &[
+                &[
+                    ("protected", p.as_str()),
+                    ("encrypted_key", k.as_str()),
+                    ("iv", iv.as_str()),
+                    ("ciphertext", ct.as_str()),
+                    ("tag", tag.as_str()),
+                ][..],
+                extra,
+            ]
+            .concat(),
+        )
+    };
+    assert_eq!(
+        open_json(&flattened(&[]), &decrypt),
+        Ok(b"payload".to_vec())
+    );
+    assert_eq!(
+        open_json(&flattened(&[("zz", r#"{"a":[1,null]}"#)]), &decrypt),
+        Ok(b"payload".to_vec())
+    );
+    // and in a recipient object of the general syntax
+    let general = object(&[
+        ("protected", &p),
+        (
+            "recipients",
+            &format!(r#"[{{"encrypted_key":{k},"zz":[true],"yy":null}}]"#),
+        ),
+        ("iv", &iv),
+        ("ciphertext", &ct),
+        ("tag", &tag),
+        ("xx", "1"),
+    ]);
+    assert_eq!(open_json(&general, &decrypt), Ok(b"payload".to_vec()));
+}
+
+/// A flattened A128GCMKW and A128GCM JWE built by hand: the CEK is wrapped under the key `[7; 16]` with the IV
+/// `[0; 12]` (the all-zero IV a decoder that defaulted a missing `iv` would use), and the wrapping's `iv` and
+/// `tag` ride in the per-recipient header, outside the content's AAD, so removing one changes nothing else.
+fn gcmkw(with_iv: bool, with_tag: bool) -> String {
+    use aes_gcm::aead::AeadInOut as _;
+    use aes_gcm::{Aes128Gcm, KeyInit as _};
+    let (kek, cek, wrap_iv, iv) = ([7_u8; 16], [9_u8; 16], [0_u8; 12], [4_u8; 12]);
+    let mut wrapped = cek.to_vec();
+    let wrap_tag = Aes128Gcm::new_from_slice(&kek)
+        .ok()
+        .and_then(|c| {
+            c.encrypt_inout_detached(&wrap_iv.into(), b"", wrapped.as_mut_slice().into())
+                .ok()
+        })
+        .map(|t| t.to_vec())
+        .unwrap_or_default();
+    let protected = b64url_encode(br#"{"alg":"A128GCMKW","enc":"A128GCM"}"#);
+    let mut body = b"payload".to_vec();
+    let tag = Aes128Gcm::new_from_slice(&cek)
+        .ok()
+        .and_then(|c| {
+            c.encrypt_inout_detached(&iv.into(), protected.as_bytes(), body.as_mut_slice().into())
+                .ok()
+        })
+        .map(|t| t.to_vec())
+        .unwrap_or_default();
+    let mut header = Vec::new();
+    if with_iv {
+        header.push(("iv", quoted(&b64url_encode(&wrap_iv))));
+    }
+    if with_tag {
+        header.push(("tag", quoted(&b64url_encode(&wrap_tag))));
+    }
+    let header: Vec<(&str, &str)> = header.iter().map(|(n, v)| (*n, v.as_str())).collect();
+    object(&[
+        ("protected", &quoted(&protected)),
+        ("header", &object(&header)),
+        ("encrypted_key", &quoted(&b64url_encode(&wrapped))),
+        ("iv", &quoted(&b64url_encode(&iv))),
+        ("ciphertext", &quoted(&b64url_encode(&body))),
+        ("tag", &quoted(&b64url_encode(&tag))),
+    ])
+}
+
+fn open_gcmkw(json: &str) -> Result<Vec<u8>, ErrorKind> {
+    let key = SecretJwk::from_oct(SecretBytes::new(vec![7; 16]))
+        .decrypt_key::<A128GcmKw>()
+        .map_err(|e| e.kind())?;
+    Jwe::parse_json(json.as_bytes())
+        .and_then(|jwe| jwe.decrypt::<A128GcmKw, A128Gcm>(&key))
+        .map(|p| p.bytes().to_vec())
+        .map_err(|e| e.kind())
+}
+
+//= https://www.rfc-editor.org/rfc/rfc7518#section-4.7.1.1
+//= type=test
+//# This Header Parameter MUST be present and MUST be understood and processed by
+//# implementations when these algorithms are used.
+#[test]
+fn gcmkw_needs_iv() {
+    assert_eq!(open_gcmkw(&gcmkw(true, true)), Ok(b"payload".to_vec()));
+    assert_eq!(open_gcmkw(&gcmkw(false, true)), Err(ErrorKind::Decrypt));
+}
+
+//= https://www.rfc-editor.org/rfc/rfc7518#section-4.7.1.2
+//= type=test
+//# This Header Parameter MUST be present and MUST be understood and processed by
+//# implementations when these algorithms are used.
+#[test]
+fn gcmkw_needs_tag() {
+    assert_eq!(open_gcmkw(&gcmkw(true, true)), Ok(b"payload".to_vec()));
+    assert_eq!(open_gcmkw(&gcmkw(true, false)), Err(ErrorKind::Decrypt));
+}

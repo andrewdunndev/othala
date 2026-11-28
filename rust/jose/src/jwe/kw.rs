@@ -200,16 +200,6 @@ macro_rules! gcm_kw {
                 let cipher =
                     AesGcm::<$cipher, U12>::new_from_slice(key.expose()).map_err(|_| decrypt())?;
                 //= https://www.rfc-editor.org/rfc/rfc7518#section-4.7.1.2
-                //= type=todo
-                //= reason=no test decrypts an A*GCMKW token whose tag member is absent; the RFC 7520 A256GCMKW vector proves it is processed
-                //# This Header Parameter MUST be present and MUST be understood and processed by
-                //# implementations when these algorithms are used.
-                //= https://www.rfc-editor.org/rfc/rfc7518#section-4.7.1.2
-                //# This Header Parameter MUST be present and MUST be understood and processed by
-                //# implementations when these algorithms are used.
-                //= https://www.rfc-editor.org/rfc/rfc7518#section-4.7.1.1
-                //= type=todo
-                //= reason=no test decrypts an A*GCMKW token whose iv member is absent; the RFC 7520 A256GCMKW vector proves it is processed
                 //# This Header Parameter MUST be present and MUST be understood and processed by
                 //# implementations when these algorithms are used.
                 //= https://www.rfc-editor.org/rfc/rfc7518#section-4.7.1.1

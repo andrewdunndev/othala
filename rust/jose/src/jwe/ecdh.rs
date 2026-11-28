@@ -157,15 +157,11 @@ fn wrap(
     e: &mut dyn Entropy,
 ) -> Result<(SecretBytes, Vec<u8>), Error> {
     //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6
-    //= type=todo
-    //= reason=no test compares the ephemeral keys of two agreements drawn from different entropy; the host owes fresh entropy (O1)
-    //# A new ephemeral public key value MUST be generated for each key agreement operation.
-    //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6
     //# A new ephemeral public key value MUST be generated for each key agreement operation.
     let eph = ephemeral(key, e)?;
     //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6.2
     //= type=exception
-    //= reason=encrypt never sets apu or apv and decrypt does not check them for distinctness; non-goal NC9
+    //= reason=encrypt never sets apu or apv and decrypt does not check them for distinctness; non-claim NC9
     //# The "apu" and "apv" values MUST be distinct, when used.
     let z = agree(&eph, key)?;
     params.epk = Some(alloc::sync::Arc::new(public_of(&eph)));
@@ -195,11 +191,6 @@ fn unwrap(
     enc: JweEnc,
     params: &Params,
 ) -> Result<SecretBytes, Error> {
-    //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6.1.1
-    //= type=todo
-    //= reason=no test decrypts an ECDH-ES token whose epk is absent; appendix C proves epk is processed
-    //# This Header Parameter MUST be present and MUST be understood and processed by
-    //# implementations when these algorithms are used.
     //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6.1.1
     //# This Header Parameter MUST be present and MUST be understood and processed by
     //# implementations when these algorithms are used.

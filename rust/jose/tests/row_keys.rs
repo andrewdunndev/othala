@@ -5,7 +5,8 @@ use std::collections::BTreeMap;
 
 use jose::{
     A256GcmKw, A256Kw, Alg, AnySigningKey, AnyVerifyKey, Dir, EdDsa, Error, Es256, Es384, Hs256,
-    Hs384, Hs512, Jwk, JwkEntry, JwkSet, Jws, Kid, Kty, Rs256, SecretJwk, SigningAlg, VerifyKey,
+    Hs384, Hs512, Jwk, JwkEntry, JwkSet, Jws, Kid, Kty, Ps256, Rs256, SecretJwk, SigningAlg,
+    VerifyKey,
 };
 use proptest::prelude::*;
 use proptest::test_runner::{RngSeed, TestError, TestRunner};
@@ -28,11 +29,22 @@ fn key_check(alg: &str, jwk: &str) -> Result<(), Error> {
         "HS384" => bound::<Hs384>(secret.and_then(|k| k.verify_key())),
         "HS512" => bound::<Hs512>(secret.and_then(|k| k.verify_key())),
         "RS256" => bound::<Rs256>(public.and_then(|k| k.verify_key())),
+        "PS256" => bound::<Ps256>(public.and_then(|k| k.verify_key())),
         "ES256" => bound::<Es256>(public.and_then(|k| k.verify_key())),
         "ES384" => bound::<Es384>(public.and_then(|k| k.verify_key())),
         "EdDSA" => bound::<EdDsa>(public.and_then(|k| k.verify_key())),
         _ => Err(jose::ErrorKind::UnsupportedAlg.into()),
     }
+}
+
+#[cfg(feature = "rsa-decrypt")]
+fn oaep_key(key: &Jwk) -> Result<(), Error> {
+    key.encrypt_key::<jose::RsaOaep>().map(|_| ())
+}
+
+#[cfg(not(feature = "rsa-decrypt"))]
+fn oaep_key(_: &Jwk) -> Result<(), Error> {
+    Err(jose::ErrorKind::UnsupportedAlg.into())
 }
 
 /// Builds the JWE key `jwk` holds for `alg`, to encrypt or to decrypt: an `oct` key.
@@ -49,6 +61,8 @@ fn jwe_key(alg: &str, jwk: &str, decrypt: bool) -> Result<(), Error> {
         "A256KW" => built::<A256Kw>(jwk, decrypt),
         "A256GCMKW" => built::<A256GcmKw>(jwk, decrypt),
         "dir" => built::<Dir>(jwk, decrypt),
+        // an RSA public key: the modulus is judged when the JWK is decoded, whatever the algorithm
+        "RSA-OAEP" => Jwk::decode(jwk.as_bytes()).and_then(|k| oaep_key(&k)),
         _ => Err(jose::ErrorKind::UnsupportedAlg.into()),
     }
 }
@@ -133,7 +147,7 @@ fn named(expect: &Expect, outcome: Result<(), jose::Error>, id: &str) {
 //# Duplicate key operation values MUST NOT be present in the array.
 #[test]
 fn key_cases() {
-    let tally = run::<Case>(vector!("jose-derived/keys.json"), 40, |case| {
+    let tally = run::<Case>(vector!("jose-derived/keys.json"), 42, |case| {
         let (alg, jwk) = (
             case.alg.as_deref().unwrap_or_default(),
             case.jwk
@@ -155,7 +169,7 @@ fn key_cases() {
         named(&case.expect, outcome, &case.id);
         Outcome::Checked
     });
-    assert_eq!((tally.total(), tally.checked()), (40, 40));
+    assert_eq!((tally.total(), tally.checked()), (42, 42));
 }
 
 //= https://www.rfc-editor.org/rfc/rfc7517#section-5
@@ -424,4 +438,105 @@ fn any_key_verifies_under_its_own_algorithm_only() {
             alg.name()
         );
     }
+}
+
+const OKP: &str =
+    r#""kty":"OKP","crv":"Ed25519","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo""#;
+
+fn kind_of<T>(r: Result<T, Error>) -> Option<jose::ErrorKind> {
+    r.err().map(|e| e.kind())
+}
+
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4.1
+//= type=test
+//# This member MUST be present in a JWK.
+#[test]
+fn a_jwk_needs_kty() {
+    let malformed = Some(jose::ErrorKind::Malformed);
+    assert_eq!(kind_of(Jwk::decode(format!("{{{OKP}}}").as_bytes())), None);
+    let without = OKP.replacen(r#""kty":"OKP","#, "", 1);
+    assert_eq!(
+        kind_of(Jwk::decode(format!("{{{without}}}").as_bytes())),
+        malformed
+    );
+    assert_eq!(
+        kind_of(SecretJwk::decode(br#"{"kty":"oct","k":"AA"}"#)),
+        None
+    );
+    assert_eq!(kind_of(SecretJwk::decode(br#"{"k":"AA"}"#)), malformed);
+}
+
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4
+//= type=test
+//# Additional members can be present in the JWK; if not understood by implementations encountering
+//# them, they MUST be ignored.
+#[test]
+fn a_jwk_ignores_members_it_does_not_know() {
+    assert_eq!(kind_of(Jwk::decode(format!("{{{OKP}}}").as_bytes())), None);
+    for extra in [
+        r#""zz":1"#,
+        r#""https://example.test/m":{"a":[1,null,"x"]}"#,
+        r#""zz":null,"yy":[true]"#,
+    ] {
+        let text = format!("{{{OKP},{extra}}}");
+        assert_eq!(kind_of(Jwk::decode(text.as_bytes())), None, "{extra}");
+        // an ignored member leaves the key it sits beside the same key
+        assert_eq!(
+            Jwk::decode(text.as_bytes()).map(|k| k.thumbprint()).ok(),
+            Jwk::decode(format!("{{{OKP}}}").as_bytes())
+                .map(|k| k.thumbprint())
+                .ok(),
+            "{extra}"
+        );
+    }
+    assert_eq!(
+        kind_of(SecretJwk::decode(br#"{"kty":"oct","k":"AA","zz":{"a":1}}"#)),
+        None
+    );
+}
+
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4
+//= type=test
+//# The member names within a JWK MUST be unique; JWK parsers MUST either reject JWKs with duplicate
+//# member names or use a JSON parser that returns only the lexically last duplicate member name, as
+//# specified in Section 15.12 (The JSON Object) of ECMAScript 5.1 [ECMAScript].
+#[test]
+fn a_jwk_refuses_a_repeated_member_name() {
+    let dup = Some(jose::ErrorKind::DuplicateMember);
+    for text in [
+        format!("{{{OKP},\"kty\":\"OKP\"}}"),
+        format!("{{{OKP},\"kid\":\"a\",\"kid\":\"b\"}}"),
+        format!("{{{OKP},\"zz\":1,\"zz\":2}}"),
+        // the same name written with an escape is the same name
+        format!("{{{OKP},\"k\\u0074y\":\"OKP\"}}"),
+    ] {
+        assert_eq!(kind_of(Jwk::decode(text.as_bytes())), dup, "{text}");
+    }
+    assert_eq!(
+        kind_of(SecretJwk::decode(br#"{"kty":"oct","k":"AA","k":"AA"}"#)),
+        dup
+    );
+    assert_eq!(kind_of(Jwk::decode(format!("{{{OKP}}}").as_bytes())), None);
+}
+
+//= https://www.rfc-editor.org/rfc/rfc7517#section-5
+//= type=test
+//# Additional members can be present in the JWK Set; if not understood by implementations
+//# encountering them, they MUST be ignored.
+#[test]
+fn a_jwk_set_ignores_members_it_does_not_know() {
+    let key = format!("{{{OKP}}}");
+    let len = |text: &str| JwkSet::decode(text.as_bytes()).map(|s| s.entries().len());
+    assert_eq!(len(&format!(r#"{{"keys":[{key}]}}"#)).ok(), Some(1));
+    for extra in [r#""zz":1"#, r#""zz":{"a":[null]},"yy":"x""#] {
+        assert_eq!(
+            len(&format!(r#"{{"keys":[{key}],{extra}}}"#)).ok(),
+            Some(1),
+            "{extra}"
+        );
+    }
+    assert_eq!(
+        kind_of(len(r#"{"zz":1,"keys":5}"#)),
+        Some(jose::ErrorKind::Malformed)
+    );
 }

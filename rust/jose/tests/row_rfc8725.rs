@@ -183,6 +183,24 @@ fn a_header_with_input_after_its_json_text_is_invalid() {
     ] {
         assert_eq!(parsed(bad), malformed, "{bad}");
     }
+    // the JSON serialization: the protected header's text, and the document itself
+    let protected = |header: &str| b64url_encode(header.as_bytes());
+    let flattened = |p: &str| format!(r#"{{"payload":"AA","protected":"{p}","signature":"AQ"}}"#);
+    let kind = |json: &str| Jws::parse_json(json.as_bytes()).err().map(|e| e.kind());
+    assert_eq!(kind(&flattened(&protected(r#"{"alg":"HS256"}"#))), None);
+    assert_eq!(
+        kind(&flattened(&protected(r#"{"alg":"HS256"}x"#))),
+        malformed
+    );
+    let document = flattened(&protected(r#"{"alg":"HS256"}"#));
+    assert_eq!(kind(&format!("{document} \n")), None);
+    for trailing in ["x", "{}", ",", &document] {
+        assert_eq!(
+            kind(&format!("{document}{trailing}")),
+            malformed,
+            "{trailing}"
+        );
+    }
 }
 
 //= https://www.rfc-editor.org/rfc/rfc7515#section-10.13

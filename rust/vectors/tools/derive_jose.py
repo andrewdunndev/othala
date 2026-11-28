@@ -134,6 +134,7 @@ def keys():
         k("rs256-2048", "RFC 7518 3.3 (2048 bits or larger)", "RS256", RSA, OK),
         k("rs256-2047", "RFC 7518 3.3 (MUST be 2048 bits or larger)", "RS256", weak_rsa(2047, "jose-derived"), kind("WeakKey")),
         k("rs256-1024", "RFC 7518 3.3", "RS256", weak_rsa(1024, "jose-derived"), kind("WeakKey")),
+        k("ps256-2047", "RFC 7518 3.5 (MUST be 2048 bits or larger)", "PS256", weak_rsa(2047, "jose-derived"), kind("WeakKey")),
         k("hs256-32-bytes", "RFC 7518 3.2 (a key as long as the hash output)", "HS256", oct_(32), OK),
         k("hs256-31-bytes", "RFC 7518 3.2 (MUST be at least the hash output size)", "HS256", oct_(31), kind("WeakKey")),
         k("hs384-47-bytes", "RFC 7518 3.2", "HS384", oct_(47), kind("WeakKey")),
@@ -156,6 +157,7 @@ def keys():
         e("dir-key-ops-encrypt", "RFC 7517 4.3 (dir encrypts the content with the key)", "dir", dict(oct_(32), key_ops=["encrypt"]), OK),
         e("dir-key-ops-wrap-key", "RFC 7517 4.3 (dir does not wrap a key)", "dir", dict(oct_(32), key_ops=["wrapKey"]), kind("KeyUse")),
         e("kw-key-ops-sign-only", "RFC 7517 4.3", "A256KW", dict(oct_(32), key_ops=["sign"]), kind("KeyUse")),
+        e("rsa-oaep-2047", "RFC 7518 4.3 (MUST be 2048 bits or larger)", "RSA-OAEP", weak_rsa(2047, "jose-derived"), kind("WeakKey")),
     ]
     a = lambda cid, spec, jwk, expect: case(cid, spec, expect, op="any_verify_key", jwk=jwk)
     c += [
