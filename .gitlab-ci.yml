@@ -233,7 +233,7 @@ check-rust:
   script:
     - just gate-rust
 
-# check-claims: `just claims` in rust/, on the image that bakes node (ci-rust is not known to); node-guard proves the pinned major.
+# check-claims: `just claims` and `just layers` in rust/, on the image that bakes node (ci-rust is not known to); node-guard proves the pinned major.
 check-claims:
   stage: verify
   image: registry.gitlab.com/dunn.dev/pipeline/ci:4.17.0@sha256:2ef7e2af84839476f02a225bb529fe93e895a79a1df9315c83644834982e6587
@@ -254,6 +254,7 @@ check-claims:
     - just node-guard
     - cd rust
     - just claims
+    - just layers
 
 # check-vectors: `just vectors` in rust/, on the image that bakes node and python3 (ci-rust is not known to); the recipe fails with a message if either is missing, and runs offline.
 check-vectors:

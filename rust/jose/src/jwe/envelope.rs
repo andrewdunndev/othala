@@ -15,97 +15,16 @@ use serde::Deserialize;
 use serde::de::IgnoredAny;
 use serde_json::value::RawValue;
 
+use crate::alg::{Params, sealed};
 use crate::crit::refuse_crit;
 use crate::json::{Capped, named, scan};
 use crate::jwk::decode::{Key, parse};
 use crate::jwk::thumbprint::members;
-use crate::key::{Private, Public};
+use crate::key::{Private, Public, dup, dup_private, private_info, public_info, public_of};
 use crate::{
-    Compact, Enc, Error, ErrorKind, KeyAlg, Kid, LocalKeyAlg, MAX_COMPACT_LEN, MAX_ENTRIES,
+    Compact, Enc, Error, ErrorKind, Jwk, KeyAlg, Kid, LocalKeyAlg, MAX_COMPACT_LEN, MAX_ENTRIES,
+    PublicKeyAlg, SecretJwk,
 };
-
-/// Per-algorithm operations, implemented beside each algorithm's markers.
-#[expect(
-    private_interfaces,
-    reason = "sealed: these traits are unnameable outside the crate"
-)]
-pub(crate) mod sealed {
-    use alloc::vec::Vec;
-
-    use base::{Entropy, SecretBytes};
-
-    use super::Params;
-    use crate::key::{Private, Public};
-    use crate::{Error, JweEnc};
-
-    /// Makes one recipient's content-encryption key.
-    pub trait KeyAlg {
-        /// The CEK for `enc` and the JWE Encrypted Key (empty for direct use and agreement); any header parameter the
-        /// algorithm adds (`epk`, `iv`, `tag`) goes in `params`, and all randomness comes from `e`.
-        fn wrap(
-            key: &Public,
-            enc: JweEnc,
-            params: &mut Params,
-            e: &mut dyn Entropy,
-        ) -> Result<(SecretBytes, Vec<u8>), Error>;
-    }
-
-    /// Recovers one recipient's content-encryption key without randomness.
-    pub trait Unwrap: KeyAlg {
-        /// The CEK for `enc`; any failure is `Decrypt`.
-        fn unwrap(
-            key: &Private,
-            encrypted_key: &[u8],
-            enc: JweEnc,
-            params: &Params,
-        ) -> Result<SecretBytes, Error>;
-    }
-
-    /// Recovers one recipient's content-encryption key through a blinded private-key operation, on one path: an
-    /// OAEP failure yields a random CEK of the same length, so the content step fails as `Decrypt` (RFC 7516 11.5).
-    #[cfg(feature = "rsa-decrypt")]
-    pub trait BlindedUnwrap: KeyAlg {
-        /// The CEK for `enc`, or a random one drawn from `e`.
-        fn unwrap(
-            key: &Private,
-            encrypted_key: &[u8],
-            enc: JweEnc,
-            e: &mut dyn Entropy,
-        ) -> SecretBytes;
-    }
-
-    /// Encrypts and decrypts content under a CEK.
-    pub trait Enc {
-        /// The CEK length in bytes.
-        const CEK_LEN: usize;
-        /// The IV length in bytes.
-        const IV_LEN: usize;
-        /// The ciphertext and authentication tag of `plaintext` under `cek`, `iv` and `aad`.
-        fn seal(
-            cek: &SecretBytes,
-            iv: &[u8],
-            aad: &[u8],
-            plaintext: &[u8],
-        ) -> Result<(Vec<u8>, Vec<u8>), Error>;
-        /// The plaintext; any failure is `Decrypt`.
-        fn open(
-            cek: &SecretBytes,
-            iv: &[u8],
-            aad: &[u8],
-            ciphertext: &[u8],
-            tag: &[u8],
-        ) -> Result<SecretBytes, Error>;
-    }
-}
-
-/// One recipient's key-management header parameters.
-pub(crate) struct Params {
-    pub(crate) epk: Option<Arc<Public>>,
-    pub(crate) apu: Vec<u8>,
-    pub(crate) apv: Vec<u8>,
-    pub(crate) iv: Option<[u8; 12]>,
-    pub(crate) tag: Option<[u8; 16]>,
-}
 
 /// One recipient: the `alg` its headers name, its parameters and its encrypted key.
 pub(crate) struct Recipient {
@@ -144,6 +63,42 @@ pub struct EncryptKey<K: KeyAlg> {
 pub struct DecryptKey<K: KeyAlg> {
     pub(crate) material: Private,
     pub(crate) alg: PhantomData<K>,
+}
+
+impl Jwk {
+    /// A key that encrypts for `K`.
+    pub fn encrypt_key<K: PublicKeyAlg>(&self) -> Result<EncryptKey<K>, Error> {
+        self.meta
+            .check_jwe(public_info(&self.material), K::ALG, false)?;
+        Ok(EncryptKey {
+            kid: self.meta.kid.clone(),
+            material: dup(&self.material),
+            alg: PhantomData,
+        })
+    }
+}
+
+impl SecretJwk {
+    /// A key that encrypts for `K`.
+    pub fn encrypt_key<K: KeyAlg>(&self) -> Result<EncryptKey<K>, Error> {
+        self.meta
+            .check_jwe(private_info(&self.material), K::ALG, false)?;
+        Ok(EncryptKey {
+            kid: self.meta.kid.clone(),
+            material: public_of(&self.material),
+            alg: PhantomData,
+        })
+    }
+
+    /// A key that decrypts for `K`.
+    pub fn decrypt_key<K: KeyAlg>(&self) -> Result<DecryptKey<K>, Error> {
+        self.meta
+            .check_jwe(private_info(&self.material), K::ALG, true)?;
+        Ok(DecryptKey {
+            material: dup_private(&self.material),
+            alg: PhantomData,
+        })
+    }
 }
 
 #[derive(Default, Deserialize)]

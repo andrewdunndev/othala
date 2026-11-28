@@ -1,12 +1,21 @@
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+
+use crate::key::Public;
 use crate::{Error, ErrorKind, key};
 
-/// Per-family operations, implemented beside each family's markers; sealing [`Alg`] keeps the set reviewed.
+/// Per-algorithm operations, implemented beside each family's markers; sealing the marker traits keeps the set reviewed.
 #[expect(
     private_interfaces,
     reason = "sealed: these traits are unnameable outside the crate"
 )]
 pub(crate) mod sealed {
-    use super::{Error, key};
+    use alloc::vec::Vec;
+
+    use base::{Entropy, SecretBytes};
+
+    use super::{Error, JweEnc, Params, key};
+    use crate::key::{Private, Public};
 
     /// Verifies one family's signatures.
     pub trait Alg {
@@ -30,6 +39,74 @@ pub(crate) mod sealed {
             e: &mut dyn base::Entropy,
         ) -> Result<Self::Signature, Error>;
     }
+
+    /// Makes one recipient's content-encryption key.
+    pub trait KeyAlg {
+        /// The CEK for `enc` and the JWE Encrypted Key (empty for direct use and agreement); any header parameter the
+        /// algorithm adds (`epk`, `iv`, `tag`) goes in `params`, and all randomness comes from `e`.
+        fn wrap(
+            key: &Public,
+            enc: JweEnc,
+            params: &mut Params,
+            e: &mut dyn Entropy,
+        ) -> Result<(SecretBytes, Vec<u8>), Error>;
+    }
+
+    /// Recovers one recipient's content-encryption key without randomness.
+    pub trait Unwrap: KeyAlg {
+        /// The CEK for `enc`; any failure is `Decrypt`.
+        fn unwrap(
+            key: &Private,
+            encrypted_key: &[u8],
+            enc: JweEnc,
+            params: &Params,
+        ) -> Result<SecretBytes, Error>;
+    }
+
+    /// Recovers one recipient's content-encryption key through a blinded private-key operation, on one path: an
+    /// OAEP failure yields a random CEK of the same length, so the content step fails as `Decrypt` (RFC 7516 11.5).
+    #[cfg(feature = "rsa-decrypt")]
+    pub trait BlindedUnwrap: KeyAlg {
+        /// The CEK for `enc`, or a random one drawn from `e`.
+        fn unwrap(
+            key: &Private,
+            encrypted_key: &[u8],
+            enc: JweEnc,
+            e: &mut dyn Entropy,
+        ) -> SecretBytes;
+    }
+
+    /// Encrypts and decrypts content under a CEK.
+    pub trait Enc {
+        /// The CEK length in bytes.
+        const CEK_LEN: usize;
+        /// The IV length in bytes.
+        const IV_LEN: usize;
+        /// The ciphertext and authentication tag of `plaintext` under `cek`, `iv` and `aad`.
+        fn seal(
+            cek: &SecretBytes,
+            iv: &[u8],
+            aad: &[u8],
+            plaintext: &[u8],
+        ) -> Result<(Vec<u8>, Vec<u8>), Error>;
+        /// The plaintext; any failure is `Decrypt`.
+        fn open(
+            cek: &SecretBytes,
+            iv: &[u8],
+            aad: &[u8],
+            ciphertext: &[u8],
+            tag: &[u8],
+        ) -> Result<SecretBytes, Error>;
+    }
+}
+
+/// One recipient's key-management header parameters.
+pub(crate) struct Params {
+    pub(crate) epk: Option<Arc<Public>>,
+    pub(crate) apu: Vec<u8>,
+    pub(crate) apv: Vec<u8>,
+    pub(crate) iv: Option<[u8; 12]>,
+    pub(crate) tag: Option<[u8; 16]>,
 }
 
 /// A JWS algorithm (RFC 7518 section 3, RFC 8037 section 3.1): one marker type each, sealed.
@@ -57,7 +134,7 @@ pub trait LocalAlg: SignAlg + sealed::Local {}
 pub trait BlindedAlg: SignAlg + sealed::Blinded {}
 
 /// A JWE key-management algorithm (RFC 7518 section 4): one marker type each, sealed.
-pub trait KeyAlg: crate::jwe::envelope::sealed::KeyAlg {
+pub trait KeyAlg: sealed::KeyAlg {
     /// Its registry value.
     const ALG: JweAlg;
 }
@@ -66,15 +143,15 @@ pub trait KeyAlg: crate::jwe::envelope::sealed::KeyAlg {
 pub trait PublicKeyAlg: KeyAlg {}
 
 /// A key-management algorithm whose decryption needs no randomness: every one but RSA-OAEP.
-pub trait LocalKeyAlg: KeyAlg + crate::jwe::envelope::sealed::Unwrap {}
+pub trait LocalKeyAlg: KeyAlg + sealed::Unwrap {}
 
 /// A key-management algorithm whose private-key operation is blinded from the caller's entropy: RSA-OAEP
 /// (feature `rsa-decrypt`, which carries the Marvin residual risk), decrypted through `Jwe::decrypt_blinded`.
 #[cfg(feature = "rsa-decrypt")]
-pub trait BlindedKeyAlg: KeyAlg + crate::jwe::envelope::sealed::BlindedUnwrap {}
+pub trait BlindedKeyAlg: KeyAlg + sealed::BlindedUnwrap {}
 
 /// A JWE content-encryption algorithm (RFC 7518 section 5): one marker type each, sealed.
-pub trait Enc: crate::jwe::envelope::sealed::Enc {
+pub trait Enc: sealed::Enc {
     /// Its registry value.
     const ENC: JweEnc;
 }

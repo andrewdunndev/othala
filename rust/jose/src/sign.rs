@@ -7,11 +7,19 @@ use core::marker::PhantomData;
 use base::b64url_encode;
 
 use crate::alg::sealed;
-use crate::key::Private;
+use crate::jwk::decode::SIGN;
+use crate::key::{Private, dup_private, private_info};
 use crate::{
-    Alg, Error, ErrorKind, Kid, LocalAlg, MAX_COMPACT_LEN, MAX_RSA_BITS, MIN_RSA_BITS, SignAlg,
-    Signer, SigningAlg, TokenKind, Typ,
+    Alg, Error, ErrorKind, Kid, LocalAlg, MAX_COMPACT_LEN, MAX_RSA_BITS, MIN_RSA_BITS, SecretJwk,
+    SignAlg, SigningAlg, TokenKind, Typ,
 };
+
+/// A source of `A` signatures over a signing input: a [`crate::SigningKey`], an [`crate::AnySigningKey`], or a
+/// host's HSM or KMS. Open on purpose; a device failure is the implementer's `Error` of kind `Signer`.
+pub trait Signer<A: Alg> {
+    /// The JWS signature over `input` in the RFC 7518 encoding (ECDSA as `R || S`).
+    fn sign(&self, input: &[u8]) -> Result<A::Signature, Error>;
+}
 
 /// The protected header of a JWS this crate issues: `alg` is `A`'s, so it is never `none`; `kid` when given, and
 /// `typ` when issued as a JWT.
@@ -39,6 +47,18 @@ pub struct Compact(pub(crate) String);
 pub struct SigningKey<A: SignAlg> {
     pub(crate) material: Private,
     pub(crate) alg: PhantomData<A>,
+}
+
+impl SecretJwk {
+    /// A key that signs `A`.
+    pub fn signing_key<A: SignAlg>(&self) -> Result<SigningKey<A>, Error> {
+        self.meta
+            .check_sig(private_info(&self.material), A::ALG, SIGN)?;
+        Ok(SigningKey {
+            material: dup_private(&self.material),
+            alg: PhantomData,
+        })
+    }
 }
 
 impl<A: Alg> Header<A> {

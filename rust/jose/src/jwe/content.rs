@@ -12,7 +12,7 @@ use expose::Expose as _;
 use hmac::{Hmac, Mac as _};
 use sha2::{Sha256, Sha384, Sha512};
 
-use crate::jwe::envelope::sealed;
+use crate::alg::sealed;
 use crate::{Enc, Error, ErrorKind, JweEnc};
 
 /// AES-128-GCM.
@@ -223,7 +223,7 @@ mod tests {
     use sha2::{Sha256, Sha384, Sha512};
 
     use super::{A128CbcHs256, A128Gcm, A192CbcHs384, A192Gcm, A256CbcHs512, A256Gcm, mac};
-    use crate::jwe::envelope::sealed::Enc as Sealed;
+    use crate::alg::sealed::Enc as Sealed;
     use crate::testing::hex;
     use crate::{ErrorKind, JweEnc};
 
