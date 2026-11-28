@@ -5,11 +5,11 @@ usage: python3 -I derive_webauthn.py <out-dir>
 writes <out-dir>/webauthn-rp-derived/{cbor,client-data,authenticator-data}.json.
 Assertions are signed with the RFC 6979 A.2.5 P-256 key and RFC 6979 deterministic k (SHA-256), so every
 signature reproduces byte for byte; the script checks the key's public point and the A.2.5 "sample"
-signature against the RFC before using them. `expect.kind` is set only for CounterRegressed and TooLarge,
-the classes the architecture contract names.
+signature against the RFC before using them. Every refusal states `expect.kind`, and `expect.step` when its spec text cites a
+step of 7.1 or 7.2 (the number is read from that text, so it is stated once).
 Licence of this script: MIT OR Apache-2.0.
 """
-import base64, hashlib, hmac, json, os, sys
+import base64, hashlib, hmac, json, os, re, sys
 
 OUT = sys.argv[1]
 b64 = lambda b: base64.urlsafe_b64encode(b).rstrip(b"=").decode()
@@ -101,13 +101,19 @@ POLICY = {"rp_id": RP, "origin": ORIGIN, "challenge": CHALLENGE, "user_verificat
 def assertion(cid, spec, expect, cd=None, ad=None, **policy):
     cd = cd if cd is not None else client_data()
     ad = ad if ad is not None else auth_data()
+    expect = refused(expect, spec) if isinstance(expect, str) else expect
     sig = der(*sign(X, ad + hashlib.sha256(cd).digest()))
     return {"id": cid, "op": "webauthn_assert", "pub": {"x": f"{PUB[0]:064x}", "y": f"{PUB[1]:064x}"}, "authenticator_data": ad.hex(),
             "client_data_json": cd.hex(), "signature": sig.hex(), **dict(POLICY, **policy), "spec": spec, "expect": expect}
 
 
 OK = lambda uv=True, counter=6: {"ok": True, "user_verified": uv, "counter": counter}
-NO = {"ok": False}
+
+
+def refused(kind, spec=""):
+    """A refusal: its kind, and the 7.1 or 7.2 step its spec text cites (none when the text cites none)."""
+    step = re.search(r"\b7\.[12] steps? (\d+)", spec)
+    return {"ok": False, "kind": kind, **({"step": int(step.group(1))} if step else {})}
 
 
 def client_cases():
@@ -115,48 +121,48 @@ def client_cases():
         assertion("control-valid", "WebAuthn L3 7.2", OK()),
         assertion("extra-member-ignored", "WebAuthn L3 5.8.1.2 (unknown members are ignored)", OK(), cd=client_data(other_keys_can_be_added_here="x")),
         assertion("cross-origin-absent", "WebAuthn L3 5.8.1 (crossOrigin may be absent)", OK(), cd=client_data(crossOrigin=None)),
-        assertion("type-create", "WebAuthn L3 7.2 step 10 \"C.type is the string webauthn.get\" (type MUST be webauthn.get)", NO, cd=client_data(type="webauthn.create")),
-        assertion("type-missing", "WebAuthn L3 7.2 step 10 \"C.type is the string webauthn.get\"", NO, cd=client_data(type=None)),
-        assertion("type-case", "WebAuthn L3 7.2 step 10 \"C.type is the string webauthn.get\" (an exact string)", NO, cd=client_data(type="WebAuthn.get")),
-        assertion("challenge-other", "WebAuthn L3 7.2 step 11 \"C.challenge equals the base64url encoding of pkOptions.challenge\"", NO, cd=client_data(challenge=b64(hashlib.sha256(b"other").digest()))),
-        assertion("challenge-padded", "WebAuthn L3 7.2 step 11 \"C.challenge equals the base64url encoding of pkOptions.challenge\" with 5.8.1 (base64url, no padding)", NO, cd=client_data(challenge=CHALLENGE + "=")),
-        assertion("challenge-std-alphabet", "WebAuthn L3 7.2 step 11 \"C.challenge equals the base64url encoding of pkOptions.challenge\"", NO, cd=client_data(challenge=CHALLENGE.replace("-", "+").replace("_", "/"))) if any(c in CHALLENGE for c in "-_") else None,
-        assertion("challenge-missing", "WebAuthn L3 7.2 step 11 \"C.challenge equals the base64url encoding of pkOptions.challenge\"", NO, cd=client_data(challenge=None)),
-        assertion("origin-other", "WebAuthn L3 7.2 step 12 \"C.origin is an origin expected by the Relying Party\"", NO, cd=client_data(origin="https://evil.example")),
-        assertion("origin-trailing-slash", "WebAuthn L3 7.2 step 12 and 13.4.9 \"C.origin is an origin expected by the Relying Party\" (an origin, compared exactly)", NO, cd=client_data(origin=ORIGIN + "/")),
-        assertion("origin-http", "WebAuthn L3 7.2 step 12 and 13.4.9 \"C.origin is an origin expected by the Relying Party\"", NO, cd=client_data(origin="http://example.org")),
-        assertion("origin-port", "WebAuthn L3 7.2 step 12 \"C.origin is an origin expected by the Relying Party\"", NO, cd=client_data(origin=ORIGIN + ":8443")),
-        assertion("origin-subdomain", "WebAuthn L3 7.2 step 12 \"C.origin is an origin expected by the Relying Party\" (subdomains are not expected unless listed)", NO, cd=client_data(origin="https://login.example.org")),
-        assertion("cross-origin-denied", "WebAuthn L3 7.2 step 13 \"If C.crossOrigin is present and set to true\" with the contract (cross-origin is deny-by-default)", NO, cd=client_data(crossOrigin=True, topOrigin="https://top.example")),
+        assertion("type-create", "WebAuthn L3 7.2 step 10 \"C.type is the string webauthn.get\" (type MUST be webauthn.get)", "Type", cd=client_data(type="webauthn.create")),
+        assertion("type-missing", "WebAuthn L3 7.2 step 10 \"C.type is the string webauthn.get\"", "Type", cd=client_data(type=None)),
+        assertion("type-case", "WebAuthn L3 7.2 step 10 \"C.type is the string webauthn.get\" (an exact string)", "Type", cd=client_data(type="WebAuthn.get")),
+        assertion("challenge-other", "WebAuthn L3 7.2 step 11 \"C.challenge equals the base64url encoding of pkOptions.challenge\"", "ChallengeMismatch", cd=client_data(challenge=b64(hashlib.sha256(b"other").digest()))),
+        assertion("challenge-padded", "WebAuthn L3 7.2 step 11 \"C.challenge equals the base64url encoding of pkOptions.challenge\" with 5.8.1 (base64url, no padding)", "ChallengeMismatch", cd=client_data(challenge=CHALLENGE + "=")),
+        assertion("challenge-std-alphabet", "WebAuthn L3 7.2 step 11 \"C.challenge equals the base64url encoding of pkOptions.challenge\"", "ChallengeMismatch", cd=client_data(challenge=CHALLENGE.replace("-", "+").replace("_", "/"))) if any(c in CHALLENGE for c in "-_") else None,
+        assertion("challenge-missing", "WebAuthn L3 7.2 step 11 \"C.challenge equals the base64url encoding of pkOptions.challenge\"", "ChallengeMismatch", cd=client_data(challenge=None)),
+        assertion("origin-other", "WebAuthn L3 7.2 step 12 \"C.origin is an origin expected by the Relying Party\"", "OriginMismatch", cd=client_data(origin="https://evil.example")),
+        assertion("origin-trailing-slash", "WebAuthn L3 7.2 step 12 and 13.4.9 \"C.origin is an origin expected by the Relying Party\" (an origin, compared exactly)", "OriginMismatch", cd=client_data(origin=ORIGIN + "/")),
+        assertion("origin-http", "WebAuthn L3 7.2 step 12 and 13.4.9 \"C.origin is an origin expected by the Relying Party\"", "OriginMismatch", cd=client_data(origin="http://example.org")),
+        assertion("origin-port", "WebAuthn L3 7.2 step 12 \"C.origin is an origin expected by the Relying Party\"", "OriginMismatch", cd=client_data(origin=ORIGIN + ":8443")),
+        assertion("origin-subdomain", "WebAuthn L3 7.2 step 12 \"C.origin is an origin expected by the Relying Party\" (subdomains are not expected unless listed)", "OriginMismatch", cd=client_data(origin="https://login.example.org")),
+        assertion("cross-origin-denied", "WebAuthn L3 7.2 step 13 \"If C.crossOrigin is present and set to true\" with the contract (cross-origin is deny-by-default)", "CrossOriginDenied", cd=client_data(crossOrigin=True, topOrigin="https://top.example")),
         assertion("cross-origin-allowed", "WebAuthn L3 7.2 steps 13 and 14 \"Verify that the value of C.topOrigin matches the origin of a page that the Relying Party expects to be sub-framed within\" (topOrigin is an expected top-level origin)", OK(), cd=client_data(crossOrigin=True, topOrigin="https://top.example"), cross_origin={"top_origins": ["https://top.example"]}),
-        assertion("top-origin-other", "WebAuthn L3 7.2 step 14 \"Verify that the value of C.topOrigin matches the origin of a page that the Relying Party expects to be sub-framed within\"", NO, cd=client_data(crossOrigin=True, topOrigin="https://evil.example"), cross_origin={"top_origins": ["https://top.example"]}),
-        assertion("top-origin-without-cross-origin", "WebAuthn L3 5.8.1 (topOrigin only when crossOrigin is true) with the contract", NO, cd=client_data(topOrigin="https://top.example")),
-        assertion("client-data-not-json", "WebAuthn L3 7.2 step 9 \"be the result of running an implementation-specific JSON parser on JSONtext\"", NO, cd=b"type=webauthn.get"),
+        assertion("top-origin-other", "WebAuthn L3 7.2 step 14 \"Verify that the value of C.topOrigin matches the origin of a page that the Relying Party expects to be sub-framed within\"", "TopOriginDenied", cd=client_data(crossOrigin=True, topOrigin="https://evil.example"), cross_origin={"top_origins": ["https://top.example"]}),
+        assertion("top-origin-without-cross-origin", "WebAuthn L3 7.2 step 14 \"If C.topOrigin is present\" with 5.8.1 (topOrigin only when crossOrigin is true) and the contract", "TopOriginDenied", cd=client_data(topOrigin="https://top.example")),
+        assertion("client-data-not-json", "WebAuthn L3 7.2 step 9 \"be the result of running an implementation-specific JSON parser on JSONtext\"", "Malformed", cd=b"type=webauthn.get"),
     ]
 
 
 def authdata_cases():
     return [
-        assertion("rp-id-hash-other", "WebAuthn L3 7.2 step 15 \"rpIdHash in authData is the SHA-256 hash of the RP ID expected by the Relying Party\"", NO, ad=auth_data(rp="evil.example")),
-        assertion("rp-id-hash-of-origin", "WebAuthn L3 7.2 step 15 \"rpIdHash in authData is the SHA-256 hash of the RP ID expected by the Relying Party\" (the hash is of the RP ID, not the origin)", NO, ad=auth_data(rp=ORIGIN)),
-        assertion("up-clear", "WebAuthn L3 7.2 step 16 \"Verify that the UP bit of the flags in authData is set\" (UP MUST be set)", NO, ad=auth_data(flags=UV)),
-        assertion("uv-clear-required", "WebAuthn L3 7.2 step 17 \"If user verification was determined to be required, verify that the UV bit of the flags in authData is set\" (UV required)", NO, ad=auth_data(flags=UP), user_verification="required"),
+        assertion("rp-id-hash-other", "WebAuthn L3 7.2 step 15 \"rpIdHash in authData is the SHA-256 hash of the RP ID expected by the Relying Party\"", "RpIdHash", ad=auth_data(rp="evil.example")),
+        assertion("rp-id-hash-of-origin", "WebAuthn L3 7.2 step 15 \"rpIdHash in authData is the SHA-256 hash of the RP ID expected by the Relying Party\" (the hash is of the RP ID, not the origin)", "RpIdHash", ad=auth_data(rp=ORIGIN)),
+        assertion("up-clear", "WebAuthn L3 7.2 step 16 \"Verify that the UP bit of the flags in authData is set\" (UP MUST be set)", "UserNotPresent", ad=auth_data(flags=UV)),
+        assertion("uv-clear-required", "WebAuthn L3 7.2 step 17 \"If user verification was determined to be required, verify that the UV bit of the flags in authData is set\" (UV required)", "UserNotVerified", ad=auth_data(flags=UP), user_verification="required"),
         assertion("uv-clear-preferred", "WebAuthn L3 7.2 step 17 \"User verification SHOULD be required if, and only if, pkOptions.userVerification is set to required\" (only required checks UV)", OK(uv=False), ad=auth_data(flags=UP)),
         assertion("uv-set-required", "WebAuthn L3 7.2 step 17 \"If user verification was determined to be required, verify that the UV bit of the flags in authData is set\"", OK(), user_verification="required"),
-        assertion("bs-without-be", "WebAuthn L3 6.1 (BS MUST be 0 when BE is 0) and 7.2 step 18 \"If the BE bit of the flags in authData is not set, verify that the BS bit is not set\"", NO, ad=auth_data(flags=UP | UV | BS)),
-        assertion("be-stored-clear-now-set", "WebAuthn L3 7.2 step 19 \"If credentialRecord.backupEligible is not set, verify that currentBe is not set\" (backupEligible MUST NOT change; the condition holds because the credential record stores BE, so this is a policy of the crate: oracle choice)", NO, ad=auth_data(flags=UP | UV | BE)),
-        assertion("be-stored-set-now-clear", "WebAuthn L3 7.2 step 19 \"If credentialRecord.backupEligible is set, verify that currentBe is set\" (the stored BE is set and the response clears it; same condition: the credential record stores BE, oracle choice)", NO, ad=auth_data(flags=UP | UV), stored_backup_eligible=True),
+        assertion("bs-without-be", "WebAuthn L3 6.1 (BS MUST be 0 when BE is 0) and 7.2 step 18 \"If the BE bit of the flags in authData is not set, verify that the BS bit is not set\"", "BackupStateWithoutEligibility", ad=auth_data(flags=UP | UV | BS)),
+        assertion("be-stored-clear-now-set", "WebAuthn L3 7.2 step 19 \"If credentialRecord.backupEligible is not set, verify that currentBe is not set\" (backupEligible MUST NOT change; the condition holds because the credential record stores BE, so this is a policy of the crate: oracle choice)", "BackupEligibilityChanged", ad=auth_data(flags=UP | UV | BE)),
+        assertion("be-stored-set-now-clear", "WebAuthn L3 7.2 step 19 \"If credentialRecord.backupEligible is set, verify that currentBe is set\" (the stored BE is set and the response clears it; same condition: the credential record stores BE, oracle choice)", "BackupEligibilityChanged", ad=auth_data(flags=UP | UV), stored_backup_eligible=True),
         assertion("be-bs-set-eligible", "WebAuthn L3 7.2 steps 18 and 19 \"Compare currentBe and currentBs with credentialRecord.backupEligible and credentialRecord.backupState\" (BS may change while BE is set and unchanged; the credential record stores BE)", OK(), ad=auth_data(flags=UP | UV | BE | BS), stored_backup_eligible=True),
         assertion("counter-advanced", "WebAuthn L3 7.2 step 22 \"authData.signCount is greater than credentialRecord.signCount\"", OK()),
-        assertion("counter-regressed", "WebAuthn L3 7.2 step 22 \"This is a signal, but not proof, that the authenticator may be cloned\" with the contract (Reject)", {"ok": False, "kind": "CounterRegressed"}, ad=auth_data(count=3)),
-        assertion("counter-equal", "WebAuthn L3 7.2 step 22 \"This is a signal, but not proof, that the authenticator may be cloned\" with the contract (Reject)", {"ok": False, "kind": "CounterRegressed"}, ad=auth_data(count=5)),
-        assertion("counter-zero-after-nonzero", "WebAuthn L3 7.2 step 22 \"This is a signal, but not proof, that the authenticator may be cloned\" with the contract (Reject)", {"ok": False, "kind": "CounterRegressed"}, ad=auth_data(count=0)),
+        assertion("counter-regressed", "WebAuthn L3 7.2 step 22 \"This is a signal, but not proof, that the authenticator may be cloned\" with the contract (Reject)", "CounterRegressed", ad=auth_data(count=3)),
+        assertion("counter-equal", "WebAuthn L3 7.2 step 22 \"This is a signal, but not proof, that the authenticator may be cloned\" with the contract (Reject)", "CounterRegressed", ad=auth_data(count=5)),
+        assertion("counter-zero-after-nonzero", "WebAuthn L3 7.2 step 22 \"This is a signal, but not proof, that the authenticator may be cloned\" with the contract (Reject)", "CounterRegressed", ad=auth_data(count=0)),
         assertion("counter-both-zero", "WebAuthn L3 7.2 step 22 \"If authData.signCount is nonzero or credentialRecord.signCount is nonzero\" (no counter on either side)", OK(counter=0), ad=auth_data(count=0), stored_counter=0),
         assertion("counter-regressed-tolerate", "WebAuthn L3 7.2 step 22 \"This is a signal, but not proof, that the authenticator may be cloned\" with the contract (Tolerate reports, never drops)", {"ok": True, "user_verified": True, "counter": {"regressed": {"stored": 5, "seen": 3}}}, ad=auth_data(count=3), counter_policy="tolerate"),
-        assertion("authdata-truncated", "WebAuthn L3 6.1 (37 bytes at least)", NO, ad=auth_data()[:36]),
-        assertion("authdata-at-flag-no-data", "WebAuthn L3 6.1 (AT set needs attested credential data)", NO, ad=auth_data(flags=UP | UV | 0x40)),
-        assertion("authdata-ed-flag-no-data", "WebAuthn L3 6.1 (ED set needs extensions)", NO, ad=auth_data(flags=UP | UV | 0x80)),
-        assertion("authdata-trailing-bytes", "WebAuthn L3 6.1 (no bytes after the declared parts: oracle choice, a strict reader refuses what the layout does not account for)", NO, ad=auth_data() + b"\x00"),
+        assertion("authdata-truncated", "WebAuthn L3 6.1 (37 bytes at least)", "Malformed", ad=auth_data()[:36]),
+        assertion("authdata-at-flag-no-data", "WebAuthn L3 6.1 (AT set needs attested credential data)", "Malformed", ad=auth_data(flags=UP | UV | 0x40)),
+        assertion("authdata-ed-flag-no-data", "WebAuthn L3 6.1 (ED set needs extensions)", "Malformed", ad=auth_data(flags=UP | UV | 0x80)),
+        assertion("authdata-trailing-bytes", "WebAuthn L3 6.1 (no bytes after the declared parts: oracle choice, a strict reader refuses what the layout does not account for)", "Malformed", ad=auth_data() + b"\x00"),
     ]
 
 
@@ -168,28 +174,28 @@ def cbor_cases():
     cose = "a5" + "0102" + "0326" + "2001" + "215820" + x + "225820" + y
     return [
         c("cose-key-canonical", "CTAP2 canonical CBOR (WebAuthn L3 6.5.1, CTAP 2.2 8)", cose, OKC),
-        c("map-keys-unsorted", "CTAP2 canonical CBOR (keys sorted, shortest first then bytewise)", "a5" + "0326" + "0102" + "2001" + "215820" + x + "225820" + y, NO),
-        c("map-duplicate-key", "RFC 8949 5.6 (duplicate keys are invalid)", "a2" + "0102" + "0102", NO),
-        c("int-not-shortest", "RFC 8949 4.2.1 (preferred serialization)", "1805", NO),
-        c("int-16-for-8", "RFC 8949 4.2.1", "190017", NO),
-        c("neg-int-not-shortest", "RFC 8949 4.2.1", "3806", NO),
-        c("length-not-shortest", "RFC 8949 4.2.1 (lengths in shortest form)", "7803616263", NO),
-        c("indefinite-bytes", "RFC 8949 4.2.1 (no indefinite length)", "5f42010243030405ff", NO),
-        c("indefinite-array", "RFC 8949 4.2.1", "9f0102ff", NO),
-        c("indefinite-map", "RFC 8949 4.2.1", "bf0102ff", NO),
-        c("break-outside-indefinite", "RFC 8949 3.2.1 (not well-formed)", "ff", NO),
-        c("reserved-additional-info", "RFC 8949 3 (additional information 28-30 is not well-formed)", "1c", NO),
-        c("simple-two-byte-low", "RFC 8949 3.3 (simple values below 32 in two bytes are not well-formed)", "f818", NO),
-        c("text-invalid-utf8", "RFC 8949 3.1 major type 3 (valid UTF-8)", "62c328", NO),
-        c("truncated-bytes", "RFC 8949 3 (the declared length exceeds the input)", "44010203", NO),
-        c("huge-declared-length", "contract rule 5.7 (a declared length is checked against the remaining input before allocating)", "5b" + "ffffffffffffffff" + "00", NO),
-        c("trailing-bytes", "RFC 8949 5.1 with WebAuthn L3 6.5 (one item, nothing after it)", "0100", NO),
-        c("tag-unexpected", "CTAP2 canonical CBOR (tags are not used)", "c11a514b67b0", NO),
-        c("float-key", "CTAP2 canonical CBOR (COSE_Key labels are integers or text)", "a1f93c0001", NO),
+        c("map-keys-unsorted", "CTAP2 canonical CBOR (keys sorted, shortest first then bytewise)", "a5" + "0326" + "0102" + "2001" + "215820" + x + "225820" + y, refused("Malformed")),
+        c("map-duplicate-key", "RFC 8949 5.6 (duplicate keys are invalid)", "a2" + "0102" + "0102", refused("Malformed")),
+        c("int-not-shortest", "RFC 8949 4.2.1 (preferred serialization)", "1805", refused("Malformed")),
+        c("int-16-for-8", "RFC 8949 4.2.1", "190017", refused("Malformed")),
+        c("neg-int-not-shortest", "RFC 8949 4.2.1", "3806", refused("Malformed")),
+        c("length-not-shortest", "RFC 8949 4.2.1 (lengths in shortest form)", "7803616263", refused("Malformed")),
+        c("indefinite-bytes", "RFC 8949 4.2.1 (no indefinite length)", "5f42010243030405ff", refused("Malformed")),
+        c("indefinite-array", "RFC 8949 4.2.1", "9f0102ff", refused("Malformed")),
+        c("indefinite-map", "RFC 8949 4.2.1", "bf0102ff", refused("Malformed")),
+        c("break-outside-indefinite", "RFC 8949 3.2.1 (not well-formed)", "ff", refused("Malformed")),
+        c("reserved-additional-info", "RFC 8949 3 (additional information 28-30 is not well-formed)", "1c", refused("Malformed")),
+        c("simple-two-byte-low", "RFC 8949 3.3 (simple values below 32 in two bytes are not well-formed)", "f818", refused("Malformed")),
+        c("text-invalid-utf8", "RFC 8949 3.1 major type 3 (valid UTF-8)", "62c328", refused("Malformed")),
+        c("truncated-bytes", "RFC 8949 3 (the declared length exceeds the input)", "44010203", refused("Malformed")),
+        c("huge-declared-length", "contract rule 5.7 (a declared length is checked against the remaining input before allocating)", "5b" + "ffffffffffffffff" + "00", refused("Malformed")),
+        c("trailing-bytes", "RFC 8949 5.1 with WebAuthn L3 6.5 (one item, nothing after it)", "0100", refused("Malformed")),
+        c("tag-unexpected", "CTAP2 canonical CBOR (tags are not used)", "c11a514b67b0", refused("Malformed")),
+        c("float-key", "CTAP2 canonical CBOR (COSE_Key labels are integers or text)", "a1f93c0001", refused("Malformed")),
         {"id": "depth-bound", "op": "cbor_limit", "bound": "webauthn_rp::MAX_CBOR_DEPTH", "excess": 1, "recipe": "nested one-element arrays 0x81 ... 0x81 0x00 whose depth (the outer array is 1) is the bound plus one",
-         "spec": "contract rule 5.7 (CBOR nesting depth)", "expect": {"ok": False, "kind": "TooLarge"}},
+         "spec": "contract rule 5.7 (CBOR nesting depth)", "expect": refused("TooLarge")},
         {"id": "item-bound", "op": "cbor_limit", "bound": "webauthn_rp::MAX_CBOR_ITEMS", "excess": 1, "recipe": "one definite array of the bound items of 0x00, so the item count with the array itself is the bound plus one",
-         "spec": "contract rule 5.7 (CBOR item count)", "expect": {"ok": False, "kind": "TooLarge"}},
+         "spec": "contract rule 5.7 (CBOR item count)", "expect": refused("TooLarge")},
     ]
 
 
@@ -224,6 +230,7 @@ REG_POLICY = {"rp_id": RP, "origin": ORIGIN, "challenge": CHALLENGE, "user_verif
 def registration(cid, spec, expect, cd=None, ao=None, **policy):
     cd = cd if cd is not None else client_data(type="webauthn.create")
     ao = ao if ao is not None else att_object()
+    expect = refused(expect, spec) if isinstance(expect, str) else expect
     return {"id": cid, "op": "webauthn_register", "attestation_object": ao.hex(), "client_data_json": cd.hex(), **dict(REG_POLICY, **policy), "spec": spec, "expect": expect}
 
 
@@ -232,22 +239,22 @@ def registration_cases():
     cd = lambda **o: client_data(**dict({"type": "webauthn.create"}, **o))
     return [
         registration("control-none-es256", "WebAuthn L3 7.1 and 8.7 (none attestation)", ok),
-        registration("type-get", "WebAuthn L3 7.1 step 7 \"C.type is webauthn.create\" (type MUST be webauthn.create)", NO, cd=client_data()),
-        registration("challenge-other", "WebAuthn L3 7.1 step 8 \"C.challenge equals the base64url encoding of pkOptions.challenge\"", NO, cd=cd(challenge=b64(hashlib.sha256(b"other").digest()))),
-        registration("origin-other", "WebAuthn L3 7.1 step 9 \"C.origin is an origin expected by the Relying Party\"", NO, cd=cd(origin="https://evil.example")),
-        registration("cross-origin-denied", "WebAuthn L3 7.1 step 10 \"If C.crossOrigin is present and set to true\" with the contract (deny-by-default)", NO, cd=cd(crossOrigin=True, topOrigin="https://top.example")),
-        registration("top-origin-other", "WebAuthn L3 7.1 step 11 \"If C.topOrigin is present\"", NO, cd=cd(crossOrigin=True, topOrigin="https://evil.example"), cross_origin={"top_origins": ["https://top.example"]}),
-        registration("rp-id-hash-other", "WebAuthn L3 7.1 step 14 \"rpIdHash in authData is the SHA-256 hash of the RP ID expected by the Relying Party\"", NO, ao=att_object(rp="evil.example")),
-        registration("up-clear", "WebAuthn L3 7.1 step 15 \"If options.mediation is not set to conditional, verify that the UP bit of the flags in authData is set\" (mediation not conditional)", NO, ao=att_object(flags=UV | 0x40)),
-        registration("uv-clear-required", "WebAuthn L3 7.1 step 16 \"verify that the UV bit of the flags in authData is set\"", NO, ao=att_object(flags=UP | 0x40), user_verification="required"),
+        registration("type-get", "WebAuthn L3 7.1 step 7 \"C.type is webauthn.create\" (type MUST be webauthn.create)", "Type", cd=client_data()),
+        registration("challenge-other", "WebAuthn L3 7.1 step 8 \"C.challenge equals the base64url encoding of pkOptions.challenge\"", "ChallengeMismatch", cd=cd(challenge=b64(hashlib.sha256(b"other").digest()))),
+        registration("origin-other", "WebAuthn L3 7.1 step 9 \"C.origin is an origin expected by the Relying Party\"", "OriginMismatch", cd=cd(origin="https://evil.example")),
+        registration("cross-origin-denied", "WebAuthn L3 7.1 step 10 \"If C.crossOrigin is present and set to true\" with the contract (deny-by-default)", "CrossOriginDenied", cd=cd(crossOrigin=True, topOrigin="https://top.example")),
+        registration("top-origin-other", "WebAuthn L3 7.1 step 11 \"If C.topOrigin is present\"", "TopOriginDenied", cd=cd(crossOrigin=True, topOrigin="https://evil.example"), cross_origin={"top_origins": ["https://top.example"]}),
+        registration("rp-id-hash-other", "WebAuthn L3 7.1 step 14 \"rpIdHash in authData is the SHA-256 hash of the RP ID expected by the Relying Party\"", "RpIdHash", ao=att_object(rp="evil.example")),
+        registration("up-clear", "WebAuthn L3 7.1 step 15 \"If options.mediation is not set to conditional, verify that the UP bit of the flags in authData is set\" (mediation not conditional)", "UserNotPresent", ao=att_object(flags=UV | 0x40)),
+        registration("uv-clear-required", "WebAuthn L3 7.1 step 16 \"verify that the UV bit of the flags in authData is set\"", "UserNotVerified", ao=att_object(flags=UP | 0x40), user_verification="required"),
         registration("uv-clear-preferred", "WebAuthn L3 7.1 step 16 \"verify that the UV bit of the flags in authData is set\"", dict(ok, user_verified=False), ao=att_object(flags=UP | 0x40)),
-        registration("bs-without-be", "WebAuthn L3 7.1 step 17 \"If the BE bit of the flags in authData is not set, verify that the BS bit is not set\"", NO, ao=att_object(flags=UP | UV | BS | 0x40)),
-        registration("alg-not-requested", "WebAuthn L3 7.1 step 20 \"matches the alg attribute of one of the items in pkOptions.pubKeyCredParams\" (alg among pubKeyCredParams)", NO, pub_key_cred_params=[-257]),
-        registration("fmt-unknown", "WebAuthn L3 7.1 step 21 \"USASCII case-sensitive match on fmt against the set of supported WebAuthn Attestation Statement Format Identifier values\" (case-sensitive match against supported formats)", NO, ao=att_object(fmt="None")),
-        registration("none-with-statement", "WebAuthn L3 8.7 (the none attStmt is the empty map)", NO, ao=att_object(att_stmt=b"\xa1" + cbor_text("x") + b"\x00")),
-        registration("at-clear", "WebAuthn L3 7.1 step 13 and 6.5.1 \"the authenticator data authData\" (registration carries attested credential data)", NO, ao=att_object(flags=UP | UV)),
+        registration("bs-without-be", "WebAuthn L3 7.1 step 17 \"If the BE bit of the flags in authData is not set, verify that the BS bit is not set\"", "BackupStateWithoutEligibility", ao=att_object(flags=UP | UV | BS | 0x40)),
+        registration("alg-not-requested", "WebAuthn L3 7.1 step 20 \"matches the alg attribute of one of the items in pkOptions.pubKeyCredParams\" (alg among pubKeyCredParams)", "Algorithm", pub_key_cred_params=[-257]),
+        registration("fmt-unknown", "WebAuthn L3 7.1 step 21 \"USASCII case-sensitive match on fmt against the set of supported WebAuthn Attestation Statement Format Identifier values\" (case-sensitive match against supported formats)", "UnknownFormat", ao=att_object(fmt="None")),
+        registration("none-with-statement", "WebAuthn L3 7.1 step 22 \"Verify that attStmt is a correct attestation statement\" with 8.7 (the none attStmt is the empty map)", "AttestationInvalid", ao=att_object(att_stmt=b"\xa1" + cbor_text("x") + b"\x00")),
+        registration("at-clear", "WebAuthn L3 7.1 step 13 and 6.5.1 \"the authenticator data authData\" (registration carries attested credential data)", "Malformed", ao=att_object(flags=UP | UV)),
         registration("credential-id-1023", "WebAuthn L3 7.1 step 25 \"credentialId is ≤ 1023 bytes\" (an id of at most 1023 bytes is within the limit)", dict(ok, credential_id=(bytes(range(256)) * 4)[:1023].hex()), ao=att_object(cred_id=(bytes(range(256)) * 4)[:1023])),
-        registration("credential-id-1024", "WebAuthn L3 7.1 step 25 \"Credential IDs larger than this many bytes SHOULD cause the RP to fail this registration ceremony\" (an id over 1023 bytes SHOULD fail the ceremony: an oracle choice, the crate refuses)", NO, ao=att_object(cred_id=bytes(range(256)) * 4)),
+        registration("credential-id-1024", "WebAuthn L3 7.1 step 25 \"Credential IDs larger than this many bytes SHOULD cause the RP to fail this registration ceremony\" (an id over 1023 bytes SHOULD fail the ceremony: an oracle choice, the crate refuses)", "CredentialIdInvalid", ao=att_object(cred_id=bytes(range(256)) * 4)),
     ]
 
 

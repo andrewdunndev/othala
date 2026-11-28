@@ -7,10 +7,11 @@ limits,chains,attestation,extensions,options-json,response-json}.json.
 Every key is derived from a label at run time with RFC 6979 deterministic ECDSA, so the output is reproducible byte for
 byte and no private key is stored in the repository or in a vector. tools/check_webauthn_ext.mjs re-verifies every
 certificate and assertion signature with Node's crypto, so each refusal is for the one rule its case names.
-`expect.kind` is set only for TooLarge, the class the architecture contract names for bounds.
+Every refusal in the files whose reader is built states `expect.kind`, and `expect.step` when its spec text cites a step of 7.1 or 7.2
+(the number is read from that text, so it is stated once). A case whose reader is not built yet carries `unbuilt`, the item that builds it.
 Licence of this script: MIT OR Apache-2.0.
 """
-import base64, hashlib, json, os, sys
+import base64, hashlib, json, os, re, sys
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -25,6 +26,13 @@ CHALLENGE = b64(sha(b"webauthn-rp-derived challenge"))
 NOW = 1_800_000_000
 OK, NO = {"ok": True}, {"ok": False}
 TOO = {"ok": False, "kind": "TooLarge"}
+
+
+def refused(kind, spec="", step=None):
+    """A refusal: its kind, and its step: the 7.1 or 7.2 step its spec text cites, or the one given (none when neither names one)."""
+    cited = re.search(r"\b7\.[12] steps? (\d+)", spec)
+    step = step or (int(cited.group(1)) if cited else None)
+    return {"ok": False, "kind": kind, **({"step": step} if step else {})}
 
 CRED = Key("webauthn-rp-derived-ext credential", "p256")
 PUB = CRED.pt
@@ -70,6 +78,7 @@ PUBJ = {"x": f"{PUB[0]:064x}", "y": f"{PUB[1]:064x}"}
 def assertion(cid, spec, expect, cd=None, ad=None, **extra):
     cd = cd if cd is not None else client_data()
     ad = ad if ad is not None else auth_data()
+    expect = refused(expect, spec) if isinstance(expect, str) else expect
     sig = CRED.sign(ad + sha(cd))
     return {"id": cid, "op": "webauthn_assert", "pub": PUBJ, "authenticator_data": ad.hex(), "client_data_json": cd.hex(), "signature": sig.hex(),
             **dict(POLICY, **extra), "spec": spec, "expect": expect}
@@ -78,6 +87,7 @@ def assertion(cid, spec, expect, cd=None, ad=None, **extra):
 def registration(cid, spec, expect, cd=None, ao=None, **extra):
     cd = cd if cd is not None else client_data(type="webauthn.create")
     ao = ao if ao is not None else att_object()
+    expect = refused(expect, spec) if isinstance(expect, str) else expect
     return {"id": cid, "op": "webauthn_register", "attestation_object": ao.hex(), "client_data_json": cd.hex(), **dict(REG_POLICY, **extra), "spec": spec, "expect": expect}
 
 
@@ -147,9 +157,14 @@ def cose_cases():
     E384 = {1: ci(2), 3: ci(-35), -1: ci(2), -2: c_bytes(int_bytes(PT384[0], 48)), -3: c_bytes(int_bytes(PT384[1], 48))}
     OKP = {1: ci(1), 3: ci(-8), -1: ci(6), -2: c_bytes(ED_B)}
     RSA = {1: ci(3), 3: ci(-257), -1: c_bytes(int_bytes(RSA_C["n"])), -2: c_bytes(b"\x01\x00\x01")}
-    c = lambda cid, spec, hexs, expect: {"id": cid, "op": "cose_key", "input": hexs, "spec": spec, "expect": expect}
+    # the reader builds ES256 only (webauthn-08 builds the rest): a case whose answer names another algorithm is `unbuilt`
+    c = lambda cid, spec, hexs, expect: {"id": cid, "op": "cose_key", "input": hexs, "spec": spec, "expect": expect} | ({"unbuilt": "webauthn-08"} if expect.get("alg", -7) != -7 else {})
     R5 = "contract R5"
-    bad = lambda cid, spec, hexs: c(cid, spec, hexs, NO)
+    # R5: a missing or mistyped member, a short or off-curve point and a non-map are Malformed; any other kty or alg is Algorithm
+    KIND = dict.fromkeys(["es256-x-31-bytes", "es256-x-33-bytes", "es256-y-31-bytes", "es256-off-curve", "es256-x-zero-y-zero", "es256-x-missing", "es256-y-missing",
+                          "es256-crv-missing", "alg-missing", "kty-text", "alg-text", "x-integer", "crv-text", "not-a-map", "empty-map"], "Malformed")
+    KIND |= dict.fromkeys(["kty-symmetric", "es512-p521", "fully-specified-esp256", "fully-specified-esp512"], "Algorithm")
+    bad = lambda cid, spec, hexs: c(cid, spec, hexs, refused(KIND[cid])) if cid in KIND else c(cid, spec, hexs, NO) | {"unbuilt": "webauthn-08"}
     short = int_bytes(PUB[0], 32)[1:]
     off = (PUB[1] + 1) % P256.p
     return [
@@ -187,7 +202,7 @@ def cose_cases():
         bad("eddsa-33-bytes", "contract R5 (a 32-byte point)", build(OKP, n2=c_bytes(ED_B + b"\x00"))),
         bad("eddsa-y-not-reduced", "RFC 8032 5.1.3 (y must be below p; this is y = p, whose encoding is not canonical)", build(OKP, n2=c_bytes((EP).to_bytes(32, "little")))),
         bad("rsa-1024-bit-n", "contract R5 and RFC 8725 3.5 (n below MIN_RSA_BITS, taken as 2048; n is an odd 1024-bit integer)", build(RSA, n1=c_bytes(int_bytes(odd_int("n1024", 1024))))),
-        c("rsa-4097-bit-n", "contract R1 and R5 (n past MAX_RSA_BITS 4096 is TooLarge; the excess is in bits; n is an odd 4097-bit integer)", build(RSA, n1=c_bytes(int_bytes(odd_int("n4097", 4097)))), TOO) | {"bound": "webauthn_rp::MAX_RSA_BITS", "excess": 1},
+        c("rsa-4097-bit-n", "contract R1 and R5 (n past MAX_RSA_BITS 4096 is TooLarge; the excess is in bits; n is an odd 4097-bit integer)", build(RSA, n1=c_bytes(int_bytes(odd_int("n4097", 4097)))), TOO) | {"bound": "webauthn_rp::MAX_RSA_BITS", "excess": 1, "unbuilt": "webauthn-08"},
         bad("rsa-2047-bit-n", "contract R5 (n below MIN_RSA_BITS 2048 by one bit; n is an odd 2047-bit integer)", build(RSA, n1=c_bytes(int_bytes(odd_int("n2047", 2047))))),
         bad("rsa-e-3", "contract R5 (e is 65537)", build(RSA, n2=c_bytes(b"\x03"))),
         bad("rsa-e-65537-padded", "contract R5 (e is 65537; a leading zero byte is not the integer's minimal form)", build(RSA, n2=c_bytes(b"\x00\x01\x00\x01"))),
@@ -218,25 +233,25 @@ def attobj_cases():
         c("canonical-order", "WebAuthn L3 6.5.4 and contract R40", c_map_raw([fmt, stmt, adat]), OK),
         c("authdata-first-order-tolerated", NOTE + " (the outer map is read order-tolerant: a client may re-encode it)", c_map_raw([adat, fmt, stmt]), OK),
         c("attstmt-first-order-tolerated", NOTE + " (attStmt first)", c_map_raw([stmt, fmt, adat]), OK),
-        c("extra-member", NOTE, c_map([fmt, stmt, adat, (t("extra"), c_uint(1))]), NO),
-        c("fmt-missing", NOTE, c_map([stmt, adat]), NO),
-        c("attstmt-missing", NOTE, c_map([fmt, adat]), NO),
-        c("authdata-missing", NOTE, c_map([fmt, stmt]), NO),
-        c("fmt-bytes", NOTE + " (fmt is text)", c_map([(t("fmt"), c_bytes(b"none")), stmt, adat]), NO),
-        c("attstmt-array", NOTE + " (attStmt is a map)", c_map([fmt, (t("attStmt"), c_array()), adat]), NO),
-        c("attstmt-null", NOTE + " (attStmt is a map)", c_map([fmt, (t("attStmt"), b"\xf6"), adat]), NO),
-        c("authdata-text", NOTE + " (authData is a byte string)", c_map([fmt, stmt, (t("authData"), c_text("x" * 37))]), NO),
-        c("authdata-array-of-ints", NOTE + " (authData is a byte string, not an array of integers)", c_map([fmt, stmt, (t("authData"), c_array(*[c_uint(0)] * 37))]), NO),
-        c("duplicate-fmt", "RFC 8949 5.6 (duplicate keys, even under an order-tolerant outer map)", cbor_head(5, 4) + kv(fmt) + kv(fmt) + kv(stmt) + kv(adat), NO),
-        c("duplicate-key-three-members", "RFC 8949 5.6 (a map of three entries with a repeated key is not exactly fmt, attStmt, authData)", cbor_head(5, 3) + kv(fmt) + kv(fmt) + kv(adat), NO),
-        c("indefinite-length-map", "RFC 8949 4.2.1 (no indefinite length, in the outer map too)", b"\xbf" + kv(fmt) + kv(stmt) + kv(adat) + b"\xff", NO),
-        c("map-length-not-shortest", "RFC 8949 4.2.1 (shortest-form heads)", b"\xb8\x03" + kv(fmt) + kv(stmt) + kv(adat), NO),
-        c("key-integer", NOTE, c_map([(c_uint(1), c_text("none")), stmt, adat]), NO),
-        c("trailing-byte", "RFC 8949 5.1 with contract R2 (nothing after the top item)", c_map_raw([fmt, stmt, adat]) + b"\x00", NO),
-        c("not-a-map", NOTE, c_array(c_text("none"), b"\xa0", c_bytes(ad)), NO),
-        c("empty", "RFC 8949 5.1 (an item is required)", b"", NO),
+        c("extra-member", NOTE, c_map([fmt, stmt, adat, (t("extra"), c_uint(1))]), refused("Malformed", step=13)),
+        c("fmt-missing", NOTE, c_map([stmt, adat]), refused("Malformed", step=13)),
+        c("attstmt-missing", NOTE, c_map([fmt, adat]), refused("Malformed", step=13)),
+        c("authdata-missing", NOTE, c_map([fmt, stmt]), refused("Malformed", step=13)),
+        c("fmt-bytes", NOTE + " (fmt is text)", c_map([(t("fmt"), c_bytes(b"none")), stmt, adat]), refused("Malformed", step=13)),
+        c("attstmt-array", NOTE + " (attStmt is a map)", c_map([fmt, (t("attStmt"), c_array()), adat]), refused("Malformed", step=13)),
+        c("attstmt-null", NOTE + " (attStmt is a map)", c_map([fmt, (t("attStmt"), b"\xf6"), adat]), refused("Malformed", step=13)),
+        c("authdata-text", NOTE + " (authData is a byte string)", c_map([fmt, stmt, (t("authData"), c_text("x" * 37))]), refused("Malformed", step=13)),
+        c("authdata-array-of-ints", NOTE + " (authData is a byte string, not an array of integers)", c_map([fmt, stmt, (t("authData"), c_array(*[c_uint(0)] * 37))]), refused("Malformed", step=13)),
+        c("duplicate-fmt", "RFC 8949 5.6 (duplicate keys, even under an order-tolerant outer map)", cbor_head(5, 4) + kv(fmt) + kv(fmt) + kv(stmt) + kv(adat), refused("Malformed", step=13)),
+        c("duplicate-key-three-members", "RFC 8949 5.6 (a map of three entries with a repeated key is not exactly fmt, attStmt, authData)", cbor_head(5, 3) + kv(fmt) + kv(fmt) + kv(adat), refused("Malformed", step=13)),
+        c("indefinite-length-map", "RFC 8949 4.2.1 (no indefinite length, in the outer map too)", b"\xbf" + kv(fmt) + kv(stmt) + kv(adat) + b"\xff", refused("Malformed", step=13)),
+        c("map-length-not-shortest", "RFC 8949 4.2.1 (shortest-form heads)", b"\xb8\x03" + kv(fmt) + kv(stmt) + kv(adat), refused("Malformed", step=13)),
+        c("key-integer", NOTE, c_map([(c_uint(1), c_text("none")), stmt, adat]), refused("Malformed", step=13)),
+        c("trailing-byte", "RFC 8949 5.1 with contract R2 (nothing after the top item)", c_map_raw([fmt, stmt, adat]) + b"\x00", refused("Malformed", step=13)),
+        c("not-a-map", NOTE, c_array(c_text("none"), b"\xa0", c_bytes(ad)), refused("Malformed", step=13)),
+        c("empty", "RFC 8949 5.1 (an item is required)", b"", refused("Malformed", step=13)),
         c("attstmt-noncanonical-order-refused", "ruling R-n (attStmt is authenticator-produced and read strict: its keys must be in canonical order; 'alg' then 'sig')",
-          c_map_raw([(t("fmt"), t("packed")), (t("attStmt"), c_map_raw([(t("sig"), c_bytes(b"\x01")), (t("alg"), c_int(-7))])), adat]), NO),
+          c_map_raw([(t("fmt"), t("packed")), (t("attStmt"), c_map_raw([(t("sig"), c_bytes(b"\x01")), (t("alg"), c_int(-7))])), adat]), refused("Malformed", step=13)),
         c("attstmt-canonical-order-read", "ruling R-n (an attStmt in canonical key order is read; structure only, the packed rules are checked in attestation.json)",
           c_map_raw([(t("fmt"), t("packed")), (t("attStmt"), c_map([(t("alg"), c_int(-7)), (t("sig"), c_bytes(b"\x01"))])), adat]), OK),
     ]
@@ -256,21 +271,21 @@ def auth_cases():
     user = lambda ident: {"allow": {"credentials": [], "identified_user": ident.hex()}}
     return [
         assertion("allow-listed", A + "step 5 \"verify that credential.id identifies one of the public key credentials listed in pkOptions.allowCredentials\" (the credential is among allowCredentials)", OK | {"user_verified": True, "counter": 6}, **base, **allow(CRED_ID, OTHER_ID)),
-        assertion("allow-not-listed", A + "step 5 \"verify that credential.id identifies one of the public key credentials listed in pkOptions.allowCredentials\" (id not in allowCredentials; contract R64 NotAllowed)", NO, **base, **allow(OTHER_ID)),
-        assertion("allow-list-of-one-other", A + "step 5 \"verify that credential.id identifies one of the public key credentials listed in pkOptions.allowCredentials\" (a single listed credential that is not the response's; contract R64)", NO, **dict(base, raw_id=OTHER_ID.hex()), **allow(CRED_ID)),
+        assertion("allow-not-listed", A + "step 5 \"verify that credential.id identifies one of the public key credentials listed in pkOptions.allowCredentials\" (id not in allowCredentials; contract R64 NotAllowed)", "NotAllowed", **base, **allow(OTHER_ID)),
+        assertion("allow-list-of-one-other", A + "step 5 \"verify that credential.id identifies one of the public key credentials listed in pkOptions.allowCredentials\" (a single listed credential that is not the response's; contract R64)", "NotAllowed", **dict(base, raw_id=OTHER_ID.hex()), **allow(CRED_ID)),
         assertion("discoverable-no-list", A + "step 5 \"If pkOptions.allowCredentials is not empty\" (an empty allow list adds no constraint; Allow::Discoverable)", OK | {"user_verified": True, "counter": 6}, **base, allow="discoverable", user_handle=UH.hex()),
-        assertion("stored-credential-other-id", A + "step 6 \"verify that the identified user account contains a credential record whose id equals credential.rawId\" (the stored credential's id is the response's; contract R65 CredentialMismatch)", NO, **dict(base, stored_credential_id=OTHER_ID.hex()), **allow(CRED_ID)),
-        assertion("user-stored-other", A + "step 6 \"verify that the identified user account contains a credential record whose id equals credential.rawId\" (the stored credential's user is the identified user; contract R66 UserHandleMismatch)", NO, **dict(base, stored_user_handle=UH2.hex()), **user(UH)),
+        assertion("stored-credential-other-id", A + "step 6 \"verify that the identified user account contains a credential record whose id equals credential.rawId\" (the stored credential's id is the response's; contract R65 CredentialMismatch)", "CredentialMismatch", **dict(base, stored_credential_id=OTHER_ID.hex()), **allow(CRED_ID)),
+        assertion("user-stored-other", A + "step 6 \"verify that the identified user account contains a credential record whose id equals credential.rawId\" (the stored credential's user is the identified user; contract R66 UserHandleMismatch)", "UserHandleMismatch", **dict(base, stored_user_handle=UH2.hex()), **user(UH)),
         assertion("user-stored-same", A + "step 6 \"verify that the identified user account contains a credential record whose id equals credential.rawId\" (contract R66)", OK | {"user_verified": True, "counter": 6}, **base, **user(UH)),
-        assertion("user-handle-other", A + "step 6 \"If response.userHandle is present, verify that it equals the user handle of the user account\" (a present userHandle equals the identified user; contract R67 UserHandleMismatch)", NO, **base, **user(UH), user_handle=UH2.hex()),
+        assertion("user-handle-other", A + "step 6 \"If response.userHandle is present, verify that it equals the user handle of the user account\" (a present userHandle equals the identified user; contract R67 UserHandleMismatch)", "UserHandleMismatch", **base, **user(UH), user_handle=UH2.hex()),
         assertion("user-handle-same", A + "step 6 \"If response.userHandle is present, verify that it equals the user handle of the user account\" (contract R67)", OK | {"user_verified": True, "counter": 6}, **base, **user(UH), user_handle=UH.hex()),
         assertion("user-handle-absent-ok", A + "step 6 \"If response.userHandle is present, verify that it equals the user handle of the user account\" (contract R67: a userHandle may be absent under Allow::User)", OK | {"user_verified": True, "counter": 6}, **base, **user(UH)),
         assertion("user-handle-empty-reads-absent", "contract R16 (an empty userHandle reads as absent) with " + A + "step 6 \"If response.userHandle is present, verify that it equals the user handle of the user account\"", OK | {"user_verified": True, "counter": 6}, **base, **user(UH), user_handle=""),
-        assertion("discoverable-handle-missing", A + "step 6 \"verify that response.userHandle is present\" (a discoverable response must carry userHandle; contract R68 UserHandleMismatch)", NO, **base, allow="discoverable"),
-        assertion("discoverable-handle-empty", "contract R16 and R68 (an empty userHandle reads as absent, so a discoverable response is refused)", NO, **base, allow="discoverable", user_handle=""),
-        assertion("discoverable-handle-other", A + "step 6 \"Verify that the user account identified by response.userHandle contains a credential record whose id equals credential.rawId\" (the userHandle is the stored credential's user; contract R69 UserHandleMismatch)", NO, **base, allow="discoverable", user_handle=UH2.hex()),
+        assertion("discoverable-handle-missing", A + "step 6 \"verify that response.userHandle is present\" (a discoverable response must carry userHandle; contract R68 UserHandleMismatch)", "UserHandleMismatch", **base, allow="discoverable"),
+        assertion("discoverable-handle-empty", A + "step 6 \"verify that response.userHandle is present\" with contract R16 and R68 (an empty userHandle reads as absent, so a discoverable response is refused)", "UserHandleMismatch", **base, allow="discoverable", user_handle=""),
+        assertion("discoverable-handle-other", A + "step 6 \"Verify that the user account identified by response.userHandle contains a credential record whose id equals credential.rawId\" (the userHandle is the stored credential's user; contract R69 UserHandleMismatch)", "UserHandleMismatch", **base, allow="discoverable", user_handle=UH2.hex()),
         assertion("discoverable-handle-same", A + "step 6 \"Verify that the user account identified by response.userHandle contains a credential record whose id equals credential.rawId\" (contract R69)", OK | {"user_verified": True, "counter": 6}, **base, allow="discoverable", user_handle=UH.hex()),
-        assertion("discoverable-handle-one-bit", A + "step 6 \"Verify that the user account identified by response.userHandle contains a credential record whose id equals credential.rawId\" (the handle compares in full: one bit differs; contract R69)", NO, **base, allow="discoverable", user_handle=(UH[:-1] + bytes([UH[-1] ^ 1])).hex()),
+        assertion("discoverable-handle-one-bit", A + "step 6 \"Verify that the user account identified by response.userHandle contains a credential record whose id equals credential.rawId\" (the handle compares in full: one bit differs; contract R69)", "UserHandleMismatch", **base, allow="discoverable", user_handle=(UH[:-1] + bytes([UH[-1] ^ 1])).hex()),
     ]
 
 
@@ -285,13 +300,13 @@ def binding_cases():
     S = "ruling R-d and contract R63 (BrowserMismatch)"
     return [
         registration("registration-same-browser", R, REG_OK(), binding=a, finish_binding=a),
-        registration("registration-other-browser", R + ": the ceremony was started in another browser", NO, binding=a, finish_binding=b),
-        registration("registration-one-bit-differs", R + ": one bit of the binding differs", NO, binding=a, finish_binding=flipped),
-        registration("registration-zero-binding", R + ": an all-zero binding does not match a real one", NO, binding=a, finish_binding=bytes(32).hex()),
+        registration("registration-other-browser", R + ": the ceremony was started in another browser", "BrowserMismatch", binding=a, finish_binding=b),
+        registration("registration-one-bit-differs", R + ": one bit of the binding differs", "BrowserMismatch", binding=a, finish_binding=flipped),
+        registration("registration-zero-binding", R + ": an all-zero binding does not match a real one", "BrowserMismatch", binding=a, finish_binding=bytes(32).hex()),
         assertion("authentication-same-browser", S, {"ok": True, "user_verified": True, "counter": 6}, binding=a, finish_binding=a),
-        assertion("authentication-other-browser", S + ": the login was started in another browser (login CSRF)", NO, binding=a, finish_binding=b),
-        assertion("authentication-one-bit-differs", S + ": one bit of the binding differs", NO, binding=a, finish_binding=flipped),
-        assertion("authentication-zero-binding", S + ": an all-zero binding does not match a real one", NO, binding=a, finish_binding=bytes(32).hex()),
+        assertion("authentication-other-browser", S + ": the login was started in another browser (login CSRF)", "BrowserMismatch", binding=a, finish_binding=b),
+        assertion("authentication-one-bit-differs", S + ": one bit of the binding differs", "BrowserMismatch", binding=a, finish_binding=flipped),
+        assertion("authentication-zero-binding", S + ": an all-zero binding does not match a real one", "BrowserMismatch", binding=a, finish_binding=bytes(32).hex()),
     ]
 
 
@@ -302,11 +317,11 @@ def regid_cases():
     other[0] ^= 1
     return [
         registration("raw-id-equals-attested", S, REG_OK(), raw_id=CRED_ID.hex()),
-        registration("raw-id-one-bit-differs", S, NO, raw_id=bytes(other).hex()),
-        registration("raw-id-longer", S + ": raw id has one extra byte", NO, raw_id=(CRED_ID + b"\x00").hex()),
-        registration("raw-id-prefix", S + ": raw id is a prefix of the attested id", NO, raw_id=CRED_ID[:-1].hex()),
-        registration("raw-id-empty", S, NO, raw_id=""),
-        registration("raw-id-unrelated", S, NO, raw_id=OTHER_ID.hex()),
+        registration("raw-id-one-bit-differs", S, "CredentialIdInvalid", raw_id=bytes(other).hex()),
+        registration("raw-id-longer", S + ": raw id has one extra byte", "CredentialIdInvalid", raw_id=(CRED_ID + b"\x00").hex()),
+        registration("raw-id-prefix", S + ": raw id is a prefix of the attested id", "CredentialIdInvalid", raw_id=CRED_ID[:-1].hex()),
+        registration("raw-id-empty", S, "CredentialIdInvalid", raw_id=""),
+        registration("raw-id-unrelated", S, "CredentialIdInvalid", raw_id=OTHER_ID.hex()),
     ]
 
 
@@ -314,9 +329,9 @@ def regid_cases():
 def origin_cases():
     apk = ("AZaz09-_" * 6)[:42] + "A"  # low entropy on purpose, every base64url symbol present, the last symbol one of A Q g w so 43 symbols are a canonical 32-byte value: a real signer hash would read as a credential to the repository secret scan
     assert len(apk) == 43
-    o = lambda cid, s, spec, ok: {"id": cid, "op": "origin_parse", "input": s, "spec": spec, "expect": OK if ok else NO}
-    r = lambda cid, s, spec, ok: {"id": cid, "op": "rp_id_parse", "input": s, "spec": spec, "expect": OK if ok else NO}
-    a = lambda cid, s, spec, ok: {"id": cid, "op": "app_id_parse", "input": s, "spec": spec, "expect": dict(OK, as_written=s) if ok else NO}
+    o = lambda cid, s, spec, ok: {"id": cid, "op": "origin_parse", "input": s, "spec": spec, "expect": OK if ok else refused("Malformed")}
+    r = lambda cid, s, spec, ok: {"id": cid, "op": "rp_id_parse", "input": s, "spec": spec, "expect": OK if ok else refused("Malformed")}
+    a = lambda cid, s, spec, ok: {"id": cid, "op": "app_id_parse", "input": s, "spec": spec, "expect": dict(OK, as_written=s) if ok else NO, "unbuilt": "webauthn-14"}
     R8, R9, R10 = "contract R8 ", "contract R9 ", "contract R10 "
     LDH = " (lowercase LDH labels, RFC 5890 2.3.1: a hyphen is not first or last)"
     cs = [
@@ -590,7 +605,7 @@ def sized(cid, op, bound, value, excess, spec, make, expect_ok=None, recipe=None
     if recipe:
         case["recipe"] = recipe
     case.update(extra or {})
-    case["expect"] = (expect_ok or OK) if excess == 0 else TOO
+    case["expect"] = (expect_ok or OK) if excess == 0 else refused("TooLarge", spec)
     return case
 
 
@@ -665,12 +680,12 @@ def limit_cases():
     cs = []
     for ex in (0, 1):
         sfx = "at-bound" if ex == 0 else "one-past"
-        cs.append(sized(f"client-data-json-{sfx}", "client_data", "MAX_CLIENT_DATA_JSON", 16384, ex, L + " and R6 (clientDataJSON size)", make_client_json,
+        cs.append(sized(f"client-data-json-{sfx}", "client_data", "MAX_CLIENT_DATA_JSON", 16384, ex, L + " and R6 (clientDataJSON size; WebAuthn L3 7.2 step 9 \"be the result of running an implementation-specific JSON parser on JSONtext\")", make_client_json,
                         recipe="the members type, challenge, origin and crossOrigin of a webauthn.get clientDataJSON, then a string member `pad` of 'a' bytes, the whole document exactly bound+excess bytes"))
     for kind in ("objects", "arrays"):
         for ex in (0, 1):
             sfx = "at-bound" if ex == 0 else "one-past"
-            cs.append(sized(f"client-data-depth-{kind}-{sfx}", "client_data", "MAX_CLIENT_DATA_DEPTH", 8, ex, L + " and R6 (nesting past MAX_CLIENT_DATA_DEPTH is TooLarge; the top-level object is depth 1)", make_client_depth(kind),
+            cs.append(sized(f"client-data-depth-{kind}-{sfx}", "client_data", "MAX_CLIENT_DATA_DEPTH", 8, ex, L + " and R6 (nesting past MAX_CLIENT_DATA_DEPTH is TooLarge at WebAuthn L3 7.2 step 9 \"be the result of running an implementation-specific JSON parser on JSONtext\"; the top-level object is depth 1)", make_client_depth(kind),
                             recipe=f"a valid webauthn.get clientDataJSON with a member `x` holding nested {kind} so that the deepest container is at depth bound+excess"))
     for ex in (0, 1):
         sfx = "at-bound" if ex == 0 else "one-past"
@@ -722,6 +737,11 @@ def limit_cases():
         {"id": "trust-anchor-pem-text", "op": "trust_anchor_from_der", "input": b"-----BEGIN CERTIFICATE-----\n".hex(), "spec": "contract R18 (DER, not PEM)", "expect": NO},
         {"id": "trust-anchor-not-a-certificate", "op": "trust_anchor_from_der", "input": seq(integer(1)).hex(), "spec": "contract R18 (a certificate)", "expect": NO},
     ]
+    # the readers of these are not built (webauthn-09 reads a DER certificate; webauthn-14 the AppID and the client extensions)
+    unbuilt = {"trust_anchor_from_der": "webauthn-09", "app_id_parse": "webauthn-14", "largeblob_result": "webauthn-14"}
+    for case in cs:
+        if item := unbuilt.get(case["op"]) or ("webauthn-14" if "extensions" in case else None):
+            case["unbuilt"] = item
     return cs
 
 

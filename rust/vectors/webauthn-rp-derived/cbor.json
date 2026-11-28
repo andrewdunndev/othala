@@ -16,7 +16,8 @@
    "input": "a503260102200121582060fed4ba255a9d31c961eb74c6356d68c049b8923b61fa6ce669622e60f29fb62258207903fe1008b8bc99a41ae9e95628bc64f2f1b20c2d7e9f5177a3c294d4462299",
    "spec": "CTAP2 canonical CBOR (keys sorted, shortest first then bytewise)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -25,7 +26,8 @@
    "input": "a201020102",
    "spec": "RFC 8949 5.6 (duplicate keys are invalid)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -34,7 +36,8 @@
    "input": "1805",
    "spec": "RFC 8949 4.2.1 (preferred serialization)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -43,7 +46,8 @@
    "input": "190017",
    "spec": "RFC 8949 4.2.1",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -52,7 +56,8 @@
    "input": "3806",
    "spec": "RFC 8949 4.2.1",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -61,7 +66,8 @@
    "input": "7803616263",
    "spec": "RFC 8949 4.2.1 (lengths in shortest form)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -70,7 +76,8 @@
    "input": "5f42010243030405ff",
    "spec": "RFC 8949 4.2.1 (no indefinite length)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -79,7 +86,8 @@
    "input": "9f0102ff",
    "spec": "RFC 8949 4.2.1",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -88,7 +96,8 @@
    "input": "bf0102ff",
    "spec": "RFC 8949 4.2.1",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -97,7 +106,8 @@
    "input": "ff",
    "spec": "RFC 8949 3.2.1 (not well-formed)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -106,7 +116,8 @@
    "input": "1c",
    "spec": "RFC 8949 3 (additional information 28-30 is not well-formed)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -115,7 +126,8 @@
    "input": "f818",
    "spec": "RFC 8949 3.3 (simple values below 32 in two bytes are not well-formed)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -124,7 +136,8 @@
    "input": "62c328",
    "spec": "RFC 8949 3.1 major type 3 (valid UTF-8)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -133,7 +146,8 @@
    "input": "44010203",
    "spec": "RFC 8949 3 (the declared length exceeds the input)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -142,7 +156,8 @@
    "input": "5bffffffffffffffff00",
    "spec": "contract rule 5.7 (a declared length is checked against the remaining input before allocating)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -151,7 +166,8 @@
    "input": "0100",
    "spec": "RFC 8949 5.1 with WebAuthn L3 6.5 (one item, nothing after it)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -160,7 +176,8 @@
    "input": "c11a514b67b0",
    "spec": "CTAP2 canonical CBOR (tags are not used)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -169,7 +186,8 @@
    "input": "a1f93c0001",
    "spec": "CTAP2 canonical CBOR (COSE_Key labels are integers or text)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {

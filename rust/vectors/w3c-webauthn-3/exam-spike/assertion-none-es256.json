@@ -32,7 +32,9 @@
    "origin": "https://evil.example",
    "challenge": "OcDnUhQXulTUPo3JUXT0I97pvzzYBP9tZchXyav01Ag",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "OriginMismatch",
+    "step": 12
    }
   },
   {
@@ -49,7 +51,9 @@
    "origin": "https://example.org.evil.example",
    "challenge": "OcDnUhQXulTUPo3JUXT0I97pvzzYBP9tZchXyav01Ag",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "OriginMismatch",
+    "step": 12
    }
   },
   {
@@ -66,7 +70,9 @@
    "origin": "https://example.org",
    "challenge": "CNT0q8lXyGVt_wTYPL_p3iP0dFHJjT7UVLoXFFLnwDk",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "ChallengeMismatch",
+    "step": 11
    }
   },
   {
@@ -83,7 +89,9 @@
    "origin": "https://example.org",
    "challenge": "OcDnUhQXulTUPo3JUXT0I97pvzzYBP9tZchXyav01Ag",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "RpIdHash",
+    "step": 15
    }
   },
   {
@@ -100,7 +108,9 @@
    "origin": "https://example.org",
    "challenge": "OcDnUhQXulTUPo3JUXT0I97pvzzYBP9tZchXyav01Ag",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Signature",
+    "step": 21
    }
   },
   {
@@ -117,7 +127,9 @@
    "origin": "https://example.org",
    "challenge": "OcDnUhQXulTUPo3JUXT0I97pvzzYBP9tZchXyav01Ag",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Type",
+    "step": 10
    }
   },
   {
@@ -134,7 +146,9 @@
    "origin": "https://example.org",
    "challenge": "OcDnUhQXulTUPo3JUXT0I97pvzzYBP9tZchXyav01Ag",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Signature",
+    "step": 21
    }
   }
  ]

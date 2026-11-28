@@ -115,7 +115,8 @@
    "input": "http://example.org",
    "spec": "contract R8 (http is for localhost only)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -124,7 +125,8 @@
    "input": "http://127.0.0.1",
    "spec": "contract R8 (http is for the host localhost only, not an IP literal)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -133,7 +135,8 @@
    "input": "http://localhost.example",
    "spec": "contract R8 (http only for the host localhost exactly)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -142,7 +145,8 @@
    "input": "http://app.localhost",
    "spec": "contract R8 (http only for the host localhost exactly)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -151,7 +155,8 @@
    "input": "https://example.org:443",
    "spec": "contract R8 (a port that is not the scheme's default)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -160,7 +165,8 @@
    "input": "http://localhost:80",
    "spec": "contract R8 (a port that is not the scheme's default)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -169,7 +175,8 @@
    "input": "https://example.org:",
    "spec": "contract R8 (a decimal port when a colon is written)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -178,7 +185,8 @@
    "input": "https://example.org:0",
    "spec": "contract R8 (a decimal port; 0 is not a port)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -187,7 +195,8 @@
    "input": "https://example.org:65536",
    "spec": "contract R8 (a decimal port of 16 bits)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -196,7 +205,8 @@
    "input": "https://example.org:http",
    "spec": "contract R8 (a decimal port)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -205,7 +215,8 @@
    "input": "https://example.org:8443:9",
    "spec": "contract R8 (one optional port)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -214,7 +225,8 @@
    "input": "https://Example.org",
    "spec": "contract R8 (lowercase labels)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -223,7 +235,8 @@
    "input": "HTTPS://example.org",
    "spec": "contract R8 (the scheme is https, written as such)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -232,7 +245,8 @@
    "input": "https://example.org.",
    "spec": "contract R8 (no empty label)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -241,7 +255,8 @@
    "input": "https://a..example.org",
    "spec": "contract R8 (no empty label)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -250,7 +265,8 @@
    "input": "https://.example.org",
    "spec": "contract R8 (no empty label)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -259,7 +275,8 @@
    "input": "https://-a.example.org",
    "spec": "contract R8  (lowercase LDH labels, RFC 5890 2.3.1: a hyphen is not first or last)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -268,7 +285,8 @@
    "input": "https://a-.example.org",
    "spec": "contract R8  (lowercase LDH labels, RFC 5890 2.3.1: a hyphen is not first or last)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -277,7 +295,8 @@
    "input": "https://exa_mple.org",
    "spec": "contract R8 (LDH labels: letters, digits, hyphen)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -286,7 +305,8 @@
    "input": "https://b\u00fccher.example",
    "spec": "contract R8 (A-labels as written: a non-ASCII label is refused, never converted)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -295,7 +315,8 @@
    "input": "https://192.168.0.1",
    "spec": "contract R8 (an IP literal is refused)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -304,7 +325,8 @@
    "input": "https://192.168.0.1:8443",
    "spec": "contract R8 (an IP literal is refused)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -313,7 +335,8 @@
    "input": "https://[::1]",
    "spec": "contract R8 (an IP literal is refused)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -322,7 +345,8 @@
    "input": "https://[::1]:8443",
    "spec": "contract R8 (an IP literal is refused)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -331,7 +355,8 @@
    "input": "https://example.org/",
    "spec": "contract R8 (nothing after the host and port; an origin has no path)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -340,7 +365,8 @@
    "input": "https://example.org/login",
    "spec": "contract R8 (no path)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -349,7 +375,8 @@
    "input": "https://example.org:8443/",
    "spec": "contract R8 (no path)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -358,7 +385,8 @@
    "input": "https://example.org?x=1",
    "spec": "contract R8 (no query)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -367,7 +395,8 @@
    "input": "https://example.org#f",
    "spec": "contract R8 (no fragment)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -376,7 +405,8 @@
    "input": "https://user@example.org",
    "spec": "contract R8 (no userinfo)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -385,7 +415,8 @@
    "input": "https://user:pw@example.org",
    "spec": "contract R8 (no userinfo)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -394,7 +425,8 @@
    "input": "ftp://example.org",
    "spec": "contract R8 (any other scheme is refused)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -403,7 +435,8 @@
    "input": "wss://example.org",
    "spec": "contract R8 (any other scheme is refused)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -412,7 +445,8 @@
    "input": "example.org",
    "spec": "contract R8 (a scheme is required)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -421,7 +455,8 @@
    "input": "//example.org",
    "spec": "contract R8 (a scheme is required)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -430,7 +465,8 @@
    "input": "https://",
    "spec": "contract R8 (a host is required)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -439,7 +475,8 @@
    "input": "",
    "spec": "contract R8 (an origin is required)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -448,7 +485,8 @@
    "input": " https://example.org",
    "spec": "contract R8 (nothing around the origin)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -457,7 +495,8 @@
    "input": "https://example.org ",
    "spec": "contract R8 (nothing after the host and port)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -466,7 +505,8 @@
    "input": "https://example%2eorg",
    "spec": "contract R8 (LDH labels only)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -475,7 +515,8 @@
    "input": "android:apk-key-hash:AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZ",
    "spec": "contract R8 (exactly 43 base64url symbols)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -484,7 +525,8 @@
    "input": "android:apk-key-hash:AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZAA",
    "spec": "contract R8 (exactly 43 base64url symbols)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -493,7 +535,8 @@
    "input": "android:apk-key-hash:AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZ=",
    "spec": "contract R8 (base64url symbols, no padding)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -502,7 +545,8 @@
    "input": "android:apk-key-hash:AZaz09+/AZaz09+/AZaz09+/AZaz09+/AZaz09+/A+A",
    "spec": "contract R8 (base64url symbols: '+' is not one)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -511,7 +555,8 @@
    "input": "android:apk-key-hash:",
    "spec": "contract R8 (exactly 43 base64url symbols)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -520,7 +565,8 @@
    "input": "android:apk-key-hash:AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZA/",
    "spec": "contract R8 (nothing after the hash)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -529,7 +575,8 @@
    "input": "Android:apk-key-hash:AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZaz09-_AZA",
    "spec": "contract R8 (the scheme as written)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -574,7 +621,8 @@
    "input": "Example.org",
    "spec": "contract R9 (lowercase labels)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -583,7 +631,8 @@
    "input": "example.org.",
    "spec": "contract R9 (a trailing dot is refused)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -592,7 +641,8 @@
    "input": "a..example.org",
    "spec": "contract R9 (an empty label is refused)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -601,7 +651,8 @@
    "input": ".example.org",
    "spec": "contract R9 (an empty label is refused)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -610,7 +661,8 @@
    "input": "",
    "spec": "contract R9 (an empty value where one is required is Malformed)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -619,7 +671,8 @@
    "input": "192.168.0.1",
    "spec": "contract R9 (an IP literal is refused)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -628,7 +681,8 @@
    "input": "::1",
    "spec": "contract R9 (an IP literal is refused)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -637,7 +691,8 @@
    "input": "[::1]",
    "spec": "contract R9 (an IP literal is refused)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -646,7 +701,8 @@
    "input": "example.org:8443",
    "spec": "contract R9 (an RP ID has no port)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -655,7 +711,8 @@
    "input": "https://example.org",
    "spec": "contract R9 (an RP ID is a domain, not an origin)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -664,7 +721,8 @@
    "input": "example.org/",
    "spec": "contract R9 (an RP ID has no path)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -673,7 +731,8 @@
    "input": "-a.example.org",
    "spec": "contract R9  (lowercase LDH labels, RFC 5890 2.3.1: a hyphen is not first or last)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -682,7 +741,8 @@
    "input": "exa_mple.org",
    "spec": "contract R9 (LDH labels)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -691,7 +751,8 @@
    "input": "b\u00fccher.example",
    "spec": "contract R9 (A-labels as written; a non-ASCII label is refused)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -700,7 +761,8 @@
    "input": "example.org ",
    "spec": "contract R9 (LDH labels only)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -711,7 +773,8 @@
    "expect": {
     "ok": true,
     "as_written": "https://example.org/app-id.json"
-   }
+   },
+   "unbuilt": "webauthn-14"
   },
   {
    "id": "app-id-origin-only",
@@ -721,7 +784,8 @@
    "expect": {
     "ok": true,
     "as_written": "https://example.org"
-   }
+   },
+   "unbuilt": "webauthn-14"
   },
   {
    "id": "app-id-port-query",
@@ -731,7 +795,8 @@
    "expect": {
     "ok": true,
     "as_written": "https://example.org:8443/a/b?q=1"
-   }
+   },
+   "unbuilt": "webauthn-14"
   },
   {
    "id": "app-id-uppercase-kept",
@@ -741,7 +806,8 @@
    "expect": {
     "ok": true,
     "as_written": "https://EXAMPLE.org/App"
-   }
+   },
+   "unbuilt": "webauthn-14"
   },
   {
    "id": "app-id-http",
@@ -750,7 +816,8 @@
    "spec": "contract R10 (https only)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-14"
   },
   {
    "id": "app-id-fragment",
@@ -759,7 +826,8 @@
    "spec": "contract R10 (without fragment)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-14"
   },
   {
    "id": "app-id-empty-fragment",
@@ -768,7 +836,8 @@
    "spec": "contract R10 (without fragment, an empty one included)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-14"
   },
   {
    "id": "app-id-ftp",
@@ -777,7 +846,8 @@
    "spec": "contract R10 (https only)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-14"
   },
   {
    "id": "app-id-no-scheme",
@@ -786,7 +856,8 @@
    "spec": "contract R10 (an https URL)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-14"
   },
   {
    "id": "app-id-empty",
@@ -795,7 +866,8 @@
    "spec": "contract R10 (an AppID is required)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-14"
   },
   {
    "id": "app-id-scheme-only",
@@ -804,7 +876,8 @@
    "spec": "contract R10 (an https URL has a host)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-14"
   },
   {
    "id": "app-id-android",
@@ -813,7 +886,8 @@
    "spec": "contract R10 (an https URL)",
    "expect": {
     "ok": false
-   }
+   },
+   "unbuilt": "webauthn-14"
   }
  ]
 }

@@ -91,6 +91,8 @@ fn check(s: &Section) -> bool {
             attestation_object: &field(reg, "attestationObject"),
             requirement: Requirement::Preferred,
             algorithms: &[],
+            raw_id: None,
+            browsers: None,
         };
         let mut denied: MemStore<Key, Record> = MemStore::default();
         let strict = relying_party("example.org", "https://example.org", CrossOrigin::Deny);
