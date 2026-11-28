@@ -186,6 +186,13 @@
    "id": "rsa1_5",
    "op": "jwe_decrypt",
    "serialization": "compact",
+   "token_jwk": {
+    "kty": "oct",
+    "kid": "81b20965-8332-43d9-a468-82160ad91ac8",
+    "use": "enc",
+    "alg": "A128KW",
+    "k": "GZy6sIZ6wl9NJOKB-jnmVQ"
+   },
    "alg": "RSA1_5",
    "enc": "A128CBC-HS256",
    "jwk": {
@@ -204,13 +211,20 @@
    "spec": "RFC 7516 A.2 (RSA1_5; a non-goal, must-refuse)",
    "expect": {
     "ok": false,
-    "kind": "UnsupportedAlg"
+    "kind": "AlgMismatch"
    }
   },
   {
    "id": "pbes2",
    "op": "jwe_decrypt",
    "serialization": "compact",
+   "token_jwk": {
+    "kty": "oct",
+    "kid": "81b20965-8332-43d9-a468-82160ad91ac8",
+    "use": "enc",
+    "alg": "A128KW",
+    "k": "GZy6sIZ6wl9NJOKB-jnmVQ"
+   },
    "alg": "PBES2-HS512+A256KW",
    "enc": "A128CBC-HS256",
    "password": "entrap_o\\xe2\\x80\\x93peter_long\\xe2\\x80\\x93credit_tun",
@@ -219,7 +233,7 @@
    "spec": "RFC 7520 5.3 (PBES2; a non-goal, must-refuse)",
    "expect": {
     "ok": false,
-    "kind": "UnsupportedAlg"
+    "kind": "AlgMismatch"
    }
   },
   {

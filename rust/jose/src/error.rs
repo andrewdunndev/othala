@@ -10,8 +10,8 @@ pub enum ErrorKind {
     DuplicateMember,
     /// An algorithm, curve or compression value this crate does not implement, or one whose feature is off.
     UnsupportedAlg,
-    /// The header's `alg` or `enc` is an implemented one other than the key's, or the key's type or curve cannot
-    /// take the algorithm.
+    /// The header's `alg` or `enc` is any value other than the key's (a refused one such as `none` included), or the
+    /// key's type or curve cannot take the algorithm.
     AlgMismatch,
     /// A JWK without `alg` used where the algorithm must come from the key.
     KeyAlgMissing,
