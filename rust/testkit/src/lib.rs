@@ -5,7 +5,7 @@ pub mod fixture;
 mod race;
 pub mod vectors;
 
-pub use conformance::store_conformance;
+pub use conformance::{RACERS, store_conformance, store_conformance_shared};
 pub use race::{Decide, race};
 pub use store::{Fault, MemStore};
 

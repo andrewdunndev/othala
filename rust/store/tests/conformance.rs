@@ -1,12 +1,14 @@
 //! The reference store against the store-effect obligation, and a table of lying stores, each caught by its own case.
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
+use std::time::Duration;
 
 use base::{
     Conflict, Effect, EffectId, Guard, Receipt, Row, Rows, Scope, Store, StoreKey, UnixTime,
     Version,
 };
 use store::{Fault, MemStore};
-use testkit::store_conformance;
+use testkit::{RACERS, store_conformance, store_conformance_shared};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct K(u8);
@@ -32,6 +34,8 @@ enum Lie {
     StopAtFirstFailure,
     ExpectBumps,
     TableVersion,
+    ConsumeSweepsSibling,
+    UpdateRewritesSibling,
     NoAppliedId,
     IdAfterGuards,
     RecordsConflictedId,
@@ -49,7 +53,7 @@ enum Lie {
     WrongReceipt,
 }
 
-const CAUGHT_IN: [(Lie, &str); 22] = [
+const CAUGHT_IN: [(Lie, &str); 24] = [
     (Lie::SkipWrites, "atomic: "),
     (Lie::ConflictAsError, "atomic: "),
     (Lie::EagerPuts, "atomic: "),
@@ -57,6 +61,8 @@ const CAUGHT_IN: [(Lie, &str); 22] = [
     (Lie::StopAtFirstFailure, "fails_after_write: "),
     (Lie::ExpectBumps, "expect_shared: "),
     (Lie::TableVersion, "disjoint: "),
+    (Lie::ConsumeSweepsSibling, "isolated: "),
+    (Lie::UpdateRewritesSibling, "isolated: "),
     (Lie::NoAppliedId, "reapply: "),
     (Lie::IdAfterGuards, "reapply: "),
     (Lie::RecordsConflictedId, "conflict_not_applied: "),
@@ -287,6 +293,18 @@ impl Store<K, u16> for Liar {
                 .collect();
             expected.iter().for_each(|k| self.bump(k));
         }
+        if lie == Lie::ConsumeSweepsSibling {
+            for k in &consumes {
+                self.rows.remove(&K(k.0 ^ 1));
+            }
+        }
+        if lie == Lie::UpdateRewritesSibling
+            && puts.contains(&K(0))
+            && !creates.contains(&K(0))
+            && let Some(row) = self.rows.get_mut(&K(1))
+        {
+            row.0 = u16::MAX;
+        }
         if lie != Lie::NoAppliedId {
             self.applied.insert(effect.id(), keys);
         }
@@ -306,4 +324,168 @@ impl Store<K, u16> for Liar {
 )]
 fn mint(effect: &Effect<K, u16>) -> Receipt {
     effect.host_applied()
+}
+
+type Backing = Arc<Mutex<MemStore<K, u16>>>;
+
+// every handle shares one backing store; the lock is the transaction
+struct Shared(Backing);
+
+impl Shared {
+    fn lock(&self) -> MutexGuard<'_, MemStore<K, u16>> {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+impl Store<K, u16> for Shared {
+    type Error = Fault;
+
+    fn load(&mut self, keys: &[K], now: UnixTime) -> Result<Rows<K, u16>, Fault> {
+        self.lock().load(keys, now)
+    }
+
+    fn apply(
+        &mut self,
+        effect: &Effect<K, u16>,
+        now: UnixTime,
+    ) -> Result<Result<Receipt, Conflict<K>>, Fault> {
+        self.lock().apply(effect, now)
+    }
+}
+
+#[test]
+fn a_shared_memstore_consumes_once() {
+    let backing = Backing::default();
+    store_conformance_shared(|| Shared(backing.clone()), K, u16::from);
+}
+
+#[derive(Default)]
+struct Table {
+    rows: BTreeMap<K, (u16, Version)>,
+    writes: u64,
+}
+
+type SharedTable = Arc<Mutex<Table>>;
+
+// holds each arrival until RACERS have come, or gives up after a while so a stray early conflict fails the
+// test instead of hanging it; arrivals add up across the rounds of one test
+#[derive(Default)]
+struct Window {
+    arrived: Mutex<usize>,
+    gate: Condvar,
+}
+
+impl Window {
+    fn wait(&self) {
+        let mut arrived = self.arrived.lock().unwrap_or_else(PoisonError::into_inner);
+        *arrived += 1;
+        let release = arrived.div_ceil(RACERS) * RACERS;
+        if *arrived >= release {
+            self.gate.notify_all();
+            return;
+        }
+        let _ = self
+            .gate
+            .wait_timeout_while(arrived, Duration::from_secs(10), |n| *n < release);
+    }
+}
+
+// the READ COMMITTED failure for one kind of racing effect: its guards are checked in one transaction and its
+// writes land in the next, with every racer between the two so the interleaving is certain; every other effect,
+// the seeding creates included, is atomic
+#[derive(Clone, Copy)]
+enum Racy {
+    Consume,
+    Update,
+    Delete,
+}
+
+struct CheckThenWrite {
+    table: SharedTable,
+    window: Arc<Window>,
+    racy: Racy,
+}
+
+impl CheckThenWrite {
+    fn rows(&self) -> MutexGuard<'_, Table> {
+        self.table.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn races(&self, effect: &Effect<K, u16>) -> bool {
+        let unchanged = effect.guards().any(|g| matches!(g, Guard::Unchanged(..)));
+        match self.racy {
+            Racy::Consume => effect.guards().any(|g| matches!(g, Guard::Consume(_))),
+            Racy::Update => unchanged && effect.puts().next().is_some(),
+            Racy::Delete => {
+                unchanged && effect.deletes().next().is_some() && effect.puts().next().is_none()
+            }
+        }
+    }
+}
+
+impl Store<K, u16> for CheckThenWrite {
+    type Error = Fault;
+
+    fn load(&mut self, keys: &[K], _now: UnixTime) -> Result<Rows<K, u16>, Fault> {
+        let table = self.rows();
+        let mut rows = Rows::new();
+        for k in keys {
+            rows.insert(k.clone(), table.rows.get(k).map(|&(r, v)| Row::new(r, v)));
+        }
+        Ok(rows)
+    }
+
+    fn apply(
+        &mut self,
+        effect: &Effect<K, u16>,
+        _now: UnixTime,
+    ) -> Result<Result<Receipt, Conflict<K>>, Fault> {
+        let mut table = self.rows();
+        if let Err(conflict) = effect.check(|k| table.rows.get(k).map(|row| row.1)) {
+            return Ok(Err(conflict));
+        }
+        if self.races(effect) {
+            drop(table);
+            self.window.wait();
+            table = self.rows();
+        }
+        for k in effect.deletes() {
+            table.rows.remove(k);
+        }
+        for (k, &r, _) in effect.puts() {
+            table.writes += 1;
+            let version = Version::new(table.writes);
+            table.rows.insert(k.clone(), (r, version));
+        }
+        Ok(Ok(mint(effect)))
+    }
+}
+
+#[test]
+fn a_check_then_write_store_double_spends_in_each_round() {
+    for (racy, case) in [
+        (Racy::Consume, "shared_consume: "),
+        (Racy::Update, "shared_update: "),
+        (Racy::Delete, "shared_delete: "),
+    ] {
+        let (table, window) = (SharedTable::default(), Arc::new(Window::default()));
+        let outcome = std::panic::catch_unwind(|| {
+            store_conformance_shared(
+                || CheckThenWrite {
+                    table: table.clone(),
+                    window: window.clone(),
+                    racy,
+                },
+                K,
+                u16::from,
+            );
+        });
+        let message = outcome.err().and_then(|p| p.downcast::<String>().ok());
+        assert!(
+            message
+                .as_deref()
+                .is_some_and(|m| m.contains(&format!("{case}exactly one racer wins the row"))),
+            "{case}want more than one winner, got {message:?}"
+        );
+    }
 }

@@ -25,7 +25,7 @@ impl StoreKey for Key {
     }
 }
 
-/// A stored row, as opaque versioned bytes through the codec factor-04 lands.
+/// A stored row, as opaque versioned bytes through [`Record::encode`] and `decode`.
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Record {
