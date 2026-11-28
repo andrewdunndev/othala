@@ -7,6 +7,8 @@ writes <out-dir>/jose-derived/{header,keys,jwks,claims,thumbprint,limits}.json.
 Deterministic: HS256 MACs use the RFC 7515 A.1 key, short RSA moduli come from fixed seeds. Every case
 names the spec section it follows in `spec`. `expect.kind` appears only where the architecture contract
 or a ruling names the refusal class; elsewhere a refusal is only `ok: false`.
+`expect.kind_without_es512` is the refusal when the `es512` feature is off and the case's P-521 key cannot be
+parsed at all (CONTRACT R16, R50); a test built without `es512` takes it in place of `kind`.
 Licence of this script: MIT OR Apache-2.0.
 """
 import base64, hashlib, hmac, json, os, sys
@@ -106,7 +108,9 @@ def weak_rsa(bits, seed):
 
 
 def keys():
-    k = lambda cid, spec, alg, jwk, expect: case(cid, spec, expect, op="jwk_verify_key", alg=alg, jwk=jwk)
+    # a P-521 key that is refused is refused whole as UnsupportedAlg when `es512` is off (CONTRACT R16, R50)
+    off521 = lambda jwk, e: {**e, "kind_without_es512": "UnsupportedAlg"} if jwk.get("crv") == "P-521" and not e["ok"] else e
+    k = lambda cid, spec, alg, jwk, expect: case(cid, spec, off521(jwk, expect), op="jwk_verify_key", alg=alg, jwk=jwk)
     off = dict(P256, y=b64(bytes([unb64(P256["y"])[0] ^ 1]) + unb64(P256["y"])[1:]))
     short_x = dict(P256, x=b64(unb64(P256["x"])[1:]))
     zero = dict(P256, x=b64(bytes(32)), y=b64(bytes(32)))

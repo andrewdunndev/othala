@@ -45,7 +45,8 @@
    "spec": "RFC 7518 3.4 and RFC 8725 3.1",
    "expect": {
     "ok": false,
-    "kind": "AlgMismatch"
+    "kind": "AlgMismatch",
+    "kind_without_es512": "UnsupportedAlg"
    }
   },
   {

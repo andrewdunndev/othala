@@ -745,6 +745,7 @@ mod tests {
     struct Expect {
         ok: bool,
         kind: Option<String>,
+        kind_without_es512: Option<String>,
     }
 
     #[derive(Deserialize)]
@@ -773,13 +774,15 @@ mod tests {
             });
             // `SecretJwk::decode` refuses a non-oct key before any binding, so the vector names `Malformed`;
             // this layer has no such step and binds the key type to the algorithm
-            // with es512 off a P-521 key is refused whole, before any alg comparison
             let kind = if case.id == "hs256-rsa-key" {
                 Some("AlgMismatch")
-            } else if case.id == "es256-p521-key" && !cfg!(feature = "es512") {
-                Some("UnsupportedAlg")
-            } else {
+            } else if cfg!(feature = "es512") {
                 case.expect.kind.as_deref()
+            } else {
+                case.expect
+                    .kind_without_es512
+                    .as_deref()
+                    .or(case.expect.kind.as_deref())
             };
             testkit::vectors::assert_verdict(
                 &outcome,
@@ -792,16 +795,6 @@ mod tests {
                 assert_eq!(
                     parse(jwk.text().as_bytes()).err().map(|e| e.kind()),
                     Some(ErrorKind::UnsupportedAlg)
-                );
-            } else if case.id.ends_with("-key")
-                && !case.expect.ok
-                && (cfg!(feature = "es512") || case.id != "es256-p521-key")
-            {
-                assert_eq!(
-                    outcome.as_ref().err().map(|e| e.kind()),
-                    Some(ErrorKind::AlgMismatch),
-                    "{}",
-                    case.id
                 );
             }
             Outcome::Checked
