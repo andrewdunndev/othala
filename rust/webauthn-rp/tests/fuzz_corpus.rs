@@ -234,13 +234,8 @@ fn manifest_derives_every_seed() -> Result<(), String> {
 /// always tries first.
 #[test]
 fn the_empty_input_is_refused_by_kind() {
-    let empty: [(fn(&[u8]) -> Result<(), ErrorKind>, ErrorKind); 4] = [
-        (attestation_object::check, ErrorKind::Malformed),
-        (authenticator_data::check, ErrorKind::Malformed),
-        (client_data::check, ErrorKind::Malformed),
-        (record::check, ErrorKind::Corrupt),
-    ];
-    for (check, kind) in empty {
-        assert_eq!(check(&[]), Err(kind));
-    }
+    assert_eq!(attestation_object::check(&[]), Err(ErrorKind::Malformed));
+    assert_eq!(authenticator_data::check(&[]), Err(ErrorKind::Malformed));
+    assert_eq!(client_data::check(&[]), Err(ErrorKind::Malformed));
+    assert_eq!(record::check(&[]), Err(ErrorKind::Corrupt));
 }
