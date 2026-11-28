@@ -88,10 +88,24 @@ fn malformed() -> Error {
     ErrorKind::Malformed.into()
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4
+//= type=todo
+//= reason=no test decodes a JWK with a member it does not know
+//# Additional members can be present in the JWK; if not understood by implementations encountering
+//# them, they MUST be ignored.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4
+//# Additional members can be present in the JWK; if not understood by implementations encountering
+//# them, they MUST be ignored.
 /// The public members read as `Cow` so an escaped value decodes (RFC 8259 7); the secret ones stay borrowed, so an
 /// escaped one is refused and no unwiped copy of a secret is made.
 #[derive(Deserialize)]
 struct Raw<'a> {
+    //= https://www.rfc-editor.org/rfc/rfc7517#section-4.1
+    //= type=todo
+    //= reason=no test decodes a JWK without kty
+    //# This member MUST be present in a JWK.
+    //= https://www.rfc-editor.org/rfc/rfc7517#section-4.1
+    //# This member MUST be present in a JWK.
     #[serde(borrow)]
     kty: Cow<'a, str>,
     kid: Option<String>,
@@ -127,6 +141,12 @@ fn bytes(text: Option<&str>) -> Result<SecretBytes, Error> {
         .map_err(|_| malformed())
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7518#section-6.2.1.3
+//# The length of this octet string MUST be the full size of a coordinate for the curve specified in
+//# the "crv" parameter.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-6.2.1.2
+//# The length of this octet string MUST be the full size of a coordinate for the curve specified in
+//# the "crv" parameter.
 /// A member of exactly `len` octets.
 fn field(text: Option<&str>, len: usize) -> Result<SecretBytes, Error> {
     let bytes = bytes(text)?;
@@ -137,6 +157,11 @@ fn field(text: Option<&str>, len: usize) -> Result<SecretBytes, Error> {
     }
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7518#section-6.3.1.2
+//# For instance, when representing the value 65537, the octet sequence to be base64url-encoded MUST
+//# consist of the three octets [1, 0, 1]; the resulting representation for this value is "AQAB".
+//= https://www.rfc-editor.org/rfc/rfc7518#section-2
+//# The octet sequence MUST utilize the minimum number of octets needed to represent the value.
 /// A minimal Base64urlUInt (RFC 7518 section 2): not empty, no leading zero octet.
 fn uint(text: Option<&str>) -> Result<SecretBytes, Error> {
     let bytes = bytes(text)?;
@@ -158,6 +183,12 @@ macro_rules! curve {
         match $r.d {
             None => Key::Public(Public::$v(public)),
             Some(d) => {
+                //= https://www.rfc-editor.org/rfc/rfc7518#section-6.2.2.1
+                //# The length of this octet string MUST be ceiling(log-base-2(n)/8) octets (where n
+                //# is the order of the curve).
+                //= https://www.rfc-editor.org/rfc/rfc7518#section-6.2.2
+                //# In addition to the members used to represent Elliptic Curve public keys, the
+                //# following member MUST be present to represent Elliptic Curve private keys.
                 let d = field(Some(d), $len)?;
                 let secret = $c::SecretKey::from_slice(d.expose()).map_err(|_| malformed())?;
                 if secret.public_key() != public {
@@ -170,6 +201,11 @@ macro_rules! curve {
 }
 
 fn ec(r: &Raw<'_>) -> Result<Key, Error> {
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-6.2.1
+    //# The following member MUST also be present for Elliptic Curve public keys for the three
+    //# curves defined in the following section:
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-6.2.1
+    //# The following members MUST be present for all Elliptic Curve public keys:
     Ok(match r.crv.as_deref().ok_or_else(malformed)? {
         "P-256" => curve!(p256, 32, r, P256),
         "P-384" => curve!(p384, 48, r, P384),
@@ -199,12 +235,20 @@ fn okp(r: &Raw<'_>) -> Result<Key, Error> {
 }
 
 fn rsa(r: &Raw<'_>) -> Result<Key, Error> {
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-6.3.1
+    //# The following members MUST be present for RSA public keys.
     let (n, e) = (uint(r.n.as_deref())?, uint(r.e.as_deref())?);
     // `uint` refuses a leading zero, so this byte bound is the bit bound and no big integer is built past it
     if n.expose().len() > MAX_RSA_BITS / 8 {
         return Err(ErrorKind::TooLarge.into());
     }
     let bits = usize::try_from(big(&n).bit_width_vartime()).unwrap_or(usize::MAX);
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-4.3
+    //# A key of size 2048 bits or larger MUST be used with these algorithms.
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-3.5
+    //# A key of size 2048 bits or larger MUST be used with this algorithm.
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-3.3
+    //# A key of size 2048 bits or larger MUST be used with these algorithms.
     if bits < MIN_RSA_BITS {
         return Err(ErrorKind::WeakKey.into());
     }
@@ -219,6 +263,9 @@ fn rsa(r: &Raw<'_>) -> Result<Key, Error> {
     let private = [r.d, r.p, r.q, r.dp, r.dq, r.qi]
         .iter()
         .any(Option::is_some);
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-6.3.2.7
+    //# If the consumer of a JWK does not support private keys with more than two primes and it
+    //# encounters a private key that includes the "oth" parameter, then it MUST NOT use the key.
     if r.oth.is_some() {
         return Err(ErrorKind::UnsupportedAlg.into());
     }
@@ -227,6 +274,8 @@ fn rsa(r: &Raw<'_>) -> Result<Key, Error> {
             .map(|key| Key::Public(Public::Rsa(key)))
             .map_err(|_| malformed());
     }
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-6.3.2
+    //# The parameter "d" is REQUIRED for RSA private keys.
     let (d, p, q) = (uint(r.d)?, uint(r.p)?, uint(r.q)?);
     rsa::PrivateKey::from_components(big(&n), big(&e), big(&d), vec![big(&p), big(&q)])
         .map(|key| Key::Private(Private::Rsa(key)))
@@ -259,6 +308,8 @@ fn usage(r: &Raw<'_>) -> Result<(Usage, Option<&'static str>, Vec<&'static str>)
             .iter()
             .find(|(name, _)| *name == op)
             .ok_or(ErrorKind::KeyUse)?;
+        //= https://www.rfc-editor.org/rfc/rfc7517#section-4.3
+        //# Duplicate key operation values MUST NOT be present in the array.
         // RFC 7517 4.3: a value MUST NOT be repeated
         if names.contains(name) {
             return Err(ErrorKind::KeyUse.into());
@@ -271,6 +322,9 @@ fn usage(r: &Raw<'_>) -> Result<(Usage, Option<&'static str>, Vec<&'static str>)
         (Some(by_use), 0) => by_use,
         (None, ops) => ops,
         (Some(by_use), ops) if ops & !by_use == 0 => ops,
+        //= https://www.rfc-editor.org/rfc/rfc7517#section-4.3
+        //# The "use" and "key_ops" JWK members SHOULD NOT be used together; however, if both are
+        //# used, the information they convey MUST be consistent.
         (Some(_), _) => return Err(ErrorKind::KeyUse.into()),
     };
     Ok((Usage(bits), use_name, names))
@@ -296,6 +350,16 @@ pub(crate) fn parse(json: &[u8]) -> Result<(Meta, Key), Error> {
     parse_filtered(json, false)?.ok_or_else(malformed)
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4
+//= type=todo
+//= reason=no test decodes a single JWK that names a member twice; a set holding one is tested at set level
+//# The member names within a JWK MUST be unique; JWK parsers MUST either reject JWKs with duplicate
+//# member names or use a JSON parser that returns only the lexically last duplicate member name, as
+//# specified in Section 15.12 (The JSON Object) of ECMAScript 5.1 [ECMAScript].
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4
+//# The member names within a JWK MUST be unique; JWK parsers MUST either reject JWKs with duplicate
+//# member names or use a JSON parser that returns only the lexically last duplicate member name, as
+//# specified in Section 15.12 (The JSON Object) of ECMAScript 5.1 [ECMAScript].
 /// As [`parse`]; with `public_only` a key carrying a private parameter or an `oct` key is `None`, before any is built.
 pub(crate) fn parse_filtered(json: &[u8], public_only: bool) -> Result<Option<(Meta, Key)>, Error> {
     scan(json)?;
@@ -404,6 +468,9 @@ impl Meta {
             SigningAlg::Hs512 => 64,
             _ => 0,
         };
+        //= https://www.rfc-editor.org/rfc/rfc7518#section-3.2
+        //# A key of the same size as the hash output (for instance, 256 bits for "HS256") or larger
+        //# MUST be used with this algorithm.
         if len < floor {
             return Err(ErrorKind::WeakKey.into());
         }
@@ -811,6 +878,33 @@ mod tests {
         assert_eq!((tally.total(), tally.checked()), (40, 26));
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-6.3.2.7
+    //= type=test
+    //# If the consumer of a JWK does not support private keys with more than two primes and it
+    //# encounters a private key that includes the "oth" parameter, then it MUST NOT use the key.
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-6.3.2
+    //= type=test
+    //# The parameter "d" is REQUIRED for RSA private keys.
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-6.3.1.2
+    //= type=test
+    //# For instance, when representing the value 65537, the octet sequence to be base64url-encoded
+    //# MUST consist of the three octets [1, 0, 1]; the resulting representation for this value is
+    //# "AQAB".
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-6.3.1
+    //= type=test
+    //# The following members MUST be present for RSA public keys.
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-4.3
+    //= type=test
+    //# A key of size 2048 bits or larger MUST be used with these algorithms.
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-3.5
+    //= type=test
+    //# A key of size 2048 bits or larger MUST be used with this algorithm.
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-3.3
+    //= type=test
+    //# A key of size 2048 bits or larger MUST be used with these algorithms.
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-2
+    //= type=test
+    //# The octet sequence MUST utilize the minimum number of octets needed to represent the value.
     #[test]
     fn section3_keys() {
         for example in ["3.3", "3.4", "3.5", "3.6"] {
@@ -858,6 +952,14 @@ mod tests {
         );
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-6.2.2.1
+    //= type=test
+    //# The length of this octet string MUST be ceiling(log-base-2(n)/8) octets (where n is the
+    //# order of the curve).
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-6.2.2
+    //= type=test
+    //# In addition to the members used to represent Elliptic Curve public keys, the following
+    //# member MUST be present to represent Elliptic Curve private keys.
     #[test]
     fn private_keys_match_their_public() {
         let bad = Some(ErrorKind::Malformed);

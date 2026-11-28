@@ -96,6 +96,41 @@ fn named(expect: &Expect, outcome: Result<(), jose::Error>, id: &str) {
     );
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7518#section-6.2.1.3
+//= type=test
+//# The length of this octet string MUST be the full size of a coordinate for the curve specified in
+//# the "crv" parameter.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-6.2.1.2
+//= type=test
+//# The length of this octet string MUST be the full size of a coordinate for the curve specified in
+//# the "crv" parameter.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-6.2.1
+//= type=test
+//# The following member MUST also be present for Elliptic Curve public keys for the three curves
+//# defined in the following section:
+//= https://www.rfc-editor.org/rfc/rfc7518#section-6.2.1
+//= type=test
+//# The following members MUST be present for all Elliptic Curve public keys:
+//= https://www.rfc-editor.org/rfc/rfc7518#section-4.3
+//= type=test
+//# A key of size 2048 bits or larger MUST be used with these algorithms.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-3.5
+//= type=test
+//# A key of size 2048 bits or larger MUST be used with this algorithm.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-3.3
+//= type=test
+//# A key of size 2048 bits or larger MUST be used with these algorithms.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-3.2
+//= type=test
+//# A key of the same size as the hash output (for instance, 256 bits for "HS256") or larger MUST be
+//# used with this algorithm.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4.3
+//= type=test
+//# The "use" and "key_ops" JWK members SHOULD NOT be used together; however, if both are used, the
+//# information they convey MUST be consistent.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-4.3
+//= type=test
+//# Duplicate key operation values MUST NOT be present in the array.
 #[test]
 fn key_cases() {
     let tally = run::<Case>(vector!("jose-derived/keys.json"), 40, |case| {
@@ -123,6 +158,17 @@ fn key_cases() {
     assert_eq!((tally.total(), tally.checked()), (40, 40));
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7517#section-5
+//= type=test
+//# The member names within a JWK Set MUST be unique; JWK Set parsers MUST either reject JWK Sets
+//# with duplicate member names or use a JSON parser that returns only the lexically last duplicate
+//# member name, as specified in Section 15.12 ("The JSON Object") of ECMAScript 5.1 [ECMAScript].
+//= https://www.rfc-editor.org/rfc/rfc7517#section-5
+//= type=test
+//# The JSON object MUST have a "keys" member, with its value being an array of JWKs.
+//= https://www.rfc-editor.org/rfc/rfc7517#section-2
+//= type=test
+//# The JSON object MUST have a "keys" member, which is an array of JWKs.
 #[test]
 fn jwk_sets() {
     let tally = run::<Case>(vector!("jose-derived/jwks.json"), 13, |case| {

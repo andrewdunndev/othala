@@ -1,0 +1,112 @@
+{
+ "rfc": 7517,
+ "source": "https://www.rfc-editor.org/rfc/rfc7517.txt",
+ "sha256": "681c19b92a85068716b7e89c5815aa821bd3f11c755ff1c641b40ae9851bb33c",
+ "licence": "IETF Trust (quoted RFC text)",
+ "requirements": [
+  {
+   "section": "2",
+   "text": "The JSON object MUST have a \"keys\" member, which is an array of JWKs."
+  },
+  {
+   "section": "4",
+   "text": "The member names within a JWK MUST be unique; JWK parsers MUST either reject JWKs with duplicate member names or use a JSON parser that returns only the lexically last duplicate member name, as specified in Section 15.12 (The JSON Object) of ECMAScript 5.1 [ECMAScript]."
+  },
+  {
+   "section": "4",
+   "text": "Additional members can be present in the JWK; if not understood by implementations encountering them, they MUST be ignored."
+  },
+  {
+   "section": "4.1",
+   "text": "This member MUST be present in a JWK."
+  },
+  {
+   "section": "4.3",
+   "text": "Duplicate key operation values MUST NOT be present in the array."
+  },
+  {
+   "section": "4.3",
+   "text": "The \"use\" and \"key_ops\" JWK members SHOULD NOT be used together; however, if both are used, the information they convey MUST be consistent."
+  },
+  {
+   "section": "4.6",
+   "text": "The identified resource MUST provide a representation of the certificate or certificate chain that conforms to RFC 5280 [RFC5280] in PEM-encoded form, with each certificate delimited as specified in Section 6.1 of RFC 4945 [RFC4945]."
+  },
+  {
+   "section": "4.6",
+   "text": "The key in the first certificate MUST match the public key represented by other members of the JWK."
+  },
+  {
+   "section": "4.6",
+   "text": "The protocol used to acquire the resource MUST provide integrity protection; an HTTP GET request to retrieve the certificate MUST use TLS [RFC2818] [RFC5246]; the identity of the server MUST be validated, as per Section 6 of RFC 6125 [RFC6125]."
+  },
+  {
+   "section": "4.6",
+   "text": "If other members are present, the contents of those members MUST be semantically consistent with the related fields in the first certificate."
+  },
+  {
+   "section": "4.6",
+   "text": "For instance, if the \"use\" member is present, then it MUST correspond to the usage that is specified in the certificate, when it includes this information."
+  },
+  {
+   "section": "4.6",
+   "text": "Similarly, if the \"alg\" member is present, it MUST correspond to the algorithm specified in the certificate."
+  },
+  {
+   "section": "4.7",
+   "text": "The PKIX certificate containing the key value MUST be the first certificate."
+  },
+  {
+   "section": "4.7",
+   "text": "The key in the first certificate MUST match the public key represented by other members of the JWK."
+  },
+  {
+   "section": "4.7",
+   "text": "If other members are present, the contents of those members MUST be semantically consistent with the related fields in the first certificate."
+  },
+  {
+   "section": "4.8",
+   "text": "The key in the certificate MUST match the public key represented by other members of the JWK."
+  },
+  {
+   "section": "4.8",
+   "text": "If other members are present, the contents of those members MUST be semantically consistent with the related fields in the referenced certificate."
+  },
+  {
+   "section": "4.9",
+   "text": "The key in the certificate MUST match the public key represented by other members of the JWK."
+  },
+  {
+   "section": "4.9",
+   "text": "If other members are present, the contents of those members MUST be semantically consistent with the related fields in the referenced certificate."
+  },
+  {
+   "section": "5",
+   "text": "The JSON object MUST have a \"keys\" member, with its value being an array of JWKs."
+  },
+  {
+   "section": "5",
+   "text": "The member names within a JWK Set MUST be unique; JWK Set parsers MUST either reject JWK Sets with duplicate member names or use a JSON parser that returns only the lexically last duplicate member name, as specified in Section 15.12 (\"The JSON Object\") of ECMAScript 5.1 [ECMAScript]."
+  },
+  {
+   "section": "5",
+   "text": "Additional members can be present in the JWK Set; if not understood by implementations encountering them, they MUST be ignored."
+  },
+  {
+   "section": "7",
+   "text": "Access to JWKs containing non-public key material by parties without legitimate access to the non-public information MUST be prevented."
+  },
+  {
+   "section": "7",
+   "text": "A \"cty\" (content type) Header Parameter value of \"jwk+json\" MUST be used to indicate that the content of the JWE is a JWK, unless the application knows that the encrypted content is a JWK by another means or convention, in which case the \"cty\" value would typically be omitted."
+  },
+  {
+   "section": "7",
+   "text": "A \"cty\" (content type) Header Parameter value of \"jwk-set+json\" MUST be used to indicate that the content of the JWE is a JWK Set, unless the application knows that the encrypted content is a JWK Set by another means or convention, in which case the \"cty\" value would typically be omitted."
+  },
+  {
+   "section": "9.2",
+   "text": "Private and symmetric keys MUST be protected from disclosure to unintended parties."
+  }
+ ]
+}

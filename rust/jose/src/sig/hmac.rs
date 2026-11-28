@@ -45,6 +45,14 @@ macro_rules! hs {
                     return Err(ErrorKind::AlgMismatch.into());
                 };
                 mac::<$hash>(key.expose(), input)?
+                    //= https://www.rfc-editor.org/rfc/rfc7518#section-3.2
+                    //= type=todo
+                    //= reason=the hmac crate compares in constant time (NC2); no test can observe timing, so it is held by review
+                    //# The comparison of the computed HMAC value to the JWS Signature value MUST be
+                    //# done in a constant-time manner to thwart timing attacks.
+                    //= https://www.rfc-editor.org/rfc/rfc7518#section-3.2
+                    //# The comparison of the computed HMAC value to the JWS Signature value MUST be
+                    //# done in a constant-time manner to thwart timing attacks.
                     .verify_slice(signature)
                     .map_err(|_| ErrorKind::BadSignature.into())
             }

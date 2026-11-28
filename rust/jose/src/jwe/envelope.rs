@@ -185,10 +185,22 @@ fn fixed<const N: usize>(text: Option<&str>) -> Result<Option<[u8; N]>, Error> {
 
 /// A header object: `zip` is refused (`null` or any non-string is `Malformed`, RFC 7516 4.1.3), and the `epk`, `iv`, `tag`, `apu` and `apv` are decoded.
 fn read(json: &[u8]) -> Result<Header, Error> {
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-4
+    //# The Header Parameter names within the JOSE Header MUST be unique, just as described in
+    //# Section 4 of [JWS].
     scan(json)?;
     let fields: Fields<'_> = serde_json::from_slice(json).map_err(|_| malformed())?;
     let names: BTreeMap<String, IgnoredAny> =
         serde_json::from_slice(json).map_err(|_| malformed())?;
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-4.1.3
+    //= type=exception
+    //= reason=zip is recognised and refused, never processed: no compression is implemented; non-goal N4 (R51)
+    //# This Header Parameter MUST be understood and processed by implementations.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-4.1.3
+    //= type=exception
+    //= reason=zip is refused in every header, protected or not, so it is never accepted outside the protected header; non-goal N4 (R51)
+    //# When used, this Header Parameter MUST be integrity protected; therefore, it MUST occur only
+    //# within the JWE Protected Header.
     if fields.zip.is_some() {
         return Err(ErrorKind::UnsupportedAlg.into());
     }
@@ -197,6 +209,10 @@ fn read(json: &[u8]) -> Result<Header, Error> {
         .map(|raw| parse(raw.get().as_bytes()))
         .transpose()?
     {
+        //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6.1.1
+        //# It MUST contain only public key parameters and SHOULD contain only the minimum JWK
+        //# parameters necessary to represent the key; other JWK parameters included can be checked
+        //# for consistency and honored, or they can be ignored.
         Some((_, Key::Public(key))) => Some(Arc::new(key)),
         Some(_) => return Err(malformed()),
         None => None,
@@ -215,7 +231,12 @@ fn read(json: &[u8]) -> Result<Header, Error> {
             .map(bytes)
             .transpose()?
             .unwrap_or_default(),
+        //= https://www.rfc-editor.org/rfc/rfc7518#section-4.7
+        //# Use of an Initialization Vector (IV) of size 96 bits is REQUIRED with this algorithm.
         iv: fixed(fields.iv.as_deref())?,
+        //= https://www.rfc-editor.org/rfc/rfc7518#section-4.7
+        //# The requested size of the Authentication Tag output MUST be 128 bits, regardless of the
+        //# key size.
         tag: fixed(fields.tag.as_deref())?,
     };
     let fields = Fields {
@@ -251,6 +272,15 @@ fn merge(
         own.unwrap_or(&blank),
     );
     let all = [protected, shared, own];
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //# The Header Parameter names in the three locations MUST be disjoint.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-5.2
+    //# When using the JWE JSON Serialization, this restriction includes that the same Header
+    //# Parameter name also MUST NOT occur in distinct JSON object values that together comprise the
+    //# JOSE Header.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-4
+    //# The Header Parameter names within the JOSE Header MUST be unique, just as described in
+    //# Section 4 of [JWS].
     let clash = all.iter().enumerate().any(|(i, a)| {
         all.iter()
             .skip(i + 1)
@@ -264,6 +294,9 @@ fn merge(
         &protected.names,
         shared.fields.crit.is_some() || own.fields.crit.is_some(),
     )?;
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-4.1.2
+    //# This Header Parameter MUST be present and MUST be understood and processed by
+    //# implementations.
     let enc = all
         .iter()
         .find_map(|header| header.fields.enc.clone())
@@ -297,6 +330,17 @@ fn merge(
             tag: params.tag.or(given.tag),
         };
     }
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //# At least one of the "header", "protected", and "unprotected" members MUST be present so that
+    //# "alg" and "enc" Header Parameter values are conveyed for each recipient computation.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-3.2
+    //= type=todo
+    //= reason=no test parses a JWE JSON serialization that holds none of the three headers
+    //# In the JWE JSON Serialization, one or more of the JWE Protected Header, JWE Shared
+    //# Unprotected Header, and JWE Per-Recipient Unprotected Header MUST be present.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-3.2
+    //# In the JWE JSON Serialization, one or more of the JWE Protected Header, JWE Shared
+    //# Unprotected Header, and JWE Per-Recipient Unprotected Header MUST be present.
     let alg = alg.ok_or_else(malformed)?;
     let recipient = Recipient {
         alg,
@@ -337,12 +381,26 @@ struct Entry<'a> {
     encrypted_key: Option<&'a str>,
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+//= type=todo
+//= reason=no test parses a JWE JSON serialization with a member it does not know
+//# Additional members can be present in both the JSON objects defined above; if not understood by
+//# implementations encountering them, they MUST be ignored.
+//= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+//# Additional members can be present in both the JSON objects defined above; if not understood by
+//# implementations encountering them, they MUST be ignored.
 #[derive(Deserialize)]
 struct Document<'a> {
     protected: Option<&'a str>,
     unprotected: Option<&'a RawValue>,
     header: Option<&'a RawValue>,
     encrypted_key: Option<&'a str>,
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //= type=todo
+    //= reason=no test parses a recipients member that is not an array of objects
+    //# recipients The "recipients" member value MUST be an array of JSON objects.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //# recipients The "recipients" member value MUST be an array of JSON objects.
     recipients: Option<Capped<Entry<'a>>>,
     aad: Option<&'a str>,
     iv: &'a str,
@@ -386,9 +444,14 @@ impl<'a> Jwe<'a> {
     /// Parses the general (`recipients`) or flattened JSON serialization; more than `MAX_ENTRIES` recipients is
     /// `TooLarge`.
     pub fn parse_json(json: &'a [u8]) -> Result<Self, Error> {
+        //= https://www.rfc-editor.org/rfc/rfc7516#section-4
+        //# The Header Parameter names within the JOSE Header MUST be unique, just as described in
+        //# Section 4 of [JWS].
         scan(json)?;
         let document: Document<'a> = serde_json::from_slice(json).map_err(|_| malformed())?;
         let entries = match document.recipients {
+            //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.2
+            //# The "recipients" member MUST NOT be present when using this syntax.
             Some(entries) if document.header.is_none() && document.encrypted_key.is_none() => {
                 entries.0
             }
@@ -424,6 +487,13 @@ impl<'a> Jwe<'a> {
                 .map(|raw| read(raw.get().as_bytes()))
                 .transpose()?;
             let (found, mut recipient, kid) = merge(first.as_ref(), shared.as_ref(), own.as_ref())?;
+            //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+            //# This primarily means that the "enc" (encryption algorithm) Header Parameter value in
+            //# the JOSE Header for each recipient and any parameters of that algorithm MUST be the
+            //# same.
+            //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+            //# Therefore, all Header Parameters that specify the treatment of the plaintext value
+            //# MUST be the same for all recipients.
             if enc.as_ref().is_some_and(|held| *held != found) {
                 return Err(malformed());
             }
@@ -492,6 +562,9 @@ impl<'a> Jwe<'a> {
         alg: &str,
         mut unwrap: impl FnMut(&Recipient) -> Result<SecretBytes, Error>,
     ) -> Result<Plaintext, Error> {
+        //= https://www.rfc-editor.org/rfc/rfc7516#section-4.1.2
+        //# This Header Parameter MUST be present and MUST be understood and processed by
+        //# implementations.
         if self.enc != E::ENC.name() {
             return Err(ErrorKind::AlgMismatch.into());
         }
@@ -523,6 +596,12 @@ impl<'a> Jwe<'a> {
                 return Ok(Plaintext { content, aad });
             }
         }
+        //= https://www.rfc-editor.org/rfc/rfc7516#section-5.2
+        //# If there was no recipient for which all of the decryption steps succeeded, then the JWE
+        //# MUST be considered invalid.
+        //= https://www.rfc-editor.org/rfc/rfc7516#section-5.2
+        //# However, in all cases, the encrypted content for at least one recipient MUST
+        //# successfully validate or the JWE MUST be considered invalid.
         Err(if named {
             ErrorKind::Decrypt
         } else {
@@ -566,6 +645,20 @@ impl<K: KeyAlg> EncryptKey<K> {
         self.seal::<E>(jwt.as_str().as_bytes(), e, true)
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7517#section-7
+    //= type=exception
+    //= reason=no jose API encrypts a JWK or JWK Set (encrypt takes opaque bytes) and the only cty it issues is JWT for a nested token (R60)
+    //# A "cty" (content type) Header Parameter value of "jwk-set+json" MUST be used to indicate
+    //# that the content of the JWE is a JWK Set, unless the application knows that the encrypted
+    //# content is a JWK Set by another means or convention, in which case the "cty" value would
+    //# typically be omitted.
+    //= https://www.rfc-editor.org/rfc/rfc7517#section-7
+    //= type=exception
+    //= reason=no jose API encrypts a JWK or JWK Set (encrypt takes opaque bytes) and the only cty it issues is JWT for a nested token (R60)
+    //# A "cty" (content type) Header Parameter value of "jwk+json" MUST be used to indicate that
+    //# the content of the JWE is a JWK, unless the application knows that the encrypted content is
+    //# a JWK by another means or convention, in which case the "cty" value would typically be
+    //# omitted.
     fn seal<E: Enc>(
         &self,
         plaintext: &[u8],
@@ -674,6 +767,9 @@ mod tests {
         MAX_ENTRIES, MAX_JSON_LEN, SecretJwk,
     };
 
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-4.1.2
+    //= type=test
+    //# This algorithm MUST be an AEAD algorithm with a specified key length.
     #[test]
     fn names() {
         let algs = [
@@ -811,6 +907,14 @@ mod tests {
         );
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //= type=test
+    //# This primarily means that the "enc" (encryption algorithm) Header Parameter value in the
+    //# JOSE Header for each recipient and any parameters of that algorithm MUST be the same.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //= type=test
+    //# Therefore, all Header Parameters that specify the treatment of the plaintext value MUST be
+    //# the same for all recipients.
     #[test]
     fn recipients_that_disagree_on_enc_are_malformed() {
         let entry = |enc: &str| format!(r#"{{"header":{{"alg":"dir","enc":"{enc}"}}}}"#);
@@ -831,6 +935,26 @@ mod tests {
         format!("{}..AA.AA.AA", b64url_encode(header.as_bytes()))
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-4.7
+    //= type=test
+    //# The requested size of the Authentication Tag output MUST be 128 bits, regardless of the key
+    //# size.
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-4.7
+    //= type=test
+    //# Use of an Initialization Vector (IV) of size 96 bits is REQUIRED with this algorithm.
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-4.6.1.1
+    //= type=test
+    //# It MUST contain only public key parameters and SHOULD contain only the minimum JWK
+    //# parameters necessary to represent the key; other JWK parameters included can be checked for
+    //# consistency and honored, or they can be ignored.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-4.1.2
+    //= type=test
+    //# This Header Parameter MUST be present and MUST be understood and processed by
+    //# implementations.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-4
+    //= type=test
+    //# The Header Parameter names within the JOSE Header MUST be unique, just as described in
+    //# Section 4 of [JWS].
     #[test]
     fn header_refusals() {
         assert_eq!(kind(&compact(r#"{"alg":"dir","enc":"A128GCM"}"#)), None);
@@ -918,6 +1042,25 @@ mod tests {
         Jwe::parse_json(json.as_bytes()).err().map(|e| e.kind())
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.2
+    //= type=test
+    //# The "recipients" member MUST NOT be present when using this syntax.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //= type=test
+    //# The Header Parameter names in the three locations MUST be disjoint.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //= type=test
+    //# At least one of the "header", "protected", and "unprotected" members MUST be present so that
+    //# "alg" and "enc" Header Parameter values are conveyed for each recipient computation.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-5.2
+    //= type=test
+    //# When using the JWE JSON Serialization, this restriction includes that the same Header
+    //# Parameter name also MUST NOT occur in distinct JSON object values that together comprise the
+    //# JOSE Header.
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-4
+    //= type=test
+    //# The Header Parameter names within the JOSE Header MUST be unique, just as described in
+    //# Section 4 of [JWS].
     #[test]
     fn json_forms() {
         let protected = b64url_encode(br#"{"enc":"A128GCM"}"#);

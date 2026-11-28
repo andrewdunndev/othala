@@ -72,6 +72,9 @@ macro_rules! oaep {
                 enc: JweEnc,
                 e: &mut dyn Entropy,
             ) -> SecretBytes {
+                //= https://www.rfc-editor.org/rfc/rfc7516#section-11.5
+                //# To mitigate the attacks described in RFC 3218 [RFC3218], the recipient MUST NOT
+                //# distinguish between format, padding, and length errors of encrypted keys.
                 let opened = Self::open(key, encrypted_key, &mut *e)
                     .filter(|cek| cek.len() == enc.cek_len());
                 // one path: the substitute is drawn whether or not it is used
@@ -198,6 +201,10 @@ mod tests {
         );
     }
 
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-11.5
+    //= type=test
+    //# To mitigate the attacks described in RFC 3218 [RFC3218], the recipient MUST NOT distinguish
+    //# between format, padding, and length errors of encrypted keys.
     /// An OAEP failure and a success both return a key of the right length, and the failure's is the entropy's.
     #[test]
     fn one_path() {

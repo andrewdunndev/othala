@@ -89,6 +89,9 @@ macro_rules! aes_kw {
                     $len,
                 )?;
                 let kw = <$kw>::new_from_slice(key.expose()).map_err(|_| ErrorKind::WeakKey)?;
+                //= https://www.rfc-editor.org/rfc/rfc7516#section-5.1
+                //# The CEK MUST have a length equal to that required for the content encryption
+                //# algorithm.
                 let cek = fresh(e, enc.cek_len());
                 let mut wrapped = vec![0; enc.cek_len() + 8];
                 kw.wrap_key(cek.expose(), &mut wrapped)
@@ -196,6 +199,22 @@ macro_rules! gcm_kw {
                 )?;
                 let cipher =
                     AesGcm::<$cipher, U12>::new_from_slice(key.expose()).map_err(|_| decrypt())?;
+                //= https://www.rfc-editor.org/rfc/rfc7518#section-4.7.1.2
+                //= type=todo
+                //= reason=no test decrypts an A*GCMKW token whose tag member is absent; the RFC 7520 A256GCMKW vector proves it is processed
+                //# This Header Parameter MUST be present and MUST be understood and processed by
+                //# implementations when these algorithms are used.
+                //= https://www.rfc-editor.org/rfc/rfc7518#section-4.7.1.2
+                //# This Header Parameter MUST be present and MUST be understood and processed by
+                //# implementations when these algorithms are used.
+                //= https://www.rfc-editor.org/rfc/rfc7518#section-4.7.1.1
+                //= type=todo
+                //= reason=no test decrypts an A*GCMKW token whose iv member is absent; the RFC 7520 A256GCMKW vector proves it is processed
+                //# This Header Parameter MUST be present and MUST be understood and processed by
+                //# implementations when these algorithms are used.
+                //= https://www.rfc-editor.org/rfc/rfc7518#section-4.7.1.1
+                //# This Header Parameter MUST be present and MUST be understood and processed by
+                //# implementations when these algorithms are used.
                 let (Some(iv), Some(tag)) = (params.iv, params.tag) else {
                     return Err(decrypt());
                 };

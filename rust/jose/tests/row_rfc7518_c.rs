@@ -29,6 +29,18 @@ fn epk(public: &Json) -> String {
     public.text().to_owned()
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7518#section-4.6.1.3
+//= type=test
+//# This Header Parameter MUST be understood and processed by implementations when these algorithms
+//# are used.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-4.6.1.2
+//= type=test
+//# This Header Parameter MUST be understood and processed by implementations when these algorithms
+//# are used.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-4.6
+//= type=test
+//# In Direct Key Agreement mode, the output of the Concat KDF MUST be a key of the same length as
+//# that used by the "enc" algorithm.
 #[test]
 fn appendix_c() {
     let tally = run::<Case>(vector!("rfc7518/appendix-c.json"), 3, |case| {

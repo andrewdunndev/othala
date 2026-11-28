@@ -43,6 +43,15 @@ fn decrypt() -> Error {
     ErrorKind::Decrypt.into()
 }
 
+//= https://www.rfc-editor.org/rfc/rfc7518#section-8.4
+//= type=exception
+//= reason=a dir or A*GCMKW key used with random 96-bit IVs is limited to 2^32 messages, and rotating it and never repeating an entropy draw is the host's (O6, O1)
+//# An IV value MUST NOT ever be used multiple times with the same AES GCM key.
+//= https://www.rfc-editor.org/rfc/rfc7518#section-8.4
+//= type=exception
+//= reason=a dir or A*GCMKW key used with random 96-bit IVs is limited to 2^32 messages, and rotating it and never repeating an entropy draw is the host's (O6, O1)
+//# In accordance with this rule, AES GCM MUST NOT be used with the same key value more than 2^32
+//# times.
 macro_rules! gcm {
     ($marker:ident, $cipher:ty, $enc:ident, $key:literal) => {
         impl Enc for $marker {
@@ -50,6 +59,8 @@ macro_rules! gcm {
         }
         impl sealed::Enc for $marker {
             const CEK_LEN: usize = $key;
+            //= https://www.rfc-editor.org/rfc/rfc7518#section-5.3
+            //# Use of an IV of size 96 bits is REQUIRED with this algorithm.
             const IV_LEN: usize = 12;
 
             fn seal(
@@ -75,10 +86,16 @@ macro_rules! gcm {
                 ciphertext: &[u8],
                 tag: &[u8],
             ) -> Result<SecretBytes, Error> {
+                //= https://www.rfc-editor.org/rfc/rfc7516#section-5.2
+                //# The CEK MUST have a length equal to that required for the content encryption
+                //# algorithm.
                 let cipher =
                     AesGcm::<$cipher, U12>::new_from_slice(cek.expose()).map_err(|_| decrypt())?;
                 let (nonce, tag) = (
                     iv.try_into().map_err(|_| decrypt())?,
+                    //= https://www.rfc-editor.org/rfc/rfc7518#section-5.3
+                    //# The requested size of the Authentication Tag output MUST be 128 bits,
+                    //# regardless of the key size.
                     tag.try_into().map_err(|_| decrypt())?,
                 );
                 let mut buffer = ciphertext.to_vec();
@@ -129,6 +146,9 @@ macro_rules! cbc_hmac {
             ) -> Result<(Vec<u8>, Vec<u8>), Error> {
                 let (mac_key, enc_key) = cek
                     .expose()
+                    //= https://www.rfc-editor.org/rfc/rfc7518#section-5.2.2.1
+                    //# The number of octets in the input key K MUST be the sum of MAC_KEY_LEN and
+                    //# ENC_KEY_LEN.
                     .split_at_checked($key / 2)
                     .ok_or(ErrorKind::WeakKey)?;
                 let encryptor = cbc::Encryptor::<$cipher>::new_from_slices(enc_key, iv)
@@ -449,5 +469,49 @@ mod tests {
         tag_first_for::<A128CbcHs256, Sha256>();
         tag_first_for::<A192CbcHs384, Sha384>();
         tag_first_for::<A256CbcHs512, Sha512>();
+    }
+
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-5.3
+    //= type=test
+    //# The requested size of the Authentication Tag output MUST be 128 bits, regardless of the
+    //# key size.
+    //= https://www.rfc-editor.org/rfc/rfc7518#section-5.3
+    //= type=test
+    //# Use of an IV of size 96 bits is REQUIRED with this algorithm.
+    #[test]
+    fn gcm_tag_and_iv_are_exactly_128_and_96_bits() {
+        fn check<E: Sealed>() {
+            let cek = SecretBytes::new(vec![7; E::CEK_LEN]);
+            let (iv, aad) = (vec![9; E::IV_LEN], b"aad".to_vec());
+            let (ciphertext, tag) = E::seal(&cek, &iv, &aad, b"attack at dawn").unwrap_or_default();
+            assert_eq!(tag.len(), 16);
+            let open = |tag: &[u8]| {
+                E::open(&cek, &iv, &aad, &ciphertext, tag)
+                    .err()
+                    .map(|e| e.kind())
+            };
+            assert_eq!(open(&tag), None);
+            assert_eq!(open(&tag[..15]), Some(ErrorKind::Decrypt));
+            assert_eq!(
+                open(&[tag.clone(), vec![0]].concat()),
+                Some(ErrorKind::Decrypt)
+            );
+            assert_eq!(open(&[]), Some(ErrorKind::Decrypt));
+            assert_eq!(iv.len(), 12);
+            let with_iv = |iv: &[u8]| {
+                E::open(&cek, iv, &aad, &ciphertext, &tag)
+                    .err()
+                    .map(|e| e.kind())
+            };
+            assert_eq!(with_iv(&iv), None);
+            assert_eq!(with_iv(&iv[..11]), Some(ErrorKind::Decrypt));
+            assert_eq!(
+                with_iv(&[iv.clone(), vec![0]].concat()),
+                Some(ErrorKind::Decrypt)
+            );
+        }
+        check::<A128Gcm>();
+        check::<A192Gcm>();
+        check::<A256Gcm>();
     }
 }
