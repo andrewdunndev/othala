@@ -120,6 +120,7 @@ Checks:
 - R65 `SigningAlg`, `JweAlg` and `JweEnc` parse exactly their registry names, case-sensitively, and `name` round-trips through `Serialize` and `Deserialize`; `none`, `RSA1_5`, `PBES2-HS256+A128KW`, `ES256K`, `Ed25519` and `DEF` are `UnsupportedAlg`: unit:jws::header::names, unit:jwe::envelope::names, vec:rfc7516/jwe.json#a2-rsa1_5-a128cbc-hs256-must-refuse, row:rfc7516.
 
 ## Runtime: spec trace
+- R67 In a JOSE JSON document a member that is present with the value `null` is `Malformed`, never an absent member (RFC 7515 4.1, 7516 7.2.1 and 7517 4 type each member as a string, object or array): every member of a JWS or JWE header, of the JWS and JWE JSON `Document` and per-signature or per-recipient `Entry`, and of a JWK; R10, R11 and R51 are this rule for `crit`, `b64` and `zip`, and the member omitted is still absent: unit:jwe::envelope::tests::a_null_member_is_malformed_not_absent, unit:jws::json::tests::a_null_member_is_malformed_not_absent, unit:jwk::decode::tests::a_null_member_is_malformed_not_absent; spec:rfc7516#7.2.1.
 - R66 Every requirement sentence of RFC 7515, RFC 7516, RFC 7517, RFC 7518 and RFC 7519 (MUST, MUST NOT, REQUIRED, SHALL, SHALL NOT; `spec/extract.mjs` says what is kept) is implemented and tested, an exception with its reason, or a counted todo, and a deviation beside an implementation names the row that states it (R32): spec:rfc7515 spec:rfc7516 spec:rfc7517 spec:rfc7518 spec:rfc7519. Known limit: a test citation is checked for its place above a live `#[test]` fn, not for its body.
 
 ## Obligation

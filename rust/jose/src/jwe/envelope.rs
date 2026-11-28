@@ -148,17 +148,25 @@ pub struct DecryptKey<K: KeyAlg> {
 
 #[derive(Default, Deserialize)]
 struct Fields<'a> {
+    #[serde(default, deserialize_with = "named")]
     alg: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     enc: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     kid: Option<String>,
     #[serde(default, deserialize_with = "named")]
     zip: Option<String>,
     #[serde(default, deserialize_with = "named")]
     crit: Option<Vec<String>>,
+    #[serde(default, deserialize_with = "named")]
     apu: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     apv: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     iv: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     tag: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     #[serde(borrow)]
     epk: Option<&'a RawValue>,
 }
@@ -372,7 +380,9 @@ fn empty() -> Header {
 
 #[derive(Deserialize)]
 struct Entry<'a> {
+    #[serde(default, deserialize_with = "named")]
     header: Option<&'a RawValue>,
+    #[serde(default, deserialize_with = "named")]
     encrypted_key: Option<&'a str>,
 }
 
@@ -381,17 +391,19 @@ struct Entry<'a> {
 //# implementations encountering them, they MUST be ignored.
 #[derive(Deserialize)]
 struct Document<'a> {
+    #[serde(default, deserialize_with = "named")]
     protected: Option<&'a str>,
+    #[serde(default, deserialize_with = "named")]
     unprotected: Option<&'a RawValue>,
+    #[serde(default, deserialize_with = "named")]
     header: Option<&'a RawValue>,
+    #[serde(default, deserialize_with = "named")]
     encrypted_key: Option<&'a str>,
     //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
-    //= type=todo
-    //= reason=a recipients member of null is read as absent, so it is not refused as a non-array; every other non-array shape is Malformed, tested
     //# recipients The "recipients" member value MUST be an array of JSON objects.
-    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
-    //# recipients The "recipients" member value MUST be an array of JSON objects.
+    #[serde(default, deserialize_with = "named")]
     recipients: Option<Capped<Entry<'a>>>,
+    #[serde(default, deserialize_with = "named")]
     aad: Option<&'a str>,
     iv: &'a str,
     ciphertext: &'a str,
@@ -1030,6 +1042,73 @@ mod tests {
 
     fn json_kind(json: &str) -> Option<ErrorKind> {
         Jwe::parse_json(json.as_bytes()).err().map(|e| e.kind())
+    }
+
+    //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.1
+    //= type=test
+    //# recipients The "recipients" member value MUST be an array of JSON objects.
+    #[test]
+    fn a_null_member_is_malformed_not_absent() {
+        let protected = b64url_encode(br#"{"enc":"A128GCM"}"#);
+        let body = r#""iv":"AA","ciphertext":"AA","tag":"AA""#;
+        let flat = |extra: &str| {
+            format!(r#"{{"protected":"{protected}","header":{{"alg":"dir"}}{extra},{body}}}"#)
+        };
+        let general = |entry: &str, extra: &str| {
+            format!(r#"{{"protected":"{protected}"{extra},"recipients":[{entry}],{body}}}"#)
+        };
+        // positive controls: the same shapes with the member omitted or holding a value
+        assert_eq!(json_kind(&flat("")), None);
+        assert_eq!(
+            json_kind(&flat(
+                r#","encrypted_key":"AA","aad":"AA","unprotected":{}"#
+            )),
+            None
+        );
+        assert_eq!(json_kind(&general(r#"{"header":{"alg":"dir"}}"#, "")), None);
+        let mut nulls = vec![
+            // the member as null beside the flattened members: never the general form's absence
+            flat(r#","encrypted_key":null"#),
+            flat(r#","aad":null"#),
+            flat(r#","unprotected":null"#),
+            flat(r#","recipients":null"#),
+            format!(
+                r#"{{"protected":"{protected}","header":{{"alg":"dir"}},"recipients":null,"encrypted_key":"AA",{body}}}"#
+            ),
+            format!(r#"{{"protected":null,"header":{{"alg":"dir"}},{body}}}"#),
+            format!(r#"{{"protected":"{protected}","header":null,{body}}}"#),
+            general(r#"{"header":null}"#, ""),
+            general(r#"{"header":{"alg":"dir"},"encrypted_key":null}"#, ""),
+            general(r#"{"header":{"alg":"dir"}}"#, r#","aad":null"#),
+            general(r#"{"header":{"alg":"dir"}}"#, r#","unprotected":null"#),
+            general(r#"{"header":{"alg":"dir"}}"#, r#","encrypted_key":null"#),
+        ];
+        // a header member of null, in the protected header and in a per-recipient header
+        for name in [
+            "alg", "enc", "kid", "zip", "crit", "apu", "apv", "iv", "tag", "epk",
+        ] {
+            // the named member is null; alg and enc stay once each, enc in the protected header only
+            let object = |enc: bool| {
+                let mut all = vec![r#""alg":"dir""#, r#""enc":"A128GCM""#];
+                all.retain(|m| {
+                    (enc || !m.starts_with(r#""enc""#)) && !m.starts_with(&format!("\"{name}\""))
+                });
+                let null = format!(r#""{name}":null"#);
+                all.push(&null);
+                format!("{{{}}}", all.join(","))
+            };
+            nulls.push(format!(
+                r#"{{"protected":"{}",{body}}}"#,
+                b64url_encode(object(true).as_bytes())
+            ));
+            nulls.push(format!(
+                r#"{{"protected":"{protected}","header":{},{body}}}"#,
+                object(false)
+            ));
+        }
+        for json in nulls {
+            assert_eq!(json_kind(&json), Some(ErrorKind::Malformed), "{json}");
+        }
     }
 
     //= https://www.rfc-editor.org/rfc/rfc7516#section-7.2.2

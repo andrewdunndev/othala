@@ -99,29 +99,45 @@ struct Raw<'a> {
     //# This member MUST be present in a JWK.
     #[serde(borrow)]
     kty: Cow<'a, str>,
+    #[serde(default, deserialize_with = "named")]
     kid: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     alg: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     #[serde(rename = "use")]
     usage: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     key_ops: Option<Vec<String>>,
+    #[serde(default, deserialize_with = "named")]
     #[serde(borrow)]
     crv: Option<Cow<'a, str>>,
+    #[serde(default, deserialize_with = "named")]
     #[serde(borrow)]
     x: Option<Cow<'a, str>>,
+    #[serde(default, deserialize_with = "named")]
     #[serde(borrow)]
     y: Option<Cow<'a, str>>,
+    #[serde(default, deserialize_with = "named")]
     #[serde(borrow)]
     n: Option<Cow<'a, str>>,
+    #[serde(default, deserialize_with = "named")]
     #[serde(borrow)]
     e: Option<Cow<'a, str>>,
+    #[serde(default, deserialize_with = "named")]
     d: Option<&'a str>,
+    #[serde(default, deserialize_with = "named")]
     p: Option<&'a str>,
+    #[serde(default, deserialize_with = "named")]
     q: Option<&'a str>,
+    #[serde(default, deserialize_with = "named")]
     dp: Option<&'a str>,
+    #[serde(default, deserialize_with = "named")]
     dq: Option<&'a str>,
+    #[serde(default, deserialize_with = "named")]
     qi: Option<&'a str>,
     #[serde(default, deserialize_with = "named")]
     oth: Option<Vec<IgnoredAny>>,
+    #[serde(default, deserialize_with = "named")]
     k: Option<&'a str>,
 }
 
@@ -1100,6 +1116,31 @@ mod tests {
         assert_eq!(oth("null"), Some(ErrorKind::Malformed));
         assert_eq!(oth("5"), Some(ErrorKind::Malformed));
         assert_eq!(oth("[]"), Some(ErrorKind::UnsupportedAlg));
+    }
+
+    //= https://www.rfc-editor.org/rfc/rfc7517#section-4
+    //= type=test
+    //# Additional members can be present in the JWK; if not understood by implementations encountering them, they MUST be ignored.
+    #[test]
+    fn a_null_member_is_malformed_not_absent() {
+        // RFC 7517 4 types every member as a string or an array: null is no value, so it is not an absent member
+        let injected = |base: &Members, name: &str| {
+            let json = text(base).replacen('{', &format!("{{\"{name}\":null,"), 1);
+            parse(json.as_bytes()).err().map(|e| e.kind())
+        };
+        assert_eq!(kind(&oct()), None);
+        assert_eq!(kind(&ec_private()), None);
+        for name in [
+            "kid", "alg", "use", "key_ops", "crv", "x", "y", "n", "e", "d", "p", "q", "dp", "dq",
+            "qi", "k",
+        ] {
+            let base = if name == "k" {
+                ec_private()
+            } else {
+                without(&oct(), name)
+            };
+            assert_eq!(injected(&base, name), Some(ErrorKind::Malformed), "{name}");
+        }
     }
 
     #[test]

@@ -6,14 +6,16 @@ use base::b64url_decode;
 use serde::Deserialize;
 use serde_json::value::RawValue;
 
-use crate::json::{Capped, scan};
+use crate::json::{Capped, named, scan};
 use crate::jws::compact::Signature;
 use crate::jws::header::Parsed;
 use crate::{Compact, Error, ErrorKind, Jws, MAX_ENTRIES};
 
 #[derive(Deserialize)]
 struct Entry<'a> {
+    #[serde(default, deserialize_with = "named")]
     protected: Option<&'a str>,
+    #[serde(default, deserialize_with = "named")]
     header: Option<&'a RawValue>,
     signature: &'a str,
 }
@@ -30,9 +32,13 @@ struct Entry<'a> {
 #[derive(Deserialize)]
 struct Document<'a> {
     payload: &'a str,
+    #[serde(default, deserialize_with = "named")]
     protected: Option<&'a str>,
+    #[serde(default, deserialize_with = "named")]
     header: Option<&'a RawValue>,
+    #[serde(default, deserialize_with = "named")]
     signature: Option<&'a str>,
+    #[serde(default, deserialize_with = "named")]
     signatures: Option<Capped<Entry<'a>>>,
 }
 
@@ -217,6 +223,45 @@ mod tests {
         let sole = general(&[entry(&es512)]);
         let off = cfg!(not(feature = "es512"));
         assert_eq!(kind(&sole), off.then_some(ErrorKind::UnsupportedAlg));
+    }
+
+    #[test]
+    fn a_null_member_is_malformed_not_absent() {
+        let sig = |extra: &str| format!(r#"{{"protected":"{H}"{extra},"signature":"AQ"}}"#);
+        let flat = |extra: &str| {
+            format!(r#"{{"payload":"AA","protected":"{H}"{extra},"signature":"AQ"}}"#)
+        };
+        let general = |entry: &str, extra: &str| {
+            format!(r#"{{"payload":"AA"{extra},"signatures":[{entry}]}}"#)
+        };
+        // positive controls: the shapes with the member omitted or holding a value
+        assert_eq!(kind(&flat("")), None);
+        assert_eq!(kind(&flat(r#","header":{"kid":"k"}"#)), None);
+        assert_eq!(kind(&general(&sig(""), "")), None);
+        let nulls = [
+            flat(r#","header":null"#),
+            format!(
+                r#"{{"payload":"AA","protected":null,"header":{{"alg":"HS256"}},"signature":"AQ"}}"#
+            ),
+            format!(r#"{{"payload":"AA","protected":"{H}","signature":null}}"#),
+            format!(r#"{{"payload":null,"protected":"{H}","signature":"AQ"}}"#),
+            format!(r#"{{"payload":"AA","signatures":null,"protected":"{H}","signature":"AQ"}}"#),
+            general(&sig(r#","header":null"#), ""),
+            general(
+                r#"{"protected":null,"header":{"alg":"HS256"},"signature":"AQ"}"#,
+                "",
+            ),
+            general(&format!(r#"{{"protected":"{H}","signature":null}}"#), ""),
+        ];
+        for json in nulls {
+            assert_eq!(kind(&json), Some(ErrorKind::Malformed), "{json}");
+        }
+        // a header member of null (RFC 7515 4.1.4 types kid, typ and cty as strings)
+        for name in ["alg", "kid", "typ", "cty"] {
+            let protected = base::b64url_encode(format!(r#"{{"{name}":null}}"#).as_bytes());
+            let doc = format!(r#"{{"payload":"AA","protected":"{protected}","signature":"AQ"}}"#);
+            assert_eq!(kind(&doc), Some(ErrorKind::Malformed), "{name}");
+        }
     }
 
     //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
