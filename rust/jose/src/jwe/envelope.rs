@@ -464,7 +464,7 @@ impl<'a> Jwe<'a> {
     }
 
     /// Decrypts through the first recipient whose `alg` is `K`'s and whose key opens it; the header `enc` must be
-    /// `E`'s. `AlgMismatch` when no `alg` or the `enc` differs, otherwise every failure is `Decrypt`.
+    /// `E`'s. `AlgMismatch` when no recipient has `K`'s `alg` or the `enc` differs, otherwise every failure is `Decrypt`.
     pub fn decrypt<K: LocalKeyAlg, E: Enc>(self, key: &DecryptKey<K>) -> Result<Plaintext, Error> {
         self.open::<E>(K::ALG.name(), |recipient| {
             <K as sealed::Unwrap>::unwrap(
