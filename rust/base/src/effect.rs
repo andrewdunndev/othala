@@ -207,7 +207,7 @@ impl<K: StoreKey, R> Effect<K, R> {
         })
     }
 
-    /// Every put: key, record and the store's garbage-collection bound.
+    /// Every put: key, record and the instant the row stops being live.
     pub fn puts(&self) -> impl Iterator<Item = (&K, &R, Option<UnixTime>)> {
         self.ops.iter().filter_map(|(k, op)| match &op.write {
             Some(Write::Put(r, expiry)) => Some((k, r, *expiry)),

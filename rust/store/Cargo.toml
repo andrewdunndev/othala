@@ -1,6 +1,6 @@
 [package]
 name = "store"
-description = "The in-memory reference store and the store-conformance cases; the one member that mints a Receipt"
+description = "The in-memory reference store; the one member that mints a Receipt"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -1,12 +1,13 @@
 //! The reference store against the store-effect obligation, and a table of lying stores, each caught by its own case.
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{Arc, Barrier, Mutex, MutexGuard, PoisonError};
 
 use base::{
     Conflict, Effect, EffectId, Guard, Receipt, Row, Rows, Scope, Store, StoreKey, UnixTime,
     Version,
 };
 use store::{Fault, MemStore};
-use testkit::store_conformance;
+use testkit::{RACERS, store_conformance, store_conformance_shared};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct K(u8);
@@ -32,6 +33,7 @@ enum Lie {
     StopAtFirstFailure,
     ExpectBumps,
     TableVersion,
+    ConsumeSweepsSibling,
     NoAppliedId,
     IdAfterGuards,
     RecordsConflictedId,
@@ -49,7 +51,7 @@ enum Lie {
     WrongReceipt,
 }
 
-const CAUGHT_IN: [(Lie, &str); 22] = [
+const CAUGHT_IN: [(Lie, &str); 23] = [
     (Lie::SkipWrites, "atomic: "),
     (Lie::ConflictAsError, "atomic: "),
     (Lie::EagerPuts, "atomic: "),
@@ -57,6 +59,7 @@ const CAUGHT_IN: [(Lie, &str); 22] = [
     (Lie::StopAtFirstFailure, "fails_after_write: "),
     (Lie::ExpectBumps, "expect_shared: "),
     (Lie::TableVersion, "disjoint: "),
+    (Lie::ConsumeSweepsSibling, "isolated: "),
     (Lie::NoAppliedId, "reapply: "),
     (Lie::IdAfterGuards, "reapply: "),
     (Lie::RecordsConflictedId, "conflict_not_applied: "),
@@ -287,6 +290,11 @@ impl Store<K, u16> for Liar {
                 .collect();
             expected.iter().for_each(|k| self.bump(k));
         }
+        if lie == Lie::ConsumeSweepsSibling {
+            for k in &consumes {
+                self.rows.remove(&K(k.0 ^ 1));
+            }
+        }
         if lie != Lie::NoAppliedId {
             self.applied.insert(effect.id(), keys);
         }
@@ -306,4 +314,110 @@ impl Store<K, u16> for Liar {
 )]
 fn mint(effect: &Effect<K, u16>) -> Receipt {
     effect.host_applied()
+}
+
+type Backing = Arc<Mutex<MemStore<K, u16>>>;
+
+// every handle shares one backing store; the lock is the transaction
+struct Shared(Backing);
+
+impl Shared {
+    fn lock(&self) -> MutexGuard<'_, MemStore<K, u16>> {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+impl Store<K, u16> for Shared {
+    type Error = Fault;
+
+    fn load(&mut self, keys: &[K], now: UnixTime) -> Result<Rows<K, u16>, Fault> {
+        self.lock().load(keys, now)
+    }
+
+    fn apply(
+        &mut self,
+        effect: &Effect<K, u16>,
+        now: UnixTime,
+    ) -> Result<Result<Receipt, Conflict<K>>, Fault> {
+        self.lock().apply(effect, now)
+    }
+}
+
+#[test]
+fn a_shared_memstore_consumes_once() {
+    let backing = Backing::default();
+    store_conformance_shared(|| Shared(backing.clone()), K, u16::from);
+}
+
+type Table = Arc<Mutex<BTreeMap<K, (u16, Version)>>>;
+
+// the READ COMMITTED failure: a consume's guards are checked in one transaction and its writes land in the next,
+// with every racer between the two so the interleaving is certain
+struct CheckThenWrite {
+    rows: Table,
+    window: Arc<Barrier>,
+}
+
+impl CheckThenWrite {
+    fn rows(&self) -> MutexGuard<'_, BTreeMap<K, (u16, Version)>> {
+        self.rows.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+impl Store<K, u16> for CheckThenWrite {
+    type Error = Fault;
+
+    fn load(&mut self, keys: &[K], _now: UnixTime) -> Result<Rows<K, u16>, Fault> {
+        let table = self.rows();
+        let mut rows = Rows::new();
+        for k in keys {
+            rows.insert(k.clone(), table.get(k).map(|&(r, v)| Row::new(r, v)));
+        }
+        Ok(rows)
+    }
+
+    fn apply(
+        &mut self,
+        effect: &Effect<K, u16>,
+        _now: UnixTime,
+    ) -> Result<Result<Receipt, Conflict<K>>, Fault> {
+        let checked = effect.check(|k| self.rows().get(k).map(|row| row.1));
+        if let Err(conflict) = checked {
+            return Ok(Err(conflict));
+        }
+        if effect.guards().any(|g| matches!(g, Guard::Consume(_))) {
+            self.window.wait();
+        }
+        let mut table = self.rows();
+        for k in effect.deletes() {
+            table.remove(k);
+        }
+        for (k, &r, _) in effect.puts() {
+            let version = Version::new(u64::try_from(table.len()).unwrap_or_default() + 1);
+            table.insert(k.clone(), (r, version));
+        }
+        Ok(Ok(mint(effect)))
+    }
+}
+
+#[test]
+fn a_check_then_write_store_double_spends() {
+    let (rows, window) = (Table::default(), Arc::new(Barrier::new(RACERS)));
+    let outcome = std::panic::catch_unwind(|| {
+        store_conformance_shared(
+            || CheckThenWrite {
+                rows: rows.clone(),
+                window: window.clone(),
+            },
+            K,
+            u16::from,
+        );
+    });
+    let message = outcome.err().and_then(|p| p.downcast::<String>().ok());
+    assert!(
+        message
+            .as_deref()
+            .is_some_and(|m| m.contains("shared_consume: exactly one racing consume")),
+        "want the shared case to see more than one winner, got {message:?}"
+    );
 }

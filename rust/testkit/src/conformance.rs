@@ -4,16 +4,25 @@
     reason = "a harness reports a failed claim by panicking"
 )]
 use std::fmt::Debug;
+use std::sync::Barrier;
+use std::thread;
 
 use base::{
-    Builder, Conflict, Effect, Failure, Pending, Receipt, Row, Slot, Store, StoreKey, UnixTime,
+    Builder, Conflict, Effect, EffectId, Failure, Pending, Receipt, Row, Slot, Store, StoreKey,
+    UnixTime,
 };
 
 use crate::{Seeded, seeded};
 
+/// Concurrent handles [`store_conformance_shared`] drives at once; a host's connection pool must hold this many.
+pub const RACERS: usize = 8;
+
+const ROUNDS: u8 = 16;
+
 /// Proves a concrete store honours the `Effect` obligation; run it on the exact apply path a shell uses.
 /// `fresh` makes an empty store; `key(n)` must be injective, increasing in `n` and inside one transaction
-/// domain for `n < 128`; `record(n)` must differ for different `n`. A failure panics with the case name.
+/// domain for `n < 128`, and for a subject-scoped key `key(0)` and `key(1)` differ only in the subject;
+/// `record(n)` must differ for different `n`. A failure panics with the case name.
 pub fn store_conformance<K, R, S>(
     mut fresh: impl FnMut() -> S,
     key: impl Fn(u8) -> K,
@@ -39,6 +48,8 @@ pub fn store_conformance<K, R, S>(
     c.expect_shared(&mut fresh());
     c.name = "disjoint";
     c.disjoint(&mut fresh());
+    c.name = "isolated";
+    c.isolated(&mut fresh());
     c.name = "reapply";
     c.reapply(&mut fresh());
     c.name = "reused_id";
@@ -53,6 +64,34 @@ pub fn store_conformance<K, R, S>(
     c.recreate(&mut fresh());
     c.name = "at_bound";
     c.at_bound(&mut fresh());
+}
+
+/// Proves a store keeps a consume single-use when applies run at once. `open` returns a new handle on one
+/// backing store, empty at the first call, and is called once per racer from the calling thread. Each round
+/// seeds a row, then [`RACERS`] handles consume it together: one gets the receipt and every other a `Missing`
+/// conflict. A pass is evidence from the scheduler's interleavings, not a proof, so run it where the store's
+/// isolation level is the production one. The other arguments are as for [`store_conformance`].
+pub fn store_conformance_shared<K, R, S>(
+    open: impl Fn() -> S,
+    key: impl Fn(u8) -> K,
+    record: impl Fn(u8) -> R,
+) where
+    K: StoreKey + Debug + Send,
+    R: Clone + PartialEq + Debug + Send,
+    S: Store<K, R> + Send,
+    S::Error: Debug,
+{
+    let mut c = Case {
+        name: "",
+        e: seeded(9),
+        key: &key,
+        record: &record,
+        now: UnixTime::new(1_000),
+    };
+    c.name = "shared_consume";
+    for n in 0..ROUNDS {
+        c.shared_consume(&open, n);
+    }
 }
 
 struct Case<'a, K, R> {
@@ -258,6 +297,85 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
             self.fail("both effects' writes stand")
         );
         self.holds(s, 1, None, "both effects' writes stand");
+    }
+
+    // two keys that differ only in their subject hold independent rows
+    fn isolated<S: Store<K, R>>(&mut self, s: &mut S)
+    where
+        S::Error: Debug,
+    {
+        let [r0, r1] = &self.seed(s, [0, 1]);
+        let update = self.build(|b, c| b.update(c.k(0), r0, c.r(9), None));
+        self.applies(s, &update, "update one key");
+        self.holds(s, 1, Some(r1), "an update leaves its sibling alone");
+        let consume = self.build(|b, c| b.consume(c.k(0)));
+        self.applies(s, &consume, "consume one key");
+        self.holds(s, 0, None, "consume deletes");
+        self.holds(s, 1, Some(r1), "a consume leaves its sibling alone");
+    }
+
+    // consumes race one row per round, since a store that checks and then writes lets several through
+    fn shared_consume<S>(&mut self, open: &impl Fn() -> S, n: u8)
+    where
+        K: Send,
+        R: Send,
+        S: Store<K, R> + Send,
+        S::Error: Debug,
+    {
+        let mut seeder = open();
+        self.seed(&mut seeder, [n]);
+        let (now, start) = (self.now, Barrier::new(RACERS));
+        let racers: Vec<_> = (0..RACERS)
+            .map(|_| (open(), self.build(|b, c| b.consume(c.k(n)))))
+            .collect();
+        let answers: Vec<_> = thread::scope(|scope| {
+            let threads: Vec<_> = racers
+                .into_iter()
+                .map(|(mut handle, effect)| {
+                    let start = &start;
+                    scope.spawn(move || {
+                        start.wait();
+                        let answer = handle.apply(&effect, now).map_err(|e| format!("{e:?}"));
+                        (effect.id(), answer)
+                    })
+                })
+                .collect();
+            threads
+                .into_iter()
+                .map(|t| {
+                    t.join()
+                        .unwrap_or_else(|_| panic!("{}", self.fail("a racer panicked")))
+                })
+                .collect()
+        });
+        let mut won: Vec<EffectId> = Vec::new();
+        for (id, answer) in answers {
+            match answer {
+                Err(err) => panic!("{}", self.fail(&format!("apply outcome known: {err}"))),
+                Ok(Ok(receipt)) => {
+                    assert_eq!(
+                        receipt.effect_id(),
+                        id,
+                        "{}",
+                        self.fail("an apply answers its own effect's receipt")
+                    );
+                    won.push(id);
+                }
+                Ok(Err(conflict)) => assert_eq!(
+                    conflict.failures(),
+                    [(self.k(n), Failure::Missing)],
+                    "{}",
+                    self.fail("a losing consume names the consumed key as missing")
+                ),
+            }
+        }
+        assert_eq!(
+            won.len(),
+            1,
+            "{}",
+            self.fail("exactly one racing consume takes the row")
+        );
+        self.holds(&mut seeder, n, None, "the consumed row is gone");
     }
 
     fn reapply<S: Store<K, R>>(&mut self, s: &mut S)

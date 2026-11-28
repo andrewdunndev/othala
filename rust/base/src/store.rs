@@ -133,7 +133,8 @@ pub trait Store<K: StoreKey, R> {
     /// Loads `keys`; a row at or after its expiry at `now` is absent.
     fn load(&mut self, keys: &[K], now: UnixTime) -> Result<Rows<K, R>, Self::Error>;
 
-    /// Applies `effect` in one transaction: every guard holds or nothing is applied.
+    /// Applies `effect` in one transaction, serialized against every other apply on its keys: every guard
+    /// holds or nothing is applied, and of racing consumes of one row exactly one succeeds.
     fn apply(
         &mut self,
         effect: &Effect<K, R>,
@@ -162,7 +163,7 @@ pub const REDECIDE: u8 = 3;
 
 #[cfg(test)]
 mod tests {
-    use super::{REDECIDE, Retry, Row, Rows, Slot, Version};
+    use super::{Retry, Row, Rows, Slot, Version};
 
     #[test]
     fn rows_slots() {
@@ -186,10 +187,5 @@ mod tests {
         assert_eq!((*row.record(), row.version().get()), (5, 7));
         assert_eq!(row.into_record(), 5);
         assert_eq!(Retry::new(2).attempts(), 2);
-    }
-
-    #[test]
-    fn redecide_is_three() {
-        assert_eq!(REDECIDE, 3);
     }
 }
