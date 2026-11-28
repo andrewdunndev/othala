@@ -58,17 +58,17 @@ def header():
         v("dup-alg-same", "RFC 7515 4 and 5.2 step 4", '{"alg":"HS256","alg":"HS256"}', kind("DuplicateMember")),
         v("dup-typ", "RFC 7515 4 and 5.2 step 4", '{"alg":"HS256","typ":"JWT","typ":"JWT"}', kind("DuplicateMember")),
         v("dup-escaped-name", "RFC 7515 4 with RFC 8259 7 (\\u0061lg names alg)", '{"alg":"HS256","\\u0061lg":"none"}', kind("DuplicateMember")),
-        v("alg-missing", "RFC 7515 4.1.1 (alg MUST be present)", '{"typ":"JWT"}', NO),
-        v("alg-not-string", "RFC 7515 4.1.1 (a case-sensitive string)", '{"alg":1}', NO),
+        v("alg-missing", "RFC 7515 4.1.1 (alg MUST be present)", '{"typ":"JWT"}', kind("Malformed")),
+        v("alg-not-string", "RFC 7515 4.1.1 (a case-sensitive string)", '{"alg":1}', kind("Malformed")),
         v("alg-case-differs", "RFC 7515 4.1.1 (case-sensitive) and RFC 8725 3.1", '{"alg":"hs256"}', kind("AlgMismatch")),
         v("alg-none-with-mac", "RFC 7518 3.6 and RFC 8725 3.1", '{"alg":"none"}', kind("AlgMismatch")),
         v("crit-unknown", "RFC 7515 4.1.11 (not understood: the JWS is invalid)", '{"alg":"HS256","crit":["exp-x"],"exp-x":1}', kind("CriticalHeader")),
-        v("crit-empty", "RFC 7515 4.1.11 (MUST NOT be the empty list)", '{"alg":"HS256","crit":[]}', NO),
-        v("crit-registered-name", "RFC 7515 4.1.11 (MUST NOT list names this spec defines)", '{"alg":"HS256","crit":["alg"]}', NO),
-        v("crit-name-absent", "RFC 7515 4.1.11 (listed names MUST be present)", '{"alg":"HS256","crit":["exp-x"]}', NO),
-        v("crit-not-array", "RFC 7515 4.1.11 (an array)", '{"alg":"HS256","crit":"exp-x"}', NO),
-        v("header-array", "RFC 7515 5.2 step 3 (a JSON object)", '["alg","HS256"]', NO),
-        v("header-not-json", "RFC 7515 5.2 step 3", '{alg:HS256}', NO),
+        v("crit-empty", "RFC 7515 4.1.11 (MUST NOT be the empty list)", '{"alg":"HS256","crit":[]}', kind("Malformed")),
+        v("crit-registered-name", "RFC 7515 4.1.11 (MUST NOT list names this spec defines)", '{"alg":"HS256","crit":["alg"]}', kind("Malformed")),
+        v("crit-name-absent", "RFC 7515 4.1.11 (listed names MUST be present)", '{"alg":"HS256","crit":["exp-x"]}', kind("Malformed")),
+        v("crit-not-array", "RFC 7515 4.1.11 (an array)", '{"alg":"HS256","crit":"exp-x"}', kind("Malformed")),
+        v("header-array", "RFC 7515 5.2 step 3 (a JSON object)", '["alg","HS256"]', kind("Malformed")),
+        v("header-not-json", "RFC 7515 5.2 step 3", '{alg:HS256}', kind("Malformed")),
     ]
     # RFC 7797: b64 false signs the raw payload; an implementation without RFC 7797 must refuse via crit
     raw = '{"iss":"joe"}'
@@ -76,15 +76,15 @@ def header():
                          ("b64-false-no-crit", '{"alg":"HS256","b64":false}', "RFC 7797 6 (b64 MUST be listed in crit)")):
         hb = b64(h.encode())
         mac = hmac.new(unb64(HS["k"]), hb.encode() + b"." + raw.encode(), hashlib.sha256).digest()
-        c.append(case(cid, spec, NO, op="jws_verify", alg="HS256", jwk=HS, jws=f"{hb}.{raw}.{b64(mac)}"))
+        c.append(case(cid, spec, kind("Malformed"), op="jws_verify", alg="HS256", jwk=HS, jws=f"{hb}.{raw}.{b64(mac)}"))
     good = hs256('{"alg":"HS256"}', PAYLOAD)
     h, p, s = good.split(".")
     c += [
-        case("segment-padded", "RFC 7515 2 (base64url without padding) and 7.1", NO, op="jws_verify", alg="HS256", jwk=HS, jws=f"{h}.{p}.{s}="),
-        case("segment-std-alphabet", "RFC 7515 2 (base64url alphabet only)", NO, op="jws_verify", alg="HS256", jwk=HS, jws=hs256('{"alg":"HS256"}', PAYLOAD).replace("-", "+").replace("_", "/")) if any(x in good for x in "-_") else None,
-        case("four-segments", "RFC 7515 7.1 (three parts)", NO, op="jws_verify", alg="HS256", jwk=HS, jws=f"{h}.{p}.{s}.{s}"),
-        case("two-segments", "RFC 7515 7.1", NO, op="jws_verify", alg="HS256", jwk=HS, jws=f"{h}.{p}"),
-        case("whitespace-inside", "RFC 7515 7.1 (no whitespace)", NO, op="jws_verify", alg="HS256", jwk=HS, jws=f"{h}.\n{p}.{s}"),
+        case("segment-padded", "RFC 7515 2 (base64url without padding) and 7.1", kind("Malformed"), op="jws_verify", alg="HS256", jwk=HS, jws=f"{h}.{p}.{s}="),
+        case("segment-std-alphabet", "RFC 7515 2 (base64url alphabet only)", kind("Malformed"), op="jws_verify", alg="HS256", jwk=HS, jws=hs256('{"alg":"HS256"}', PAYLOAD).replace("-", "+").replace("_", "/")) if any(x in good for x in "-_") else None,
+        case("four-segments", "RFC 7515 7.1 (three parts)", kind("Malformed"), op="jws_verify", alg="HS256", jwk=HS, jws=f"{h}.{p}.{s}.{s}"),
+        case("two-segments", "RFC 7515 7.1", kind("Malformed"), op="jws_verify", alg="HS256", jwk=HS, jws=f"{h}.{p}"),
+        case("whitespace-inside", "RFC 7515 7.1 (no whitespace)", kind("Malformed"), op="jws_verify", alg="HS256", jwk=HS, jws=f"{h}.\n{p}.{s}"),
     ]
     return [x for x in c if x]
 
@@ -111,20 +111,20 @@ def keys():
     oct_ = lambda n: {"kty": "oct", "k": b64(bytes(range(n)))}
     c = [
         k("es256-p256", "RFC 7518 3.4", "ES256", P256, OK),
-        k("es256-p384-key", "RFC 7518 3.4 (ES256 is P-256) and RFC 8725 3.1", "ES256", P384, NO),
-        k("es256-p521-key", "RFC 7518 3.4 and RFC 8725 3.1", "ES256", P521, NO),
-        k("es384-p256-key", "RFC 7518 3.4 (ES384 is P-384)", "ES384", P256, NO),
-        k("es256-rsa-key", "RFC 7518 3.4 and RFC 8725 3.1", "ES256", RSA, NO),
-        k("es256-okp-key", "RFC 7518 3.4 and RFC 8037 3.1", "ES256", ED, NO),
-        k("rs256-ec-key", "RFC 7518 3.3 and RFC 8725 3.1", "RS256", P256, NO),
-        k("hs256-rsa-key", "RFC 7518 3.2 and RFC 8725 3.1 (RS-to-HS swap)", "HS256", RSA, NO),
-        k("eddsa-x25519-key", "RFC 8037 3.1 (X25519 is not a signature curve) and ruling R-e", "EdDSA", X25519, NO),
+        k("es256-p384-key", "RFC 7518 3.4 (ES256 is P-256) and RFC 8725 3.1", "ES256", P384, kind("AlgMismatch")),
+        k("es256-p521-key", "RFC 7518 3.4 and RFC 8725 3.1", "ES256", P521, kind("AlgMismatch")),
+        k("es384-p256-key", "RFC 7518 3.4 (ES384 is P-384)", "ES384", P256, kind("AlgMismatch")),
+        k("es256-rsa-key", "RFC 7518 3.4 and RFC 8725 3.1", "ES256", RSA, kind("AlgMismatch")),
+        k("es256-okp-key", "RFC 7518 3.4 and RFC 8037 3.1", "ES256", ED, kind("AlgMismatch")),
+        k("rs256-ec-key", "RFC 7518 3.3 and RFC 8725 3.1", "RS256", P256, kind("AlgMismatch")),
+        k("hs256-rsa-key", "RFC 7518 3.2 and RFC 8725 3.1 (RS-to-HS swap)", "HS256", RSA, kind("Malformed")),
+        k("eddsa-x25519-key", "RFC 8037 3.1 (X25519 is not a signature curve) and ruling R-e", "EdDSA", X25519, kind("UnsupportedAlg")),
         k("eddsa-ed25519", "RFC 8037 3.1", "EdDSA", ED, OK),
-        k("es256-off-curve", "RFC 8725 3.4 (validate the point)", "ES256", off, NO),
-        k("es256-point-zero", "RFC 8725 3.4 and SEC 1 3.2.2", "ES256", zero, NO),
-        k("es256-x-short", "RFC 7518 6.2.1.2 (x MUST be the full coordinate size)", "ES256", short_x, NO),
-        k("es256-crv-missing", "RFC 7518 6.2.1.1 (crv is required)", "ES256", {kk: vv for kk, vv in P256.items() if kk != "crv"}, NO),
-        k("es256-y-missing", "RFC 7518 6.2.1.3 (y is required for P-256)", "ES256", {kk: vv for kk, vv in P256.items() if kk != "y"}, NO),
+        k("es256-off-curve", "RFC 8725 3.4 (validate the point)", "ES256", off, kind("Malformed")),
+        k("es256-point-zero", "RFC 8725 3.4 and SEC 1 3.2.2", "ES256", zero, kind("Malformed")),
+        k("es256-x-short", "RFC 7518 6.2.1.2 (x MUST be the full coordinate size)", "ES256", short_x, kind("Malformed")),
+        k("es256-crv-missing", "RFC 7518 6.2.1.1 (crv is required)", "ES256", {kk: vv for kk, vv in P256.items() if kk != "crv"}, kind("Malformed")),
+        k("es256-y-missing", "RFC 7518 6.2.1.3 (y is required for P-256)", "ES256", {kk: vv for kk, vv in P256.items() if kk != "y"}, kind("Malformed")),
         k("rs256-2048", "RFC 7518 3.3 (2048 bits or larger)", "RS256", RSA, OK),
         k("rs256-2047", "RFC 7518 3.3 (MUST be 2048 bits or larger)", "RS256", weak_rsa(2047, "jose-derived"), kind("WeakKey")),
         k("rs256-1024", "RFC 7518 3.3", "RS256", weak_rsa(1024, "jose-derived"), kind("WeakKey")),
@@ -134,13 +134,13 @@ def keys():
         k("hs512-63-bytes", "RFC 7518 3.2", "HS512", oct_(63), kind("WeakKey")),
         k("hs256-use-enc", "RFC 7517 4.2 (use enc is not for signatures)", "HS256", dict(oct_(32), use="enc"), kind("KeyUse")),
         k("hs256-key-ops-encrypt", "RFC 7517 4.3 (key_ops without verify)", "HS256", dict(oct_(32), key_ops=["encrypt"]), kind("KeyUse")),
-        k("hs256-use-key-ops-disagree", "RFC 7517 4.3 (use and key_ops SHOULD NOT both be used; when they disagree the key is refused: oracle choice)", "HS256", dict(oct_(32), use="sig", key_ops=["encrypt"]), NO),
+        k("hs256-use-key-ops-disagree", "RFC 7517 4.3 (use and key_ops SHOULD NOT both be used; when they disagree the key is refused: oracle choice)", "HS256", dict(oct_(32), use="sig", key_ops=["encrypt"]), kind("KeyUse")),
     ]
     a = lambda cid, spec, jwk, expect: case(cid, spec, expect, op="any_verify_key", jwk=jwk)
     c += [
         a("any-alg-bound", "RFC 7517 4.4 with RFC 8725 3.1 (the JWK alg binds)", HS_KID, OK),
         a("any-alg-missing", "RFC 8725 3.1 (a key used dynamically needs its alg)", {kk: vv for kk, vv in HS_KID.items() if kk != "alg"}, kind("KeyAlgMissing")),
-        a("any-alg-kty-mismatch", "RFC 7518 3.1 and RFC 8725 3.1", dict(P256, alg="RS256"), NO),
+        a("any-alg-kty-mismatch", "RFC 7518 3.1 and RFC 8725 3.1", dict(P256, alg="RS256"), kind("AlgMismatch")),
         a("any-enc-key", "RFC 7517 4.2", ENC_KEY, kind("KeyUse")),
     ]
     return c
@@ -155,12 +155,12 @@ def jwks():
     return [
         d("two-keys", "RFC 7517 5", two, {"ok": True, "keys": 2}),
         d("unknown-kty-skipped", "RFC 7517 5 (SHOULD ignore JWKs whose kty is not understood)", unknown, {"ok": True, "keys": 1}),
-        d("keys-missing", "RFC 7517 5.1 (keys is REQUIRED)", {"kids": []}, NO),
-        d("keys-not-array", "RFC 7517 5.1 (an array of JWKs)", {"keys": HS_KID}, NO),
+        d("keys-missing", "RFC 7517 5.1 (keys is REQUIRED)", {"kids": []}, kind("Malformed")),
+        d("keys-not-array", "RFC 7517 5.1 (an array of JWKs)", {"keys": HS_KID}, kind("Malformed")),
         case("dup-keys-member", "RFC 8259 4 with RFC 7517 5 (this oracle rejects duplicate names)", kind("DuplicateMember"), op="jwks_decode", jwks_json='{"keys":[],"keys":[]}'),
         f("find-by-kid", "RFC 7517 4.5", two, HS_KID["kid"], {"ok": True, "kty": "oct"}),
-        f("find-absent-kid", "RFC 7517 4.5", two, "absent", NO),
-        f("find-duplicate-kid", "RFC 7517 4.5 (kids SHOULD be distinct; an ambiguous lookup is refused, never a pick)", dup, HS_KID["kid"], NO),
+        f("find-absent-kid", "RFC 7517 4.5", two, "absent", kind("BadSignature")),
+        f("find-duplicate-kid", "RFC 7517 4.5 (kids SHOULD be distinct; an ambiguous lookup is refused, never a pick)", dup, HS_KID["kid"], kind("DuplicateMember")),
     ]
 
 
@@ -196,11 +196,11 @@ def claims():
         t("nbf-past-leeway", "RFC 7519 4.1.5", kind("NotYetValid"), {"nbf": NOW + LEEWAY + 1}),
         t("nbf-string", "RFC 7519 2", kind("ClaimType"), {"nbf": str(NOW)}),
         t("iat-string", "RFC 7519 2 and 4.1.6", kind("ClaimType"), {"iat": str(NOW)}),
-        t("iat-future-past-leeway", "RFC 7519 4.1.6 with OIDC Core 3.1.3.7 step 10 (this oracle refuses an iat beyond now plus leeway)", NO, {"iat": NOW + LEEWAY + 1}),
+        t("iat-future-past-leeway", "RFC 7519 4.1.6 with OIDC Core 3.1.3.7 step 10 (this oracle refuses an iat beyond now plus leeway)", kind("NotYetValid"), {"iat": NOW + LEEWAY + 1}),
         t("typ-wrong", "RFC 8725 3.11 (explicit typing)", kind("Type"), hdr='{"alg":"HS256","typ":"JWT"}'),
         t("typ-missing", "RFC 8725 3.11 and RFC 9068 4", kind("Type"), hdr='{"alg":"HS256"}'),
         t("dup-claim", "RFC 7519 4 (MUST reject or use the last; this oracle rejects)", kind("DuplicateMember"), raw=f'{{"iss":"https://other.example","iss":"{ISS}","aud":"{AUD}","exp":{NOW + 300}}}'),
-        t("claims-array", "RFC 7519 7.2 step 10 (a JSON object)", NO, raw="[1]"),
+        t("claims-array", "RFC 7519 7.2 step 10 (a JSON object)", kind("Malformed"), raw="[1]"),
     ]
 
 
@@ -217,8 +217,8 @@ def thumbprint():
         t("rsa-optional-members-ignored", "RFC 7638 3.2 (e, kty, n)", RSA_KID, {"out": thumb(RSA_KID, ("e", "kty", "n"))}),
         t("oct", "RFC 7638 3.2 (k, kty)", HS_KID, {"out": thumb(HS_KID, ("k", "kty"))}),
         t("okp-ed25519", "RFC 8037 2 (crv, kty, x) and A.3", ED, {"out": thumb(ED, ("crv", "kty", "x"))}),
-        t("ec-y-missing", "RFC 7638 3.2 (required members must be present)", {k: v for k, v in P256.items() if k != "y"}, NO),
-        t("kty-unknown", "RFC 7638 3.2 (members are defined per kty)", {"kty": "unknown-kty", "x": "AA"}, NO),
+        t("ec-y-missing", "RFC 7638 3.2 (required members must be present)", {k: v for k, v in P256.items() if k != "y"}, kind("Malformed")),
+        t("kty-unknown", "RFC 7638 3.2 (members are defined per kty)", {"kty": "unknown-kty", "x": "AA"}, kind("UnsupportedAlg")),
     ]
 
 

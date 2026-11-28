@@ -675,9 +675,19 @@ mod tests {
             serde_json::from_str::<Audience>("\"x\"").ok(),
             Audience::new("x").ok()
         );
-        assert!(
-            serde_json::from_str::<Issuer>("\"\"").is_err()
-                && serde_json::from_str::<Audience>("\"\"").is_err()
+        assert_eq!(
+            (
+                serde_json::from_str::<Issuer>("\"\"")
+                    .err()
+                    .map(|e| format!("{e}")),
+                serde_json::from_str::<Audience>("\"\"")
+                    .err()
+                    .map(|e| format!("{e}")),
+            ),
+            (
+                Some("input is not well-formed; reject it, it cannot be repaired".into()),
+                Some("input is not well-formed; reject it, it cannot be repaired".into())
+            )
         );
         assert_eq!(
             serde_json::to_string(&Issuer::new("x").ok())

@@ -29,15 +29,13 @@ struct Case {
 fn row(file: Vector, total: usize) {
     let tally = run::<Case>(file, total, |case| {
         let outcome = common::verify(&case.alg, case.jwk.text(), &case.jws);
-        assert_eq!(outcome.is_ok(), case.expect.ok, "{}", case.id);
-        if let Some(named) = &case.expect.kind {
-            assert_eq!(
-                outcome.err().map(|e| format!("{:?}", e.kind())).as_ref(),
-                Some(named),
-                "{}",
-                case.id
-            );
-        }
+        testkit::vectors::assert_verdict(
+            &outcome,
+            case.expect.ok,
+            case.expect.kind.as_deref(),
+            |e| e.kind(),
+            &case.id,
+        );
         Outcome::Checked
     });
     assert_eq!((tally.total(), tally.checked()), (total, total));
@@ -95,7 +93,7 @@ fn kid_never_selects() -> Result<(), TestError<(String, usize)>> {
     TestRunner::new(config).run(&(".{0,40}", 0..extras.len()), |(kid, extra)| {
         let text = token(&kid, extras.get(extra).copied().unwrap_or_default());
         let parsed = Jws::parse(&text);
-        prop_assert!(parsed.is_ok());
+        prop_assert_eq!(parsed.as_ref().err().map(|e| e.kind()), None);
         let payload = parsed.and_then(|jws| jws.verify(key.as_ref().map_err(|e| *e)?));
         prop_assert_eq!(
             payload.map(|p| p.bytes().to_vec()).ok(),

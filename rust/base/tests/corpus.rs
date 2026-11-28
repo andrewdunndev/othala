@@ -8,7 +8,6 @@ fn b64url_decode_corpus() {
     let files = testkit::fixture::files(&dir);
     assert!(files.len() >= 21, "corpus has {} files", files.len());
     for (name, data) in files {
-        let replay = std::panic::catch_unwind(|| property::check(&data));
-        assert!(replay.is_ok(), "corpus file {name}");
+        testkit::fixture::replay(&name, || property::check(&data));
     }
 }

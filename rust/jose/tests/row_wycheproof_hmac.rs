@@ -40,7 +40,13 @@ fn row<A: Alg>(file: Vector, hash_bits: u32, checked: usize) {
         let outcome = verifier.and_then(|key| key.verify_signature(&message, &tag));
         let full = group.tag_size == Some(hash_bits);
         match (case.result, full) {
-            (Expected::Valid, true) => assert!(outcome.is_ok(), "{}: {}", case.tc_id, case.comment),
+            (Expected::Valid, true) => assert_eq!(
+                outcome.err().map(|e| e.kind()),
+                None,
+                "{}: {}",
+                case.tc_id,
+                case.comment
+            ),
             (Expected::Acceptable, _) => return Outcome::NotApplicable,
             _ => assert_eq!(
                 outcome.err().map(|e| e.kind()),

@@ -33,7 +33,7 @@ fn rfc7520_section3() {
             "3.1" | "3.2" => not_applicable.push(example.example.clone()),
             _ if private => {
                 let key = SecretJwk::decode(json).map_err(|e| e.kind());
-                assert!(key.is_ok(), "{}: {key:?}", example.example);
+                assert_eq!(key.as_ref().err(), None, "{}", example.example);
                 let key = key.ok();
                 assert_eq!(key.as_ref().map(SecretJwk::kty), Some(kty));
                 assert_eq!(
@@ -49,7 +49,7 @@ fn rfc7520_section3() {
             }
             _ => {
                 let key = Jwk::decode(json).map_err(|e| e.kind());
-                assert!(key.is_ok(), "{}: {key:?}", example.example);
+                assert_eq!(key.as_ref().err(), None, "{}", example.example);
                 let key = key.ok();
                 assert_eq!(key.as_ref().map(Jwk::kty), Some(kty));
                 assert_eq!(key.as_ref().and_then(Jwk::kid).map(|k| k.as_str()), kid);

@@ -265,6 +265,29 @@ mod tests {
         ClientData::parse(json.as_bytes()).map_err(|e| e.kind())
     }
 
+    /// Every member the parse keeps, for whole-value comparison.
+    type Fields = (
+        alloc::string::String,
+        alloc::vec::Vec<u8>,
+        alloc::string::String,
+        Option<bool>,
+        Option<alloc::string::String>,
+    );
+
+    fn fields(d: ClientData) -> Fields {
+        (d.kind, d.challenge, d.origin, d.cross_origin, d.top_origin)
+    }
+
+    fn empty() -> Fields {
+        (
+            alloc::string::String::new(),
+            vec![],
+            alloc::string::String::new(),
+            None,
+            None,
+        )
+    }
+
     #[test]
     fn members_are_read() {
         let json = format!(
@@ -316,7 +339,7 @@ mod tests {
 
     #[test]
     fn the_input_is_one_bom_and_utf8() {
-        assert!(parse("\u{feff}{}").is_ok());
+        assert_eq!(parse("\u{feff}{}").map(fields), Ok(empty()));
         assert_eq!(parse("\u{feff}\u{feff}{}"), Err(ErrorKind::Malformed));
         assert_eq!(
             ClientData::parse(&[b'{', 0xff, b'}']).map_err(|e| e.kind()),
@@ -395,7 +418,7 @@ mod tests {
             r#"{"a":null,"b":true,"c":false}"#,
             r#"{ }"#,
         ] {
-            assert!(parse(good).is_ok(), "{good}");
+            assert_eq!(parse(good).map(fields), Ok(empty()), "{good}");
         }
         for bad in [
             "01", "1.", ".5", "1e", "1e+", "-", "--1", "tru", "nul", "falsy", "[1,]", "[1 2]", "[",
@@ -415,14 +438,20 @@ mod tests {
             format!(r#"{{"a":{}0{}}}"#, open.repeat(depth), close.repeat(depth))
         };
         for (open, close) in [("[", "]"), (r#"{"a":"#, "}")] {
-            assert!(parse(&nested(open, close, MAX_CLIENT_DATA_DEPTH - 1)).is_ok());
+            assert_eq!(
+                parse(&nested(open, close, MAX_CLIENT_DATA_DEPTH - 1)).map(fields),
+                Ok(empty())
+            );
             assert_eq!(
                 parse(&nested(open, close, MAX_CLIENT_DATA_DEPTH)),
                 Err(ErrorKind::TooLarge)
             );
         }
         let padded = |len: usize| format!("{{}}{}", " ".repeat(len - 2));
-        assert!(parse(&padded(MAX_CLIENT_DATA_JSON)).is_ok());
+        assert_eq!(
+            parse(&padded(MAX_CLIENT_DATA_JSON)).map(fields),
+            Ok(empty())
+        );
         assert_eq!(
             parse(&padded(MAX_CLIENT_DATA_JSON + 1)),
             Err(ErrorKind::TooLarge)

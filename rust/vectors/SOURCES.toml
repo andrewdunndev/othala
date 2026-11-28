@@ -134,7 +134,7 @@ feeds = ["jose"]
 notes = "Derived, not published by the RFC: valid signatures under a header alg that does not match the key or the expectation, made once with Node crypto from throwaway keys. The generator is not committed because fresh keys make it non-reproducible; the file is frozen output. Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; "
 cases = 25
 files = [
-  { path = "rfc8725-derived/jws-alg.json", sha256 = "bdb0203a76b79f1f7e04ca9f62b5ccfa1694f7f881686056a44219e091acc9d6", cases = 25 },
+  { path = "rfc8725-derived/jws-alg.json", sha256 = "f6b8e180e3dd2abe5326c14b3556e00739f1182c03b23238601182763fe975dd", cases = 25 },
 ]
 
 [source."w3c-webauthn-3-exam-spike"]
@@ -257,10 +257,10 @@ revision = "RFC 7520 section 5"
 retrieved = "2026-11-26"
 licence = "IETF Trust (RFC text; data values only)"
 feeds = ["jose"]
-notes = "tools/extract_jwe.py on rfc7520.txt (sha256 14798c3b2d72e35375d5fb86d280a1e8df6109a6ee6cbfc091a0c57a8cc076c6), case shape of rfc7515/jws.json, op jwe_decrypt. Every compact, general and flattened serialization of 5.1-5.13 with the key the example names. In scope (RSA-OAEP behind rsa-decrypt, ECDH-ES and ECDH-ES+A128KW/A256KW, dir, A256GCMKW, A128KW; A128GCM, A256GCM, A128CBC-HS256) expect the Figure 72 plaintext; each in-scope compact form adds five derived refusals (tampered tag, ciphertext, IV and encrypted key, truncated tag; for dir and ECDH-ES a non-empty encrypted key, RFC 7516 5.2 step 10). Must-refuse (non-goals): 5.1 RSA1_5, 5.3 PBES2-HS512+A256KW, 5.9 zip DEF, and 5.13 recipient 1 (RSA1_5); 5.13 recipients 2 and 3 decrypt. The 95 cases then in this file, the A.1 to A.3 cases of rfc7516/jwe.json and rfc7518/*.json were cross-checked against Node WebCrypto/OpenSSL when first committed; the truncated-tag cases (since regenerated to cut the decoded tag), A.4, A.5 and the RFC 7520 section 6 file are not cross-checked, only the RFC's own outputs decrypt and verify in our code."
+notes = "tools/extract_jwe.py on rfc7520.txt (sha256 14798c3b2d72e35375d5fb86d280a1e8df6109a6ee6cbfc091a0c57a8cc076c6), case shape of rfc7515/jws.json, op jwe_decrypt. Every compact, general and flattened serialization of 5.1-5.13 with the key the example names. In scope (RSA-OAEP behind rsa-decrypt, ECDH-ES and ECDH-ES+A128KW/A256KW, dir, A256GCMKW, A128KW; A128GCM, A256GCM, A128CBC-HS256) expect the Figure 72 plaintext; each in-scope compact form adds five derived refusals (tampered tag, ciphertext, IV and encrypted key, truncated tag; for dir and ECDH-ES a non-empty encrypted key, RFC 7516 5.2 step 10). Must-refuse (non-goals): 5.1 RSA1_5, 5.3 PBES2-HS512+A256KW, 5.9 zip DEF, and 5.13 recipient 1 (RSA1_5); 5.13 recipients 2 and 3 decrypt. The 95 cases then in this file, the A.1 to A.3 cases of rfc7516/jwe.json and rfc7518/*.json were cross-checked against Node WebCrypto/OpenSSL when first committed; the A.4, A.5 and the RFC 7520 section 6 file are not cross-checked, only the RFC's own outputs decrypt and verify in our code."
 cases = 64
 files = [
-  { path = "rfc7520/jwe-cases.json", sha256 = "b742a3ba6558429004b5124d9e8a0cefd2e34ebc4d84767fa778ede9935471d2", cases = 64 },
+  { path = "rfc7520/jwe-cases.json", sha256 = "7a2d93a97b578c4264eed5ca77955d6422b4af722a396076315527cdcf78d77b", cases = 64 },
 ]
 
 [source."rfc7516"]
@@ -272,7 +272,7 @@ feeds = ["jose"]
 notes = "tools/extract_jwe.py on rfc7516.txt (sha256 722cfcddc15f58e746891ba4b846853d3711153a774e4dd55ad6db100474a21f), case shape of rfc7515/jws.json, op jwe_decrypt. A.1 RSA-OAEP + A256GCM (behind rsa-decrypt) and A.3 A128KW + A128CBC-HS256 each valid plus five derived refusals (tampered tag, ciphertext, IV, encrypted key; truncated tag). A.2 RSA1_5 + A128CBC-HS256 is must-refuse (non-goal). A.4 (general JSON, RSA1_5 and A128KW recipients) and A.5 (flattened JSON, A128KW): the A128KW key is the case for each, opening to the A.3 plaintext with A.4's RSA1_5 recipient skipped; A.2 is must-refuse and its token is AlgMismatch under token_jwk, an owned oct key (CONTRACT R52)."
 cases = 15
 files = [
-  { path = "rfc7516/jwe.json", sha256 = "c8b0d425d3e0017aa4ce5fc24391c107dd56adc325a69905f6918336a1e66e7d", cases = 15 },
+  { path = "rfc7516/jwe.json", sha256 = "e20ec4b54126e13fe6292268889348ac1b09b16d612aa34548eb1fbe449c317d", cases = 15 },
 ]
 
 [source."rfc7518"]
@@ -362,13 +362,13 @@ feeds = ["jose"]
 notes = "Derived by tools/derive_jose.py and tools/derive_jose_jwe.mjs (deterministic, re-run byte-identical) from the specs and the pinned upstream keys only, never from crate code or drafts (ruling R-b). Each case names its spec section in `spec`. expect.kind is set only where the architecture contract or a ruling names the class (DuplicateMember, CriticalHeader, AlgMismatch, WeakKey, KeyUse, KeyAlgMissing, Issuer, Audience, MissingClaim, Expired, NotYetValid, ClaimType, Type, TooLarge; UnsupportedAlg for X25519 per R-e). Oracle choices beyond a MUST are stated in the case's spec text: duplicate names rejected (not last-wins), RFC 7797 not implemented, a duplicate-kid lookup refused, an iat beyond now plus leeway refused. limits.json names each bound as a crate constant (contract rule 5.7 states no numbers: jose::MAX_COMPACT_LEN, jose::MAX_JSON_DEPTH, jose::MAX_JWKS_KEYS) and carries the exact input at the bound (excess 0, accepted) and one past it (excess 1, TooLarge); a JWS is given as its header and payload text, not as a token, so the data does not read as a credential to the secret scan. Header MACs, EC/RSA key validity and every JWE (otherwise valid, so the refusal is for the header alone) were cross-checked with Node crypto; the Ed25519 thumbprint equals RFC 8037 A.3."
 cases = 109
 files = [
-  { path = "jose-derived/claims.json", sha256 = "708fe7fcd78b3463fae0ebe1ac7cb33823a518b6743bb76ca611798eda7f7696", cases = 23 },
-  { path = "jose-derived/header.json", sha256 = "25d515ff305dabcb4c672b4ad0116cc2f2071f36e471f90511e35c0d68612b24", cases = 23 },
+  { path = "jose-derived/claims.json", sha256 = "e5eecd774966e5e4576f3b9e993eb3395bf673585206f4b168cd8551e1ab99da", cases = 23 },
+  { path = "jose-derived/header.json", sha256 = "9492f4bdea52555000f9274fc674016bdc5f1c6d92b8ed45a5b0654cf7c1fd65", cases = 23 },
   { path = "jose-derived/jwe-header.json", sha256 = "abffce55481a23fa6dc6c6517fcff4c9071dc03291a285d94592ba62fef214a3", cases = 11 },
-  { path = "jose-derived/jwks.json", sha256 = "2e9135581fcda0c0bd8128ed3cc966d8c2a1bf574f3fd83ea248d82c40a1048c", cases = 8 },
-  { path = "jose-derived/keys.json", sha256 = "59ecabe434bd617484e98d6f299ac726f30b13624208a18559b0262f6da3ab3d", cases = 29 },
+  { path = "jose-derived/jwks.json", sha256 = "ca7888c0bde66f331c03cfa0b5e7a4f0173f46ab4c43a17f59d4b74c5908e990", cases = 8 },
+  { path = "jose-derived/keys.json", sha256 = "3a3996c0c1faa926b07baa35b06c7802f10f73d92cb8f79d0beb490ea223d4a2", cases = 29 },
   { path = "jose-derived/limits.json", sha256 = "68f727a22c03c2db3384e02f878b99855ef58180f74132897dfb43540e8e2748", cases = 8 },
-  { path = "jose-derived/thumbprint.json", sha256 = "6e0127398009b39c2a124711a5eadbdd189e8c0e7e49aa3934fe82945f6b6209", cases = 7 },
+  { path = "jose-derived/thumbprint.json", sha256 = "40ee2e96df446ba3a49185222f9dd77d5eaaeba1b47842b7370cf4b5aa7fd11a", cases = 7 },
 ]
 
 [source."factor-derived"]

@@ -68,8 +68,14 @@ mod tests {
         text.pop();
         text.push('+');
         let mut outcome = None;
-        let seen = freed(text.len(), || outcome = Some(b64url_decode(&text).is_err()));
-        assert_eq!(outcome, Some(true), "the text is refused");
+        let seen = freed(text.len(), || {
+            outcome = Some(b64url_decode(&text).err().map(|e| e.kind()))
+        });
+        assert_eq!(
+            outcome,
+            Some(Some(base::ErrorKind::Malformed)),
+            "the text is refused"
+        );
         assert_eq!(
             seen,
             (1, 0),

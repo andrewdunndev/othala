@@ -100,7 +100,8 @@
    "jws": "eyJ0eXAiOiJKV1QifQ.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.dSD_2OjgSISeaHs_UrTGM-mhVTL3Hl3yyGpMYYTKsvM",
    "spec": "RFC 7515 4.1.1 (alg MUST be present)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -114,7 +115,8 @@
    "jws": "eyJhbGciOjF9.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.UDH5IkYS9WZV0IwTnBi5O7tSWya_iWarwwgpKY8xPdo",
    "spec": "RFC 7515 4.1.1 (a case-sensitive string)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -173,7 +175,8 @@
    "jws": "eyJhbGciOiJIUzI1NiIsImNyaXQiOltdfQ.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.UMG4HVyn3M0hTkxX1aaLQ0ARXO3dlwix1MHCXzg-Ars",
    "spec": "RFC 7515 4.1.11 (MUST NOT be the empty list)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -187,7 +190,8 @@
    "jws": "eyJhbGciOiJIUzI1NiIsImNyaXQiOlsiYWxnIl19.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.EJcsgF0kZpGKWmsIphyzlR4xFoyX6ooZ7LpeZhNYeAg",
    "spec": "RFC 7515 4.1.11 (MUST NOT list names this spec defines)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -201,7 +205,8 @@
    "jws": "eyJhbGciOiJIUzI1NiIsImNyaXQiOlsiZXhwLXgiXX0.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.Q37WKV10FAv8VGuFaEd0z152eoS57zXe1SSHZzLPw3Q",
    "spec": "RFC 7515 4.1.11 (listed names MUST be present)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -215,7 +220,8 @@
    "jws": "eyJhbGciOiJIUzI1NiIsImNyaXQiOiJleHAteCJ9.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.60qkguy_CpwOtKHEgJKt32ROols7cNLBhC7IFxplg3k",
    "spec": "RFC 7515 4.1.11 (an array)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -229,7 +235,8 @@
    "jws": "WyJhbGciLCJIUzI1NiJd.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.5lG8kOMXAGHbMcz7SwPMsO0Gmd1ykCV5lX2yWH7nRP8",
    "spec": "RFC 7515 5.2 step 3 (a JSON object)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -243,7 +250,8 @@
    "jws": "e2FsZzpIUzI1Nn0.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.JM5Lhlbgh_5z8dtaT7wFoB_HxarwjM_ksmJ8svH7HC4",
    "spec": "RFC 7515 5.2 step 3",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -257,7 +265,8 @@
    "jws": "eyJhbGciOiJIUzI1NiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19.{\"iss\":\"joe\"}.4iw_oikij8eRkrlBE9cJNiI-hyhnuiWzpdfbsO_-UGQ",
    "spec": "RFC 7797 3 and 6 with RFC 7515 4.1.11 (this oracle does not implement RFC 7797)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -271,7 +280,8 @@
    "jws": "eyJhbGciOiJIUzI1NiIsImI2NCI6ZmFsc2V9.{\"iss\":\"joe\"}.x-Az7v0P6kviskKx4NDFwNouuxOj1mt8kgHJ-CO9yLg",
    "spec": "RFC 7797 6 (b64 MUST be listed in crit)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -285,7 +295,8 @@
    "jws": "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.8hYiNs4l2gWKk3tChISXhyUeB3Vl09RpsoWjhp0vboU=",
    "spec": "RFC 7515 2 (base64url without padding) and 7.1",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -299,7 +310,8 @@
    "jws": "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.8hYiNs4l2gWKk3tChISXhyUeB3Vl09RpsoWjhp0vboU.8hYiNs4l2gWKk3tChISXhyUeB3Vl09RpsoWjhp0vboU",
    "spec": "RFC 7515 7.1 (three parts)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -313,7 +325,8 @@
    "jws": "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9",
    "spec": "RFC 7515 7.1",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -327,7 +340,8 @@
    "jws": "eyJhbGciOiJIUzI1NiJ9.\neyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.8hYiNs4l2gWKk3tChISXhyUeB3Vl09RpsoWjhp0vboU",
    "spec": "RFC 7515 7.1 (no whitespace)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   }
  ]

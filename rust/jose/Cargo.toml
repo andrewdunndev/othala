@@ -22,19 +22,19 @@ expose.workspace = true
 serde = { workspace = true, features = ["alloc", "derive"] }
 serde_json = { version = "1.0.154", default-features = false, features = ["alloc", "raw_value"] }
 sha2.workspace = true
-hmac = "0.13"
-p256 = { version = "0.14", default-features = false, features = ["ecdsa", "ecdh"] }
-p384 = { version = "0.14", default-features = false, features = ["ecdsa", "ecdh"] }
+hmac.workspace = true
+p256 = { workspace = true, features = ["ecdsa", "ecdh"] }
+p384 = { workspace = true, features = ["ecdsa", "ecdh"] }
 p521 = { version = "0.14", default-features = false, features = ["ecdsa", "ecdh"], optional = true }
 ecdsa = { version = "0.17", default-features = false, features = ["algorithm"] }
-ed25519-dalek = { version = "3", default-features = false }
-rsa = { version = "0.10", default-features = false, features = ["pkcs1v15"] }
+ed25519-dalek.workspace = true
+rsa = { workspace = true, features = ["pkcs1v15"] }
 aes = { version = "0.9", default-features = false }
 aes-gcm = { version = "0.11", default-features = false, features = ["aes", "alloc"] }
 cbc = { version = "0.2", default-features = false, features = ["alloc", "block-padding"] }
 aes-kw = { version = "0.3", default-features = false }
 one-step-kdf = { version = "=0.1.0-rc.1", default-features = false }
-sha1 = { version = "0.11", default-features = false, optional = true }
+sha1 = { workspace = true, optional = true }
 rand_core = { workspace = true, optional = true }
 
 [dev-dependencies]

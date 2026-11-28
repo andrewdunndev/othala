@@ -2,6 +2,8 @@
 //! decryption path.
 #![cfg(feature = "rsa-decrypt")]
 
+mod common_refusal;
+
 use base::{Entropy, b64url_decode, b64url_encode};
 use jose::{
     A128CbcHs256, A128Gcm, A256CbcHs512, A256Gcm, BlindedKeyAlg, Enc, ErrorKind, Jwe, Jwk,
@@ -105,36 +107,16 @@ fn row(file: Vector, total: usize, checked: usize) {
                 &mut draws,
             ),
         });
-        assert_eq!(
-            outcome.is_ok(),
+        common_refusal::assert_outcome(
+            &outcome,
             case.expect.ok,
-            "{} {:?}",
-            case.id,
-            outcome.as_ref().err().map(|e| e.kind())
+            case.expect.kind.as_deref(),
+            &case.id,
         );
-        if let Some(named) = &case.expect.kind {
-            assert_eq!(
-                outcome
-                    .as_ref()
-                    .err()
-                    .map(|e| format!("{:?}", e.kind()))
-                    .as_ref(),
-                Some(named),
-                "{}",
-                case.id
-            );
-        }
         if let Some(want) = &case.expect.plaintext {
             assert_eq!(
                 outcome.ok().map(|p| b64url_encode(&p)).as_ref(),
                 Some(want),
-                "{}",
-                case.id
-            );
-        } else if parse(compact, &wire).is_ok() {
-            assert_eq!(
-                outcome.err().map(|e| e.kind()),
-                Some(ErrorKind::Decrypt),
                 "{}",
                 case.id
             );
@@ -229,5 +211,5 @@ fn oaep_round_trip() {
         }
         Ok(())
     });
-    assert!(outcome.is_ok(), "{outcome:?}");
+    assert_eq!(outcome, Ok(()));
 }

@@ -28,7 +28,8 @@
    },
    "spec": "RFC 7518 3.4 (ES256 is P-256) and RFC 8725 3.1",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    }
   },
   {
@@ -43,7 +44,8 @@
    },
    "spec": "RFC 7518 3.4 and RFC 8725 3.1",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    }
   },
   {
@@ -58,7 +60,8 @@
    },
    "spec": "RFC 7518 3.4 (ES384 is P-384)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    }
   },
   {
@@ -72,7 +75,8 @@
    },
    "spec": "RFC 7518 3.4 and RFC 8725 3.1",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    }
   },
   {
@@ -86,7 +90,8 @@
    },
    "spec": "RFC 7518 3.4 and RFC 8037 3.1",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    }
   },
   {
@@ -101,7 +106,8 @@
    },
    "spec": "RFC 7518 3.3 and RFC 8725 3.1",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    }
   },
   {
@@ -115,7 +121,8 @@
    },
    "spec": "RFC 7518 3.2 and RFC 8725 3.1 (RS-to-HS swap)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -130,7 +137,8 @@
    },
    "spec": "RFC 8037 3.1 (X25519 is not a signature curve) and ruling R-e",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "UnsupportedAlg"
    }
   },
   {
@@ -159,7 +167,8 @@
    },
    "spec": "RFC 8725 3.4 (validate the point)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -174,7 +183,8 @@
    },
    "spec": "RFC 8725 3.4 and SEC 1 3.2.2",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -189,7 +199,8 @@
    },
    "spec": "RFC 7518 6.2.1.2 (x MUST be the full coordinate size)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -203,7 +214,8 @@
    },
    "spec": "RFC 7518 6.2.1.1 (crv is required)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -217,7 +229,8 @@
    },
    "spec": "RFC 7518 6.2.1.3 (y is required for P-256)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "Malformed"
    }
   },
   {
@@ -365,7 +378,8 @@
    },
    "spec": "RFC 7517 4.3 (use and key_ops SHOULD NOT both be used; when they disagree the key is refused: oracle choice)",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "KeyUse"
    }
   },
   {
@@ -410,7 +424,8 @@
    },
    "spec": "RFC 7518 3.1 and RFC 8725 3.1",
    "expect": {
-    "ok": false
+    "ok": false,
+    "kind": "AlgMismatch"
    }
   },
   {

@@ -363,7 +363,7 @@ mod tests {
             [finish(255), finish(256), finish(1024), finish(1025)]
                 .map(|r: Option<Result<usize, ErrorKind>>| r.unwrap_or(Err(ErrorKind::Signer)));
         assert_eq!(results[0], Err(ErrorKind::Malformed));
-        assert!(results[1].is_ok() && results[2].is_ok());
+        assert_eq!((results[1], results[2]), (Ok(366), Ok(1390)));
         assert_eq!(results[3], Err(ErrorKind::Malformed));
         let ps = Unsigned::<Ps256>::jws(Header::new(), b"x").and_then(|u| u.finish(vec![1; 10]));
         assert_eq!(ps.err().map(|e| e.kind()), Some(ErrorKind::Malformed));
@@ -384,7 +384,7 @@ mod tests {
         };
         // header 20 + '.' + payload + '.' + 43
         let longest = (MAX_COMPACT_LEN - 65) / 4 * 3;
-        assert!(fits(longest).is_ok());
+        assert_eq!(fits(longest).err().map(|e| e.kind()), None);
         assert_eq!(
             fits(12_239).map(|c| c.as_str().len()).ok(),
             Some(MAX_COMPACT_LEN)
@@ -394,7 +394,12 @@ mod tests {
             exact.map(|u| u.signing_input().len()).ok(),
             Some(MAX_COMPACT_LEN)
         );
-        assert!(Unsigned::<Hs256>::jws(Header::new(), &vec![0; 12_273]).is_err());
+        assert_eq!(
+            Unsigned::<Hs256>::jws(Header::new(), &vec![0; 12_273])
+                .err()
+                .map(|e| e.kind()),
+            Some(ErrorKind::TooLarge)
+        );
         assert_eq!(
             fits(longest + 3).err().map(|e| e.kind()),
             Some(ErrorKind::TooLarge)

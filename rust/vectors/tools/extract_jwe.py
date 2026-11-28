@@ -8,7 +8,7 @@ Values are copied from the RFC text; byte arrays become hex or base64url. Cases 
 "tampered", "truncated", "nonempty" or "off-curve" are derived by one mechanical edit of an upstream
 value. "must-refuse" cases use a non-goal (RSA1_5, PBES2, zip) and expect ok false; the RFC 7516 one names
 the kind of its token-level refusal under token_jwk, the A.3 oct key (a header alg that is not the key's, R52).
-Tampered RFC 7516 cases name Decrypt (RFC 7516 11.4). RFC 7516 A.4 (general) and A.5 (flattened) are cases for
+Tampered RFC 7516 cases name Decrypt (RFC 7516 11.4), a truncated tag Malformed. RFC 7516 A.4 (general) and A.5 (flattened) are cases for
 the A128KW recipient's key; the RSA1_5 recipient of A.4 is the one A.2 refuses.
 Licence of this script: MIT OR Apache-2.0.
 """
@@ -141,14 +141,16 @@ def compact_cases(cid, base, jwe, kind=None):
     out = [dict(base, id=cid + "-valid", jwe=jwe)]
     bad = {"ok": False, **({"kind": kind} if kind else {})}
     edits = [("tampered-tag", [h, k, iv, c, flip(t)]), ("tampered-ciphertext", [h, k, iv, flip(c), t]),
-             ("tampered-iv", [h, k, flip(iv), c, t]), ("truncated-tag", [h, k, iv, c, b64(unb64(t)[:-4])])]
+             ("tampered-iv", [h, k, flip(iv), c, t]), ("truncated-tag", [h, k, iv, c, t[:-4]])]
     if k:
         edits.append(("tampered-encrypted-key", [h, flip(k), iv, c, t]))
     else:
         # direct modes require an empty encrypted key (RFC 7516 section 5.2 step 10)
         edits.append(("nonempty-encrypted-key", [h, b64(bytes(16)), iv, c, t]))
     for name, parts in edits:
-        out.append(dict(base, id=f"{cid}-{name}", jwe=".".join(parts), expect=bad))
+        # a tag cut as text is not canonical base64url
+        expect = dict(bad, kind="Malformed") if kind and name == "truncated-tag" else bad
+        out.append(dict(base, id=f"{cid}-{name}", jwe=".".join(parts), expect=expect))
     return out
 
 

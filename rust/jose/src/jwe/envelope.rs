@@ -742,11 +742,32 @@ mod tests {
             ] {
                 assert_eq!(kind, Some(ErrorKind::UnsupportedAlg), "{name}");
             }
-            assert!(serde_json::from_str::<JweAlg>(&format!("\"{name}\"")).is_err());
-            assert!(serde_json::from_str::<JweEnc>(&format!("\"{name}\"")).is_err());
+            assert_eq!(
+                serde_json::from_str::<JweAlg>(&format!("\"{name}\""))
+                    .err()
+                    .map(|e| format!("{e}")),
+                Some("algorithm, curve or compression is not supported; choose an implemented one or enable its feature".into()),
+                "{name}"
+            );
+            assert_eq!(
+                serde_json::from_str::<JweEnc>(&format!("\"{name}\""))
+                    .err()
+                    .map(|e| format!("{e}")),
+                Some("algorithm, curve or compression is not supported; choose an implemented one or enable its feature".into()),
+                "{name}"
+            );
         }
         // a name of the other registry is not a name of this one
-        assert!(JweAlg::parse("A128GCM").is_err() && JweEnc::parse("A128KW").is_err());
+        assert_eq!(
+            (
+                JweAlg::parse("A128GCM").err().map(|e| e.kind()),
+                JweEnc::parse("A128KW").err().map(|e| e.kind())
+            ),
+            (
+                Some(ErrorKind::UnsupportedAlg),
+                Some(ErrorKind::UnsupportedAlg)
+            )
+        );
     }
 
     struct Zeros;
