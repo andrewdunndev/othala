@@ -46,6 +46,15 @@ struct Expect {
     counter: Option<Count>,
 }
 
+/// The refusals the carried exam-spike file does not state, by case id.
+pub(crate) type Refusals = BTreeMap<String, Refusal>;
+
+#[derive(Deserialize)]
+struct Row {
+    id: String,
+    expect: Refusal,
+}
+
 // the oracle's `allow`: the listed credentials of an identified user, or any credential that carries its user handle
 #[derive(Deserialize)]
 #[serde(untagged)]
@@ -316,8 +325,8 @@ fn flow(c: &Case, spike: bool) -> Result<Flow, &'static str> {
 }
 
 /// One case through the ceremony: ok or refused as the oracle says, the kind and step it states, and the effect it leaves.
-pub(crate) fn check(c: &Case, spike: bool) -> Outcome {
-    let done = flow(c, spike);
+pub(crate) fn check(c: &Case, spike: Option<&Refusals>) -> Outcome {
+    let done = flow(c, spike.is_some());
     assert_eq!(done.as_ref().err(), None, "{}", c.id);
     let Ok(done) = done else {
         return Outcome::NotApplicable;
@@ -380,12 +389,15 @@ pub(crate) fn check(c: &Case, spike: bool) -> Outcome {
             );
         }
         Err(err) => {
-            c.expect.refusal.check(
-                &c.id,
-                Some(SpecStep::Authentication),
-                err.kind(),
-                err.spec_step(),
-            );
+            spike
+                .and_then(|table| table.get(&c.id))
+                .unwrap_or(&c.expect.refusal)
+                .check(
+                    &c.id,
+                    Some(SpecStep::Authentication),
+                    err.kind(),
+                    err.spec_step(),
+                );
             let credentials = |m: &BTreeMap<Key, Record>| {
                 m.iter()
                     .filter(|(k, _)| matches!(k, Key::Credential(_)))
@@ -405,6 +417,18 @@ pub(crate) fn check(c: &Case, spike: bool) -> Outcome {
 
 /// Every case of `vector` through the ceremony.
 pub(crate) fn cases(vector: Vector, floor: usize, spike: bool) {
-    let tally = run::<Case>(vector, floor, |c| check(c, spike));
+    // the carried exam-spike file states only ok, so our own table says what each of its refusals is
+    let mut table = Refusals::new();
+    let refusals = run::<Row>(
+        testkit::vector!("webauthn-rp-derived/exam-spike-refusals.json"),
+        7,
+        |row| {
+            table.insert(row.id.clone(), row.expect.clone());
+            Outcome::Checked
+        },
+    );
+    assert_eq!(refusals.checked(), refusals.total());
+    let table = spike.then_some(&table);
+    let tally = run::<Case>(vector, floor, |c| check(c, table));
     assert_eq!(tally.checked(), tally.total());
 }

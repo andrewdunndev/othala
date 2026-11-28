@@ -268,8 +268,26 @@ def write(name, source, cases):
         fh.write("\n")
 
 
+def exam_spike_refusals():
+    # the kind and step of each refusal of the carried exam-spike file (w3c-webauthn-3/exam-spike/assertion-none-es256.json), which states only ok
+    q = lambda step, text: f'WebAuthn L3 7.2 step {step} "{text}"'
+    origin = q(12, "C.origin is an origin expected by the Relying Party")
+    signature = q(21, "verify that sig is a valid signature")
+    rows = [
+        ("wrong-origin", "OriginMismatch", origin),
+        ("wrong-origin-suffix", "OriginMismatch", origin),
+        ("wrong-challenge", "ChallengeMismatch", q(11, "C.challenge equals the base64url encoding of pkOptions.challenge")),
+        ("wrong-rp-id", "RpIdHash", q(15, "rpIdHash in authData is the SHA-256 hash of the RP ID expected by the Relying Party")),
+        ("tampered-signature", "Signature", signature),
+        ("tampered-client-data", "Type", q(10, "C.type is the string webauthn.get") + " (the tampered clientDataJSON carries webauthn.create, refused before the signature is read)"),
+        ("tampered-authenticator-data", "Signature", signature),
+    ]
+    return [{"id": cid, "spec": spec, "expect": refused(kind, spec)} for cid, kind, spec in rows]
+
+
 SIG = "assertions signed by tools/derive_webauthn.py with the RFC 6979 A.2.5 P-256 key (deterministic k); rp example.org, origin https://example.org, stored counter 5, BE stored clear, cross-origin denied unless the case lists top_origins"
 write("client-data.json", "clientDataJSON checks (WebAuthn L3 7.2 steps 8-14); " + SIG, client_cases())
 write("authenticator-data.json", "authenticator data checks (WebAuthn L3 6.1, 7.2 steps 15-22); " + SIG, authdata_cases())
 write("registration.json", "registration checks with none attestation (WebAuthn L3 7.1, 8.7); credential key is the RFC 6979 A.2.5 P-256 key as a canonical COSE_Key; rp example.org, origin https://example.org, pubKeyCredParams [-7] unless the case lists others", registration_cases())
 write("cbor.json", "strict CBOR decoding (RFC 8949 4.2.1 and CTAP2 canonical form, as WebAuthn L3 2.4 requires of the conformance classes it names); hex inputs written by hand per the rule named in `spec`", cbor_cases())
+write("exam-spike-refusals.json", "the kind and step each refusal of the carried exam-spike assertion file must report, keyed by its case id; that file states only ok", exam_spike_refusals())

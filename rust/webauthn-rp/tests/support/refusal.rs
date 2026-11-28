@@ -5,7 +5,7 @@ use serde::Deserialize;
 use webauthn_rp::SpecStep;
 
 /// The `kind` and `step` members of an `expect` that has `ok: false`.
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub(crate) struct Refusal {
     kind: Option<String>,
     step: Option<u8>,

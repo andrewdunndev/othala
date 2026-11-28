@@ -113,7 +113,7 @@ mod browser_binding {
             8,
             |c| match c {
                 Case::Registration(c) => super::oracle_registration::check(c),
-                Case::Assertion(c) => super::oracle_assertion::check(c, false),
+                Case::Assertion(c) => super::oracle_assertion::check(c, None),
             },
         );
         assert_eq!(tally.checked(), tally.total());

@@ -227,31 +227,39 @@ def attobj_cases():
     t = lambda s: c_text(s)
     kv = lambda p: p[0] + p[1]
     fmt, stmt, adat = (t("fmt"), t("none")), (t("attStmt"), b"\xa0"), (t("authData"), c_bytes(ad))
-    c = lambda cid, spec, raw, expect: {"id": cid, "op": "attestation_object", "input": raw.hex(), "spec": spec, "expect": expect}
+    # contract R40: a refusal is `Malformed` at step 13, so the step is cited in the case's own text like every other
+    STEP13 = 'WebAuthn L3 7.1 step 13 "Perform CBOR decoding on the attestationObject field"'
+
+    def c(cid, spec, raw, expect):
+        if isinstance(expect, str):
+            spec = STEP13 + " with " + spec
+            expect = refused(expect, spec)
+        return {"id": cid, "op": "attestation_object", "input": raw.hex(), "spec": spec, "expect": expect}
+
     NOTE = "contract R40 (exactly fmt, attStmt, authData) with ruling R-n"
     return [
         c("canonical-order", "WebAuthn L3 6.5.4 and contract R40", c_map_raw([fmt, stmt, adat]), OK),
         c("authdata-first-order-tolerated", NOTE + " (the outer map is read order-tolerant: a client may re-encode it)", c_map_raw([adat, fmt, stmt]), OK),
         c("attstmt-first-order-tolerated", NOTE + " (attStmt first)", c_map_raw([stmt, fmt, adat]), OK),
-        c("extra-member", NOTE, c_map([fmt, stmt, adat, (t("extra"), c_uint(1))]), refused("Malformed", step=13)),
-        c("fmt-missing", NOTE, c_map([stmt, adat]), refused("Malformed", step=13)),
-        c("attstmt-missing", NOTE, c_map([fmt, adat]), refused("Malformed", step=13)),
-        c("authdata-missing", NOTE, c_map([fmt, stmt]), refused("Malformed", step=13)),
-        c("fmt-bytes", NOTE + " (fmt is text)", c_map([(t("fmt"), c_bytes(b"none")), stmt, adat]), refused("Malformed", step=13)),
-        c("attstmt-array", NOTE + " (attStmt is a map)", c_map([fmt, (t("attStmt"), c_array()), adat]), refused("Malformed", step=13)),
-        c("attstmt-null", NOTE + " (attStmt is a map)", c_map([fmt, (t("attStmt"), b"\xf6"), adat]), refused("Malformed", step=13)),
-        c("authdata-text", NOTE + " (authData is a byte string)", c_map([fmt, stmt, (t("authData"), c_text("x" * 37))]), refused("Malformed", step=13)),
-        c("authdata-array-of-ints", NOTE + " (authData is a byte string, not an array of integers)", c_map([fmt, stmt, (t("authData"), c_array(*[c_uint(0)] * 37))]), refused("Malformed", step=13)),
-        c("duplicate-fmt", "RFC 8949 5.6 (duplicate keys, even under an order-tolerant outer map)", cbor_head(5, 4) + kv(fmt) + kv(fmt) + kv(stmt) + kv(adat), refused("Malformed", step=13)),
-        c("duplicate-key-three-members", "RFC 8949 5.6 (a map of three entries with a repeated key is not exactly fmt, attStmt, authData)", cbor_head(5, 3) + kv(fmt) + kv(fmt) + kv(adat), refused("Malformed", step=13)),
-        c("indefinite-length-map", "RFC 8949 4.2.1 (no indefinite length, in the outer map too)", b"\xbf" + kv(fmt) + kv(stmt) + kv(adat) + b"\xff", refused("Malformed", step=13)),
-        c("map-length-not-shortest", "RFC 8949 4.2.1 (shortest-form heads)", b"\xb8\x03" + kv(fmt) + kv(stmt) + kv(adat), refused("Malformed", step=13)),
-        c("key-integer", NOTE, c_map([(c_uint(1), c_text("none")), stmt, adat]), refused("Malformed", step=13)),
-        c("trailing-byte", "RFC 8949 5.1 with contract R2 (nothing after the top item)", c_map_raw([fmt, stmt, adat]) + b"\x00", refused("Malformed", step=13)),
-        c("not-a-map", NOTE, c_array(c_text("none"), b"\xa0", c_bytes(ad)), refused("Malformed", step=13)),
-        c("empty", "RFC 8949 5.1 (an item is required)", b"", refused("Malformed", step=13)),
+        c("extra-member", NOTE, c_map([fmt, stmt, adat, (t("extra"), c_uint(1))]), "Malformed"),
+        c("fmt-missing", NOTE, c_map([stmt, adat]), "Malformed"),
+        c("attstmt-missing", NOTE, c_map([fmt, adat]), "Malformed"),
+        c("authdata-missing", NOTE, c_map([fmt, stmt]), "Malformed"),
+        c("fmt-bytes", NOTE + " (fmt is text)", c_map([(t("fmt"), c_bytes(b"none")), stmt, adat]), "Malformed"),
+        c("attstmt-array", NOTE + " (attStmt is a map)", c_map([fmt, (t("attStmt"), c_array()), adat]), "Malformed"),
+        c("attstmt-null", NOTE + " (attStmt is a map)", c_map([fmt, (t("attStmt"), b"\xf6"), adat]), "Malformed"),
+        c("authdata-text", NOTE + " (authData is a byte string)", c_map([fmt, stmt, (t("authData"), c_text("x" * 37))]), "Malformed"),
+        c("authdata-array-of-ints", NOTE + " (authData is a byte string, not an array of integers)", c_map([fmt, stmt, (t("authData"), c_array(*[c_uint(0)] * 37))]), "Malformed"),
+        c("duplicate-fmt", "RFC 8949 5.6 (duplicate keys, even under an order-tolerant outer map)", cbor_head(5, 4) + kv(fmt) + kv(fmt) + kv(stmt) + kv(adat), "Malformed"),
+        c("duplicate-key-three-members", "RFC 8949 5.6 (a map of three entries with a repeated key is not exactly fmt, attStmt, authData)", cbor_head(5, 3) + kv(fmt) + kv(fmt) + kv(adat), "Malformed"),
+        c("indefinite-length-map", "RFC 8949 4.2.1 (no indefinite length, in the outer map too)", b"\xbf" + kv(fmt) + kv(stmt) + kv(adat) + b"\xff", "Malformed"),
+        c("map-length-not-shortest", "RFC 8949 4.2.1 (shortest-form heads)", b"\xb8\x03" + kv(fmt) + kv(stmt) + kv(adat), "Malformed"),
+        c("key-integer", NOTE, c_map([(c_uint(1), c_text("none")), stmt, adat]), "Malformed"),
+        c("trailing-byte", "RFC 8949 5.1 with contract R2 (nothing after the top item)", c_map_raw([fmt, stmt, adat]) + b"\x00", "Malformed"),
+        c("not-a-map", NOTE, c_array(c_text("none"), b"\xa0", c_bytes(ad)), "Malformed"),
+        c("empty", "RFC 8949 5.1 (an item is required)", b"", "Malformed"),
         c("attstmt-noncanonical-order-refused", "ruling R-n (attStmt is authenticator-produced and read strict: its keys must be in canonical order; 'alg' then 'sig')",
-          c_map_raw([(t("fmt"), t("packed")), (t("attStmt"), c_map_raw([(t("sig"), c_bytes(b"\x01")), (t("alg"), c_int(-7))])), adat]), refused("Malformed", step=13)),
+          c_map_raw([(t("fmt"), t("packed")), (t("attStmt"), c_map_raw([(t("sig"), c_bytes(b"\x01")), (t("alg"), c_int(-7))])), adat]), "Malformed"),
         c("attstmt-canonical-order-read", "ruling R-n (an attStmt in canonical key order is read; structure only, the packed rules are checked in attestation.json)",
           c_map_raw([(t("fmt"), t("packed")), (t("attStmt"), c_map([(t("alg"), c_int(-7)), (t("sig"), c_bytes(b"\x01"))])), adat]), OK),
     ]

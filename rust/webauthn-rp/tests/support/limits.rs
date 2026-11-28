@@ -33,6 +33,7 @@ struct Case {
     id: String,
     op: String,
     unbuilt: Option<String>,
+    extensions: Option<serde::de::IgnoredAny>,
     // the bytes of the case: hex up to 4096, base64url above, with the length and SHA-256 they must have; a text value for an RP ID or AppID
     input: Option<String>,
     input_b64url: Option<String>,
@@ -207,9 +208,6 @@ pub(crate) fn cases() {
         testkit::vector!("webauthn-rp-derived/limits.json"),
         30,
         |c| {
-            if c.unbuilt.is_some() {
-                return Outcome::NotApplicable;
-            }
             let read = match c.op.as_str() {
                 "cbor_limit" => Some(
                     decode(&c.bytes(), Order::Canonical)
@@ -218,6 +216,12 @@ pub(crate) fn cases() {
                 ),
                 _ => read(c),
             };
+            if c.unbuilt.is_some() {
+                // a case that must be accepted proves its marker true: the reader still refuses it. A client extension is no input the crate takes yet, so those cases cannot be tried.
+                let tried = c.extensions.is_none() && matches!(read, Some(Ok(())));
+                assert!(!(c.expect.ok && tried), "{}: built, drop the marker", c.id);
+                return Outcome::NotApplicable;
+            }
             let Some(read) = read else {
                 return Outcome::NotApplicable;
             };
