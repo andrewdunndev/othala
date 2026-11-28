@@ -11,8 +11,8 @@ use p256::elliptic_curve::sec1::ToSec1Point as _;
 use rsa::traits::PublicKeyParts as _;
 use sha2::{Digest as _, Sha256};
 
-use crate::jwk::decode::public_of;
 use crate::key::Public;
+use crate::key::public_of;
 use crate::{Jwk, Kid, SecretJwk};
 
 /// A key's JWK members besides `kid`, `alg`, `use` and `key_ops`, `kty` first: canonical (full-length coordinates,

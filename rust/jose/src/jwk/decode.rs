@@ -1,61 +1,25 @@
 //! JWK decoding (RFC 7517, RFC 7518 section 6, RFC 8037 section 2) and the key-type-to-algorithm binding.
 use alloc::borrow::Cow;
-use alloc::collections::BTreeSet;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::cell::Cell;
 use core::fmt;
 use core::marker::PhantomData;
 
 use base::{SecretBytes, b64url_decode};
 use expose::Expose as _;
 use rsa::BoxedUint;
-use serde::de::{DeserializeSeed, IgnoredAny, MapAccess, SeqAccess, Visitor};
+use serde::de::IgnoredAny;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::alg::SIGNING;
-use crate::key::{Private, Public};
+use crate::alg::{CONTENT, SIGNING, registry_name};
+use crate::json::{named, scan};
+use crate::key::{Fam, Private, Public, dup, dup_private, private_info, public_info, public_of};
 use crate::{
-    Alg, DecryptKey, EncryptKey, Error, ErrorKind, JweAlg, KeyAlg, MAX_ENTRIES, MAX_JSON_DEPTH,
-    MAX_JSON_LEN, MAX_NAME_LEN, MAX_RSA_BITS, MAX_RSA_EXPONENT, MIN_RSA_BITS, PublicAlg,
-    PublicKeyAlg, SignAlg, SigningAlg, SigningKey, VerifyKey,
+    Alg, DecryptKey, EncryptKey, Error, ErrorKind, JweAlg, KeyAlg, MAX_NAME_LEN, MAX_RSA_BITS,
+    MAX_RSA_EXPONENT, MIN_RSA_BITS, PublicAlg, PublicKeyAlg, SignAlg, SigningAlg, SigningKey,
+    VerifyKey,
 };
-
-/// A JSON array read into at most `MAX_ENTRIES + 1` elements, the rest skipped unbuilt: a caller that sees more than
-/// `MAX_ENTRIES` refuses the document without ever holding it all.
-pub(crate) struct Capped<T>(pub(crate) Vec<T>);
-
-impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Capped<T> {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        struct Cap<T>(core::marker::PhantomData<T>);
-
-        impl<'de, T: serde::Deserialize<'de>> serde::de::Visitor<'de> for Cap<T> {
-            type Value = Capped<T>;
-
-            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                f.write_str("an array")
-            }
-
-            fn visit_seq<A: serde::de::SeqAccess<'de>>(
-                self,
-                mut seq: A,
-            ) -> Result<Capped<T>, A::Error> {
-                let mut kept = Vec::new();
-                while kept.len() <= MAX_ENTRIES {
-                    match seq.next_element()? {
-                        Some(item) => kept.push(item),
-                        None => return Ok(Capped(kept)),
-                    }
-                }
-                while seq.next_element::<serde::de::IgnoredAny>()?.is_some() {}
-                Ok(Capped(kept))
-            }
-        }
-
-        d.deserialize_seq(Cap(core::marker::PhantomData))
-    }
-}
 
 /// A key id: an opaque lookup hint, compared byte for byte, never trusted.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -120,160 +84,8 @@ pub(crate) enum Key {
     Private(Private),
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Fam {
-    Oct,
-    P256,
-    P384,
-    P521,
-    Ed25519,
-    Rsa,
-}
-
-/// Every registry value a JWK's `alg` may carry: JWS `alg`, JWE `alg` and `enc`.
-const REGISTRY: [&str; 32] = [
-    "HS256",
-    "HS384",
-    "HS512",
-    "RS256",
-    "RS384",
-    "RS512",
-    "PS256",
-    "PS384",
-    "PS512",
-    "ES256",
-    "ES384",
-    "ES512",
-    "EdDSA",
-    "A128KW",
-    "A192KW",
-    "A256KW",
-    "A128GCMKW",
-    "A192GCMKW",
-    "A256GCMKW",
-    "dir",
-    "ECDH-ES",
-    "ECDH-ES+A128KW",
-    "ECDH-ES+A192KW",
-    "ECDH-ES+A256KW",
-    "RSA-OAEP",
-    "RSA-OAEP-256",
-    "A128GCM",
-    "A192GCM",
-    "A256GCM",
-    "A128CBC-HS256",
-    "A192CBC-HS384",
-    "A256CBC-HS512",
-];
-
 fn malformed() -> Error {
     ErrorKind::Malformed.into()
-}
-
-/// Reads JSON for any member named twice or nesting past the bound, which `serde`'s struct reading cannot see.
-struct Scan<'c> {
-    depth: usize,
-    why: &'c Cell<ErrorKind>,
-}
-
-impl<'de> DeserializeSeed<'de> for Scan<'_> {
-    type Value = ();
-
-    fn deserialize<D: Deserializer<'de>>(self, d: D) -> Result<(), D::Error> {
-        d.deserialize_any(self)
-    }
-}
-
-impl<'de> Visitor<'de> for Scan<'_> {
-    type Value = ();
-
-    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("JSON")
-    }
-
-    fn visit_bool<E>(self, _: bool) -> Result<(), E> {
-        Ok(())
-    }
-
-    fn visit_i64<E>(self, _: i64) -> Result<(), E> {
-        Ok(())
-    }
-
-    fn visit_u64<E>(self, _: u64) -> Result<(), E> {
-        Ok(())
-    }
-
-    fn visit_f64<E>(self, _: f64) -> Result<(), E> {
-        Ok(())
-    }
-
-    fn visit_str<E>(self, _: &str) -> Result<(), E> {
-        Ok(())
-    }
-
-    fn visit_unit<E>(self) -> Result<(), E> {
-        Ok(())
-    }
-
-    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<(), A::Error> {
-        self.nest()?;
-        while seq.next_element_seed(self.deeper())?.is_some() {}
-        Ok(())
-    }
-
-    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<(), A::Error> {
-        self.nest()?;
-        let mut seen = BTreeSet::new();
-        while let Some(name) = map.next_key::<String>()? {
-            if !seen.insert(name) {
-                self.why.set(ErrorKind::DuplicateMember);
-                return Err(serde::de::Error::custom("duplicate member"));
-            }
-            map.next_value_seed(self.deeper())?;
-        }
-        Ok(())
-    }
-}
-
-impl<'c> Scan<'c> {
-    const fn deeper(&self) -> Self {
-        Self {
-            depth: self.depth + 1,
-            why: self.why,
-        }
-    }
-
-    fn nest<E: serde::de::Error>(&self) -> Result<(), E> {
-        if self.depth > MAX_JSON_DEPTH {
-            self.why.set(ErrorKind::TooLarge);
-            return Err(E::custom("too deep"));
-        }
-        Ok(())
-    }
-}
-
-/// `TooLarge` past the length or depth bound, `DuplicateMember` for a name used twice, `Malformed` for anything
-/// that is not one JSON text.
-pub(crate) fn scan(json: &[u8]) -> Result<(), Error> {
-    if json.len() > MAX_JSON_LEN {
-        return Err(ErrorKind::TooLarge.into());
-    }
-    let why = Cell::new(ErrorKind::Malformed);
-    let mut de = serde_json::Deserializer::from_slice(json);
-    Scan {
-        depth: 1,
-        why: &why,
-    }
-    .deserialize(&mut de)
-    .and_then(|()| de.end())
-    .map_err(|_| why.get().into())
-}
-
-/// A member that must hold a `T` when it is named: JSON `null` is an ill-typed member, never an absent one.
-pub(crate) fn named<'de, T: Deserialize<'de>, D: Deserializer<'de>>(
-    d: D,
-) -> Result<Option<T>, D::Error> {
-    T::deserialize(d).map(Some)
 }
 
 /// The public members read as `Cow` so an escaped value decodes (RFC 8259 7); the secret ones stay borrowed, so an
@@ -467,17 +279,12 @@ fn usage(r: &Raw<'_>) -> Result<(Usage, Option<&'static str>, Vec<&'static str>)
 fn meta(r: &Raw<'_>) -> Result<Meta, Error> {
     let alg = match r.alg.as_deref() {
         None => None,
-        Some(a) => Some(
-            REGISTRY
-                .iter()
-                .find(|name| **name == a)
-                .ok_or(ErrorKind::UnsupportedAlg)?,
-        ),
+        Some(a) => Some(registry_name(a).ok_or(ErrorKind::UnsupportedAlg)?),
     };
     let (usage, use_name, ops) = usage(r)?;
     Ok(Meta {
         kid: r.kid.as_deref().map(Kid::new).transpose()?,
-        alg: alg.copied(),
+        alg,
         usage,
         use_name,
         ops,
@@ -513,71 +320,6 @@ pub(crate) fn parse_filtered(json: &[u8], public_only: bool) -> Result<Option<(M
         _ => return Err(ErrorKind::UnsupportedAlg.into()),
     };
     Ok(Some((meta(&r)?, key)))
-}
-
-fn copy(key: &SecretBytes) -> SecretBytes {
-    SecretBytes::new(key.expose().to_vec())
-}
-
-pub(crate) fn dup(key: &Public) -> Public {
-    match key {
-        Public::Oct(k) => Public::Oct(copy(k)),
-        Public::P256(k) => Public::P256(*k),
-        Public::P384(k) => Public::P384(*k),
-        #[cfg(feature = "es512")]
-        Public::P521(k) => Public::P521(*k),
-        Public::Ed25519(k) => Public::Ed25519(*k),
-        Public::Rsa(k) => Public::Rsa(k.clone()),
-    }
-}
-
-pub(crate) fn dup_private(key: &Private) -> Private {
-    match key {
-        Private::Oct(k) => Private::Oct(copy(k)),
-        Private::P256(k) => Private::P256(k.clone()),
-        Private::P384(k) => Private::P384(k.clone()),
-        #[cfg(feature = "es512")]
-        Private::P521(k) => Private::P521(k.clone()),
-        Private::Ed25519(k) => Private::Ed25519(k.clone()),
-        Private::Rsa(k) => Private::Rsa(k.clone()),
-    }
-}
-
-pub(crate) fn public_of(key: &Private) -> Public {
-    match key {
-        Private::Oct(k) => Public::Oct(copy(k)),
-        Private::P256(k) => Public::P256(k.public_key()),
-        Private::P384(k) => Public::P384(k.public_key()),
-        #[cfg(feature = "es512")]
-        Private::P521(k) => Public::P521(k.public_key()),
-        Private::Ed25519(k) => Public::Ed25519(k.verifying_key()),
-        Private::Rsa(k) => Public::Rsa(k.to_public_key()),
-    }
-}
-
-/// The family of a public key, and its length when symmetric.
-pub(crate) fn public_info(key: &Public) -> (Fam, usize) {
-    match key {
-        Public::Oct(k) => (Fam::Oct, k.expose().len()),
-        Public::P256(_) => (Fam::P256, 0),
-        Public::P384(_) => (Fam::P384, 0),
-        #[cfg(feature = "es512")]
-        Public::P521(_) => (Fam::P521, 0),
-        Public::Ed25519(_) => (Fam::Ed25519, 0),
-        Public::Rsa(_) => (Fam::Rsa, 0),
-    }
-}
-
-pub(crate) fn private_info(key: &Private) -> (Fam, usize) {
-    match key {
-        Private::Oct(k) => (Fam::Oct, k.expose().len()),
-        Private::P256(_) => (Fam::P256, 0),
-        Private::P384(_) => (Fam::P384, 0),
-        #[cfg(feature = "es512")]
-        Private::P521(_) => (Fam::P521, 0),
-        Private::Ed25519(_) => (Fam::Ed25519, 0),
-        Private::Rsa(_) => (Fam::Rsa, 0),
-    }
 }
 
 fn kty_of(fam: Fam) -> Kty {
@@ -677,9 +419,9 @@ impl Meta {
         decrypt: bool,
     ) -> Result<(), Error> {
         // a `dir` key names the content algorithm it serves as its `alg` (RFC 7516 A, RFC 7520 5.6)
-        let enc = self.alg.filter(|a| {
-            alg == JweAlg::Dir && REGISTRY.get(26..).is_some_and(|enc| enc.contains(a))
-        });
+        let enc = self
+            .alg
+            .filter(|a| alg == JweAlg::Dir && CONTENT.into_iter().any(|enc| enc.name() == *a));
         self.check(
             jwe_takes(alg, fam),
             enc.unwrap_or(alg.name()),
@@ -907,21 +649,17 @@ mod tests {
     use alloc::borrow::ToOwned as _;
     use alloc::collections::BTreeMap;
     use alloc::format;
-    use alloc::string::{String, ToString as _};
+    use alloc::string::String;
     use alloc::vec;
     use alloc::vec::Vec;
     use serde::Deserialize;
     use testkit::vector;
     use testkit::vectors::{Appendix, Example, Json, Outcome, figures, run, sections};
 
-    use super::{
-        DECRYPT, DERIVE, ENCRYPT, Key, REGISTRY, SIGN, SIGNING, UNWRAP, VERIFY, WRAP, parse,
-        private_info, public_info, scan,
-    };
-    use crate::{
-        ErrorKind, Jwk, Kid, Kty, MAX_ENTRIES, MAX_JSON_DEPTH, MAX_JSON_LEN, MAX_NAME_LEN,
-        SecretJwk,
-    };
+    use super::{DECRYPT, DERIVE, ENCRYPT, Key, SIGN, SIGNING, UNWRAP, VERIFY, WRAP, parse};
+    use crate::alg::registry_names;
+    use crate::key::{private_info, public_info};
+    use crate::{ErrorKind, Jwk, Kid, Kty, MAX_NAME_LEN, SecretJwk};
 
     /// A JWK as members: a value that opens with `[` is written as JSON, any other as a string.
     type Members = BTreeMap<String, String>;
@@ -1016,21 +754,6 @@ mod tests {
         alg: Option<String>,
         jwk: Option<Json>,
         expect: Expect,
-    }
-
-    #[test]
-    fn capped_arrays_keep_one_past_the_bound() {
-        let json = |n: usize| format!("[{}]", vec!["1"; n].join(","));
-        let read = |n: usize| {
-            serde_json::from_str::<super::Capped<u8>>(&json(n))
-                .map(|c| c.0.len())
-                .ok()
-        };
-        assert_eq!(read(MAX_ENTRIES), Some(MAX_ENTRIES));
-        assert_eq!(read(MAX_ENTRIES + 1), Some(MAX_ENTRIES + 1));
-        assert_eq!(read(1000), Some(MAX_ENTRIES + 1));
-        let wrong = serde_json::from_str::<super::Capped<u8>>("5").err();
-        assert!(wrong.is_some_and(|e| e.to_string().contains("an array")));
     }
 
     #[test]
@@ -1292,7 +1015,7 @@ mod tests {
                 .ok()
                 .map(|j| j.meta.sig_alg())
         };
-        for name in REGISTRY {
+        for name in registry_names() {
             let parsed = parse(text(&with(&oct(), "alg", name)).as_bytes());
             assert_eq!(parsed.map(|(m, _)| m.alg).ok(), Some(Some(name)));
         }
@@ -1301,43 +1024,6 @@ mod tests {
         }
         assert_eq!(sig_alg(&oct()), Some(None));
         assert_eq!(sig_alg(&with(&oct(), "alg", "A128GCM")), Some(None));
-    }
-
-    #[test]
-    fn jwe_names_are_registry_names() {
-        use crate::JweAlg::{
-            A128GcmKw, A128Kw, A192GcmKw, A192Kw, A256GcmKw, A256Kw, Dir, EcdhEs, EcdhEsA128Kw,
-            EcdhEsA192Kw, EcdhEsA256Kw, RsaOaep, RsaOaep256,
-        };
-        let names = [
-            A128Kw,
-            A192Kw,
-            A256Kw,
-            A128GcmKw,
-            A192GcmKw,
-            A256GcmKw,
-            Dir,
-            EcdhEs,
-            EcdhEsA128Kw,
-            EcdhEsA192Kw,
-            EcdhEsA256Kw,
-            RsaOaep,
-            RsaOaep256,
-        ]
-        .map(|alg| alg.name());
-        assert_eq!(names.as_slice(), REGISTRY.get(13..26).unwrap_or_default());
-    }
-
-    #[test]
-    fn expectation_text() {
-        let why = core::cell::Cell::new(ErrorKind::Malformed);
-        let scan = super::Scan {
-            depth: 1,
-            why: &why,
-        };
-        let error: serde_json::Error =
-            serde::de::Error::invalid_type(serde::de::Unexpected::Bool(true), &scan);
-        assert!(alloc::string::ToString::to_string(&error).contains("expected JSON"));
     }
 
     #[test]
@@ -1513,40 +1199,6 @@ mod tests {
         );
         let json = serde_json::to_string(&Kid::new("a").ok());
         assert_eq!(json.ok().as_deref(), Some("\"a\""));
-    }
-
-    #[test]
-    fn scan_bounds() {
-        let kind = |json: &str| scan(json.as_bytes()).err().map(|e| e.kind());
-        assert_eq!(kind("{\"a\":1,\"b\":[true,null,1.5,-1,\"s\",{}]}"), None);
-        assert_eq!(kind("{\"a\":1,\"a\":2}"), Some(ErrorKind::DuplicateMember));
-        assert_eq!(
-            kind("{\"a\":1,\"\\u0061\":2}"),
-            Some(ErrorKind::DuplicateMember)
-        );
-        assert_eq!(
-            kind("[{\"a\":{\"b\":1,\"b\":1}}]"),
-            Some(ErrorKind::DuplicateMember)
-        );
-        assert_eq!(kind("{\"a\":1} x"), Some(ErrorKind::Malformed));
-        assert_eq!(kind("{\"a\":"), Some(ErrorKind::Malformed));
-        let nested = |depth: usize| format!("{}{}", "[".repeat(depth), "]".repeat(depth));
-        assert_eq!(kind(&nested(MAX_JSON_DEPTH)), None);
-        assert_eq!(kind(&nested(MAX_JSON_DEPTH + 1)), Some(ErrorKind::TooLarge));
-        let objects = |depth: usize| format!("{}1{}", "{\"a\":".repeat(depth), "}".repeat(depth));
-        assert_eq!(kind(&objects(MAX_JSON_DEPTH)), None);
-        assert_eq!(
-            kind(&objects(MAX_JSON_DEPTH + 1)),
-            Some(ErrorKind::TooLarge)
-        );
-        let mut padded = Vec::from(b"{}".as_slice());
-        padded.resize(MAX_JSON_LEN, b' ');
-        assert_eq!(scan(&padded).err().map(|e| e.kind()), None);
-        padded.push(b' ');
-        assert_eq!(
-            scan(&padded).err().map(|e| e.kind()),
-            Some(ErrorKind::TooLarge)
-        );
     }
 
     #[test]

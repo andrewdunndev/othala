@@ -16,6 +16,8 @@ extern crate alloc;
 mod alg;
 mod claims;
 mod error;
+mod header;
+mod json;
 mod jwt;
 mod key;
 #[cfg(any(feature = "rsa-decrypt", feature = "rsa-sign"))]

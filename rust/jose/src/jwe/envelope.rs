@@ -15,9 +15,10 @@ use serde::Deserialize;
 use serde::de::IgnoredAny;
 use serde_json::value::RawValue;
 
-use crate::jwk::decode::{Capped, Key, named, parse, scan};
+use crate::header::refuse_crit;
+use crate::json::{Capped, named, scan};
+use crate::jwk::decode::{Key, parse};
 use crate::jwk::thumbprint::members;
-use crate::jws::header::REGISTERED;
 use crate::key::{Private, Public};
 use crate::{
     Compact, Enc, Error, ErrorKind, KeyAlg, Kid, LocalKeyAlg, MAX_COMPACT_LEN, MAX_ENTRIES,
@@ -152,6 +153,7 @@ struct Fields<'a> {
     kid: Option<String>,
     #[serde(default, deserialize_with = "named")]
     zip: Option<String>,
+    #[serde(default, deserialize_with = "named")]
     crit: Option<Vec<String>>,
     apu: Option<String>,
     apv: Option<String>,
@@ -257,21 +259,11 @@ fn merge(
     if clash {
         return Err(ErrorKind::DuplicateMember.into());
     }
-    if shared.fields.crit.is_some() || own.fields.crit.is_some() {
-        return Err(malformed());
-    }
-    if let Some(crit) = &protected.fields.crit {
-        let usable = !crit.is_empty()
-            && crit
-                .iter()
-                .all(|name| !REGISTERED.contains(&name.as_str()) && protected.names.contains(name));
-        return Err(if usable {
-            ErrorKind::CriticalHeader
-        } else {
-            ErrorKind::Malformed
-        }
-        .into());
-    }
+    refuse_crit(
+        protected.fields.crit.as_deref(),
+        &protected.names,
+        shared.fields.crit.is_some() || own.fields.crit.is_some(),
+    )?;
     let enc = all
         .iter()
         .find_map(|header| header.fields.enc.clone())

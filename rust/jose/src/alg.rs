@@ -233,7 +233,7 @@ pub(crate) const SIGNING: [SigningAlg; 13] = [
     SigningAlg::EdDsa,
 ];
 
-const KEY_MANAGEMENT: [JweAlg; 13] = [
+pub(crate) const KEY_MANAGEMENT: [JweAlg; 13] = [
     JweAlg::A128Kw,
     JweAlg::A192Kw,
     JweAlg::A256Kw,
@@ -249,7 +249,7 @@ const KEY_MANAGEMENT: [JweAlg; 13] = [
     JweAlg::RsaOaep256,
 ];
 
-const CONTENT: [JweEnc; 6] = [
+pub(crate) const CONTENT: [JweEnc; 6] = [
     JweEnc::A128Gcm,
     JweEnc::A192Gcm,
     JweEnc::A256Gcm,
@@ -257,6 +257,18 @@ const CONTENT: [JweEnc; 6] = [
     JweEnc::A192CbcHs384,
     JweEnc::A256CbcHs512,
 ];
+
+/// Every registry value a JWK's `alg` may carry: JWS `alg`, JWE `alg` and `enc`.
+pub(crate) fn registry_names() -> impl Iterator<Item = &'static str> {
+    let sig = SIGNING.into_iter().map(SigningAlg::name);
+    let key = KEY_MANAGEMENT.into_iter().map(JweAlg::name);
+    sig.chain(key).chain(CONTENT.into_iter().map(JweEnc::name))
+}
+
+/// The registry value spelled `name`, as a `'static` string.
+pub(crate) fn registry_name(name: &str) -> Option<&'static str> {
+    registry_names().find(|known| *known == name)
+}
 
 macro_rules! registry {
     ($type:ident, $all:expr) => {
