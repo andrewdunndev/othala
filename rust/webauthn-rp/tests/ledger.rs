@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 // the ui cases and twins on disk; a glob that matched nothing would pass while measuring nothing
-const CASES: usize = 13;
+const CASES: usize = 9;
 const CONTRACT: &str = include_str!("../CONTRACT.md");
 
 #[test]

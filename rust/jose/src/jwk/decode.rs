@@ -773,8 +773,11 @@ mod tests {
             });
             // `SecretJwk::decode` refuses a non-oct key before any binding, so the vector names `Malformed`;
             // this layer has no such step and binds the key type to the algorithm
+            // with es512 off a P-521 key is refused whole, before any alg comparison
             let kind = if case.id == "hs256-rsa-key" {
                 Some("AlgMismatch")
+            } else if case.id == "es256-p521-key" && !cfg!(feature = "es512") {
+                Some("UnsupportedAlg")
             } else {
                 case.expect.kind.as_deref()
             };
@@ -792,7 +795,6 @@ mod tests {
                 );
             } else if case.id.ends_with("-key")
                 && !case.expect.ok
-                // with es512 off a P-521 key is refused whole, before any alg comparison
                 && (cfg!(feature = "es512") || case.id != "es256-p521-key")
             {
                 assert_eq!(
