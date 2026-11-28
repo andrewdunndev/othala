@@ -1,4 +1,5 @@
 //! JWK decoding (RFC 7517, RFC 7518 section 6, RFC 8037 section 2) and the key-type-to-algorithm binding.
+use alloc::borrow::Cow;
 use alloc::collections::BTreeSet;
 use alloc::string::String;
 use alloc::vec;
@@ -94,8 +95,10 @@ pub(crate) const VERIFY: u8 = 2;
 const WRAP: u8 = 4;
 const UNWRAP: u8 = 8;
 const DERIVE: u8 = 16;
-const ENCRYPT: u8 = WRAP + DERIVE;
-const DECRYPT: u8 = UNWRAP + DERIVE;
+const ENCRYPT: u8 = 32;
+const DECRYPT: u8 = 64;
+/// What `use: enc` permits.
+const ENC_USE: u8 = WRAP + UNWRAP + DERIVE + ENCRYPT + DECRYPT;
 
 /// A public JWK (RFC 7517, RFC 7518 section 6, RFC 8037 section 2): EC on P-256, P-384 or P-521, RSA, or OKP
 /// Ed25519, never private or symmetric material. Opaque: members are read through accessors and written by
@@ -266,26 +269,42 @@ pub(crate) fn scan(json: &[u8]) -> Result<(), Error> {
     .map_err(|_| why.get().into())
 }
 
+/// A member that must hold a `T` when it is named: JSON `null` is an ill-typed member, never an absent one.
+pub(crate) fn named<'de, T: Deserialize<'de>, D: Deserializer<'de>>(
+    d: D,
+) -> Result<Option<T>, D::Error> {
+    T::deserialize(d).map(Some)
+}
+
+/// The public members read as `Cow` so an escaped value decodes (RFC 8259 7); the secret ones stay borrowed, so an
+/// escaped one is refused and no unwiped copy of a secret is made.
 #[derive(Deserialize)]
 struct Raw<'a> {
-    kty: &'a str,
+    #[serde(borrow)]
+    kty: Cow<'a, str>,
     kid: Option<String>,
     alg: Option<String>,
     #[serde(rename = "use")]
     usage: Option<String>,
     key_ops: Option<Vec<String>>,
-    crv: Option<&'a str>,
-    x: Option<&'a str>,
-    y: Option<&'a str>,
-    n: Option<&'a str>,
-    e: Option<&'a str>,
+    #[serde(borrow)]
+    crv: Option<Cow<'a, str>>,
+    #[serde(borrow)]
+    x: Option<Cow<'a, str>>,
+    #[serde(borrow)]
+    y: Option<Cow<'a, str>>,
+    #[serde(borrow)]
+    n: Option<Cow<'a, str>>,
+    #[serde(borrow)]
+    e: Option<Cow<'a, str>>,
     d: Option<&'a str>,
     p: Option<&'a str>,
     q: Option<&'a str>,
     dp: Option<&'a str>,
     dq: Option<&'a str>,
     qi: Option<&'a str>,
-    oth: Option<IgnoredAny>,
+    #[serde(default, deserialize_with = "named")]
+    oth: Option<Vec<IgnoredAny>>,
     k: Option<&'a str>,
 }
 
@@ -321,7 +340,7 @@ fn big(bytes: &SecretBytes) -> BoxedUint {
 
 macro_rules! curve {
     ($c:ident, $len:expr, $r:expr, $v:ident) => {{
-        let (x, y) = (field($r.x, $len)?, field($r.y, $len)?);
+        let (x, y) = (field($r.x.as_deref(), $len)?, field($r.y.as_deref(), $len)?);
         let point = [&[4][..], x.expose(), y.expose()].concat();
         let public = $c::PublicKey::from_sec1_bytes(&point).map_err(|_| malformed())?;
         match $r.d {
@@ -339,7 +358,7 @@ macro_rules! curve {
 }
 
 fn ec(r: &Raw<'_>) -> Result<Key, Error> {
-    Ok(match r.crv.ok_or_else(malformed)? {
+    Ok(match r.crv.as_deref().ok_or_else(malformed)? {
         "P-256" => curve!(p256, 32, r, P256),
         "P-384" => curve!(p384, 48, r, P384),
         #[cfg(feature = "es512")]
@@ -349,11 +368,11 @@ fn ec(r: &Raw<'_>) -> Result<Key, Error> {
 }
 
 fn okp(r: &Raw<'_>) -> Result<Key, Error> {
-    if r.crv.ok_or_else(malformed)? != "Ed25519" {
+    if r.crv.as_deref().ok_or_else(malformed)? != "Ed25519" {
         return Err(ErrorKind::UnsupportedAlg.into());
     }
     let array = |b: &SecretBytes| <[u8; 32]>::try_from(b.expose()).map_err(|_| malformed());
-    let public = ed25519_dalek::VerifyingKey::from_bytes(&array(&field(r.x, 32)?)?)
+    let public = ed25519_dalek::VerifyingKey::from_bytes(&array(&field(r.x.as_deref(), 32)?)?)
         .map_err(|_| malformed())?;
     Ok(match r.d {
         None => Key::Public(Public::Ed25519(public)),
@@ -368,7 +387,7 @@ fn okp(r: &Raw<'_>) -> Result<Key, Error> {
 }
 
 fn rsa(r: &Raw<'_>) -> Result<Key, Error> {
-    let (n, e) = (uint(r.n)?, uint(r.e)?);
+    let (n, e) = (uint(r.n.as_deref())?, uint(r.e.as_deref())?);
     // `uint` refuses a leading zero, so this byte bound is the bit bound and no big integer is built past it
     if n.expose().len() > MAX_RSA_BITS / 8 {
         return Err(ErrorKind::TooLarge.into());
@@ -406,9 +425,9 @@ fn rsa(r: &Raw<'_>) -> Result<Key, Error> {
 const OPS: [(&str, u8); 8] = [
     ("sign", SIGN),
     ("verify", VERIFY),
-    ("encrypt", WRAP),
+    ("encrypt", ENCRYPT),
     ("wrapKey", WRAP),
-    ("decrypt", UNWRAP),
+    ("decrypt", DECRYPT),
     ("unwrapKey", UNWRAP),
     ("deriveKey", DERIVE),
     ("deriveBits", DERIVE),
@@ -418,7 +437,7 @@ fn usage(r: &Raw<'_>) -> Result<(Usage, Option<&'static str>, Vec<&'static str>)
     let (use_name, by_use) = match r.usage.as_deref() {
         None => (None, None),
         Some("sig") => (Some("sig"), Some(SIGN + VERIFY)),
-        Some("enc") => (Some("enc"), Some(WRAP + UNWRAP + DERIVE)),
+        Some("enc") => (Some("enc"), Some(ENC_USE)),
         Some(_) => return Err(ErrorKind::KeyUse.into()),
     };
     let mut names = Vec::new();
@@ -428,6 +447,10 @@ fn usage(r: &Raw<'_>) -> Result<(Usage, Option<&'static str>, Vec<&'static str>)
             .iter()
             .find(|(name, _)| *name == op)
             .ok_or(ErrorKind::KeyUse)?;
+        // RFC 7517 4.3: a value MUST NOT be repeated
+        if names.contains(name) {
+            return Err(ErrorKind::KeyUse.into());
+        }
         names.push(*name);
         ops |= bit;
     }
@@ -476,7 +499,7 @@ pub(crate) fn parse_filtered(json: &[u8], public_only: bool) -> Result<Option<(M
     if public_only && (private || r.kty == "oct") {
         return Ok(None);
     }
-    let key = match r.kty {
+    let key = match &*r.kty {
         "EC" => ec(&r)?,
         "RSA" => rsa(&r)?,
         "OKP" => okp(&r)?,
@@ -583,6 +606,21 @@ const fn sig_fam(alg: SigningAlg) -> Fam {
     }
 }
 
+/// The `key_ops` value a key serves `alg` under (RFC 7517 4.3): `dir` encrypts the content with the key, a key-wrapping
+/// algorithm wraps the content key, and key agreement derives a key.
+const fn jwe_op(alg: JweAlg, decrypt: bool) -> u8 {
+    match (alg, decrypt) {
+        (JweAlg::Dir, false) => ENCRYPT,
+        (JweAlg::Dir, true) => DECRYPT,
+        (
+            JweAlg::EcdhEs | JweAlg::EcdhEsA128Kw | JweAlg::EcdhEsA192Kw | JweAlg::EcdhEsA256Kw,
+            _,
+        ) => DERIVE,
+        (_, false) => WRAP,
+        (_, true) => UNWRAP,
+    }
+}
+
 const fn jwe_takes(alg: JweAlg, fam: Fam) -> bool {
     match alg {
         JweAlg::A128Kw
@@ -630,18 +668,23 @@ impl Meta {
         Ok(())
     }
 
-    /// `alg` is a JWE algorithm of the key's family, `ops` is permitted, and an AES key is as long as its algorithm says.
+    /// `alg` is a JWE algorithm of the key's family, the operation `alg` needs on that key is permitted, and an AES key
+    /// is as long as its algorithm says.
     pub(crate) fn check_jwe(
         &self,
         (fam, len): (Fam, usize),
         alg: JweAlg,
-        ops: u8,
+        decrypt: bool,
     ) -> Result<(), Error> {
         // a `dir` key names the content algorithm it serves as its `alg` (RFC 7516 A, RFC 7520 5.6)
         let enc = self.alg.filter(|a| {
             alg == JweAlg::Dir && REGISTRY.get(26..).is_some_and(|enc| enc.contains(a))
         });
-        self.check(jwe_takes(alg, fam), enc.unwrap_or(alg.name()), ops)?;
+        self.check(
+            jwe_takes(alg, fam),
+            enc.unwrap_or(alg.name()),
+            jwe_op(alg, decrypt),
+        )?;
         let want = match alg {
             JweAlg::A128Kw | JweAlg::A128GcmKw => 16,
             JweAlg::A192Kw | JweAlg::A192GcmKw => 24,
@@ -726,7 +769,7 @@ impl Jwk {
     /// A key that encrypts for `K`.
     pub fn encrypt_key<K: PublicKeyAlg>(&self) -> Result<EncryptKey<K>, Error> {
         self.meta
-            .check_jwe(public_info(&self.material), K::ALG, ENCRYPT)?;
+            .check_jwe(public_info(&self.material), K::ALG, false)?;
         Ok(EncryptKey {
             kid: self.meta.kid.clone(),
             material: dup(&self.material),
@@ -791,7 +834,7 @@ impl SecretJwk {
     pub fn public(&self) -> Option<Jwk> {
         let bits = match self.meta.use_name {
             Some("sig") => SIGN + VERIFY,
-            Some(_) => WRAP + UNWRAP + DERIVE,
+            Some(_) => ENC_USE,
             None => u8::MAX,
         };
         match self.material {
@@ -830,7 +873,7 @@ impl SecretJwk {
     /// A key that encrypts for `K`.
     pub fn encrypt_key<K: KeyAlg>(&self) -> Result<EncryptKey<K>, Error> {
         self.meta
-            .check_jwe(private_info(&self.material), K::ALG, ENCRYPT)?;
+            .check_jwe(private_info(&self.material), K::ALG, false)?;
         Ok(EncryptKey {
             kid: self.meta.kid.clone(),
             material: public_of(&self.material),
@@ -841,7 +884,7 @@ impl SecretJwk {
     /// A key that decrypts for `K`.
     pub fn decrypt_key<K: KeyAlg>(&self) -> Result<DecryptKey<K>, Error> {
         self.meta
-            .check_jwe(private_info(&self.material), K::ALG, DECRYPT)?;
+            .check_jwe(private_info(&self.material), K::ALG, true)?;
         Ok(DecryptKey {
             material: dup_private(&self.material),
             alg: PhantomData,
@@ -971,7 +1014,7 @@ mod tests {
         id: String,
         op: String,
         alg: Option<String>,
-        jwk: Json,
+        jwk: Option<Json>,
         expect: Expect,
     }
 
@@ -993,14 +1036,15 @@ mod tests {
     #[test]
     fn keys_bind_algorithms() {
         let tally = run::<Case>(vector!("jose-derived/keys.json"), 20, |case| {
-            let Some(alg) = SIGNING
+            let Some((alg, jwk)) = SIGNING
                 .into_iter()
                 .find(|a| Some(a.name()) == case.alg.as_deref())
                 .filter(|_| case.op == "jwk_verify_key")
+                .zip(case.jwk.as_ref())
             else {
                 return Outcome::NotApplicable;
             };
-            let outcome = parse(case.jwk.text().as_bytes()).and_then(|(meta, key)| match key {
+            let outcome = parse(jwk.text().as_bytes()).and_then(|(meta, key)| match key {
                 Key::Public(k) => meta.check_sig(public_info(&k), alg, VERIFY),
                 Key::Private(k) => meta.check_sig(private_info(&k), alg, VERIFY),
             });
@@ -1016,11 +1060,11 @@ mod tests {
                 case.expect.ok,
                 kind,
                 |e| e.kind(),
-                case.jwk.text(),
+                jwk.text(),
             );
             if case.id == "eddsa-x25519-key" {
                 assert_eq!(
-                    parse(case.jwk.text().as_bytes()).err().map(|e| e.kind()),
+                    parse(jwk.text().as_bytes()).err().map(|e| e.kind()),
                     Some(ErrorKind::UnsupportedAlg)
                 );
             } else if case.id.ends_with("-key")
@@ -1037,7 +1081,7 @@ mod tests {
             }
             Outcome::Checked
         });
-        assert_eq!((tally.total(), tally.checked()), (29, 25));
+        assert_eq!((tally.total(), tally.checked()), (40, 26));
     }
 
     #[test]
@@ -1139,7 +1183,7 @@ mod tests {
         );
         assert_eq!(
             public(&with(&ec, "use", "enc")),
-            Some((WRAP + UNWRAP + DERIVE, 0, Some("enc")))
+            Some((WRAP | UNWRAP | DERIVE | ENCRYPT | DECRYPT, 0, Some("enc")))
         );
         assert_eq!(
             public(&with(&ec, "key_ops", "[\"sign\"]")),
@@ -1166,14 +1210,14 @@ mod tests {
         assert_eq!(usage(&with(&oct(), "use", "sig")), Some(SIGN | VERIFY));
         assert_eq!(
             usage(&with(&oct(), "use", "enc")),
-            Some(WRAP | UNWRAP | DERIVE)
+            Some(WRAP | UNWRAP | DERIVE | ENCRYPT | DECRYPT)
         );
         for (op, bits) in [
             ("sign", SIGN),
             ("verify", VERIFY),
-            ("encrypt", WRAP),
+            ("encrypt", ENCRYPT),
             ("wrapKey", WRAP),
-            ("decrypt", UNWRAP),
+            ("decrypt", DECRYPT),
             ("unwrapKey", UNWRAP),
             ("deriveKey", DERIVE),
             ("deriveBits", DERIVE),
@@ -1186,6 +1230,14 @@ mod tests {
             Some(SIGN | VERIFY)
         );
         assert_eq!(usage(&with(&oct(), "key_ops", "[]")), Some(u8::MAX));
+        assert_eq!(
+            kind(&with(&oct(), "key_ops", "[\"sign\",\"sign\"]")),
+            Some(ErrorKind::KeyUse)
+        );
+        assert_eq!(
+            usage(&with(&oct(), "key_ops", "[\"encrypt\",\"wrapKey\"]")),
+            Some(ENCRYPT | WRAP)
+        );
         let both = with(&with(&oct(), "use", "sig"), "key_ops", "[\"verify\"]");
         assert_eq!(usage(&both), Some(VERIFY));
         let clash = with(&with(&oct(), "use", "enc"), "key_ops", "[\"verify\"]");
@@ -1200,6 +1252,37 @@ mod tests {
             Some(ErrorKind::UnsupportedAlg)
         );
         assert_eq!(kind(&with(&oct(), "kid", "")), Some(ErrorKind::Malformed));
+    }
+
+    #[test]
+    fn escaped_and_null_members() {
+        // RFC 8259 7: an escape spells the same string, in the public members
+        let escaped = text(&figure("3.3")).replacen("\"RSA\"", "\"R\\u0053A\"", 1);
+        assert_eq!(
+            Jwk::decode(escaped.as_bytes()).ok().map(|k| k.kty()),
+            Some(Kty::Rsa)
+        );
+        // a secret member is read borrowed: an escaped one is refused, so no unwiped copy is made
+        for (key, member) in [(oct(), "k"), (ec_private(), "d")] {
+            let secret = text(&key).replacen(
+                &format!("\"{member}\":\""),
+                &format!("\"{member}\":\"\\u0041"),
+                1,
+            );
+            assert_eq!(
+                SecretJwk::decode(secret.as_bytes()).err().map(|e| e.kind()),
+                Some(ErrorKind::Malformed),
+                "{member}"
+            );
+        }
+        let rsa = figure("3.3");
+        let oth = |value: &str| {
+            let json = text(&rsa).replacen('{', &format!("{{\"oth\":{value},"), 1);
+            parse(json.as_bytes()).err().map(|e| e.kind())
+        };
+        assert_eq!(oth("null"), Some(ErrorKind::Malformed));
+        assert_eq!(oth("5"), Some(ErrorKind::Malformed));
+        assert_eq!(oth("[]"), Some(ErrorKind::UnsupportedAlg));
     }
 
     #[test]
@@ -1289,41 +1372,41 @@ mod tests {
         let kw = info(&oct());
         let kw = kw.as_ref();
         assert_eq!(
-            kw.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::Dir, ENCRYPT))),
+            kw.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::Dir, false))),
             None
         );
         assert_eq!(
-            kw.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::Dir, DECRYPT))),
+            kw.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::Dir, true))),
             None
         );
         assert_eq!(
             sig_only
                 .as_ref()
-                .and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::A128Kw, ENCRYPT))),
+                .and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::A128Kw, false))),
             usage
         );
         assert_eq!(
-            kw.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::EcdhEs, ENCRYPT))),
+            kw.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::EcdhEs, false))),
             mismatch
         );
         assert_eq!(
-            kw.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::RsaOaep, ENCRYPT))),
+            kw.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::RsaOaep, false))),
             mismatch
         );
         let aes = info(&figure("3.6"));
         let aes = aes.as_ref();
         assert_eq!(
-            aes.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::A128Kw, ENCRYPT))),
+            aes.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::A128Kw, false))),
             mismatch
         );
         let rsa = info(&without(&figure("3.3"), "use"));
         let rsa = rsa.as_ref();
         assert_eq!(
-            rsa.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::RsaOaep256, ENCRYPT))),
+            rsa.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::RsaOaep256, false))),
             None
         );
         assert_eq!(
-            rsa.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::A128Kw, ENCRYPT))),
+            rsa.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::A128Kw, false))),
             mismatch
         );
         let ec = info(&without(&ec_private(), "d"));
@@ -1335,15 +1418,14 @@ mod tests {
             JweAlg::EcdhEsA256Kw,
         ] {
             assert_eq!(
-                ec.and_then(|(m, i)| kind(m.check_jwe(*i, alg, DERIVE))),
+                ec.and_then(|(m, i)| kind(m.check_jwe(*i, alg, false))),
                 None
             );
         }
         assert_eq!(
-            ec.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::RsaOaep, ENCRYPT))),
+            ec.and_then(|(m, i)| kind(m.check_jwe(*i, JweAlg::RsaOaep, false))),
             mismatch
         );
-        assert_eq!((ENCRYPT, DECRYPT), (WRAP | DERIVE, UNWRAP | DERIVE));
         let signed = with(&figure("3.3"), "alg", "RS256");
         assert_eq!(
             Jwk::decode(text(&signed).as_bytes())
@@ -1357,6 +1439,50 @@ mod tests {
                 .and_then(|k| k.sig_alg()),
             None
         );
+    }
+
+    #[test]
+    fn key_ops_serve_one_operation_per_algorithm() {
+        use crate::JweAlg;
+        let ops = [
+            "sign",
+            "verify",
+            "encrypt",
+            "decrypt",
+            "wrapKey",
+            "unwrapKey",
+            "deriveKey",
+            "deriveBits",
+        ];
+        let ec = without(&ec_private(), "d");
+        let rsa = without(&figure("3.3"), "use");
+        let rows: [(&Members, JweAlg, [&[&str]; 2]); 6] = [
+            (&oct(), JweAlg::Dir, [&["encrypt"], &["decrypt"]]),
+            (&oct(), JweAlg::A256Kw, [&["wrapKey"], &["unwrapKey"]]),
+            (&oct(), JweAlg::A256GcmKw, [&["wrapKey"], &["unwrapKey"]]),
+            (&rsa, JweAlg::RsaOaep256, [&["wrapKey"], &["unwrapKey"]]),
+            (&ec, JweAlg::EcdhEs, [&["deriveKey", "deriveBits"]; 2]),
+            (&ec, JweAlg::EcdhEsA128Kw, [&["deriveKey", "deriveBits"]; 2]),
+        ];
+        for (key, alg, served) in rows {
+            for (decrypt, served) in [false, true].into_iter().zip(served) {
+                for op in ops {
+                    let member = with(key, "key_ops", &format!("[\"{op}\"]"));
+                    let got = match parse(text(&member).as_bytes()) {
+                        Err(e) => Some(e.kind()),
+                        Ok((m, k)) => {
+                            let info = match &k {
+                                Key::Private(k) => private_info(k),
+                                Key::Public(k) => public_info(k),
+                            };
+                            m.check_jwe(info, alg, decrypt).err().map(|e| e.kind())
+                        }
+                    };
+                    let want = (!served.contains(&op)).then_some(ErrorKind::KeyUse);
+                    assert_eq!(got, want, "{alg:?} decrypt={decrypt} {op}");
+                }
+            }
+        }
     }
 
     #[test]

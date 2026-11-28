@@ -383,6 +383,193 @@
    }
   },
   {
+   "id": "hs256-key-ops-duplicate",
+   "op": "jwk_verify_key",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+    "key_ops": [
+     "verify",
+     "verify"
+    ]
+   },
+   "spec": "RFC 7517 4.3 (duplicate key_ops values MUST NOT be present)",
+   "expect": {
+    "ok": false,
+    "kind": "KeyUse"
+   }
+  },
+  {
+   "id": "es256-escaped-members",
+   "op": "jwk_verify_key",
+   "alg": "ES256",
+   "jwk_json": "{\"kty\":\"E\\u0043\",\"crv\":\"P\\u002d256\",\"x\":\"f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU\",\"y\":\"x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0\"}",
+   "spec": "RFC 8259 7 (an escape spells the same string) with RFC 7518 6.2.1.1",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "a256kw-key-ops-wrap-key",
+   "op": "jwk_encrypt_key",
+   "alg": "A256KW",
+   "jwk": {
+    "kty": "oct",
+    "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+    "key_ops": [
+     "wrapKey"
+    ]
+   },
+   "direction": "encrypt",
+   "spec": "RFC 7517 4.3 (wrapKey: encrypt key)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "a256kw-key-ops-unwrap-key",
+   "op": "jwk_encrypt_key",
+   "alg": "A256KW",
+   "jwk": {
+    "kty": "oct",
+    "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+    "key_ops": [
+     "unwrapKey"
+    ]
+   },
+   "direction": "decrypt",
+   "spec": "RFC 7517 4.3 (unwrapKey: decrypt key)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "kw-key-ops-derive-only",
+   "op": "jwk_encrypt_key",
+   "alg": "A256KW",
+   "jwk": {
+    "kty": "oct",
+    "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+    "key_ops": [
+     "deriveKey"
+    ]
+   },
+   "direction": "encrypt",
+   "spec": "RFC 7517 4.3 (deriveKey is key agreement, not key wrapping)",
+   "expect": {
+    "ok": false,
+    "kind": "KeyUse"
+   }
+  },
+  {
+   "id": "a256kw-key-ops-encrypt",
+   "op": "jwk_encrypt_key",
+   "alg": "A256KW",
+   "jwk": {
+    "kty": "oct",
+    "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+    "key_ops": [
+     "encrypt"
+    ]
+   },
+   "direction": "encrypt",
+   "spec": "RFC 7517 4.3 (encrypt is for content, wrapKey for a key; this oracle follows the wording)",
+   "expect": {
+    "ok": false,
+    "kind": "KeyUse"
+   }
+  },
+  {
+   "id": "a256kw-key-ops-wrap-key-only",
+   "op": "jwk_encrypt_key",
+   "alg": "A256KW",
+   "jwk": {
+    "kty": "oct",
+    "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+    "key_ops": [
+     "wrapKey"
+    ]
+   },
+   "direction": "decrypt",
+   "spec": "RFC 7517 4.3 (a key that only wraps cannot unwrap)",
+   "expect": {
+    "ok": false,
+    "kind": "KeyUse"
+   }
+  },
+  {
+   "id": "a256gcmkw-key-ops-encrypt",
+   "op": "jwk_encrypt_key",
+   "alg": "A256GCMKW",
+   "jwk": {
+    "kty": "oct",
+    "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+    "key_ops": [
+     "encrypt"
+    ]
+   },
+   "direction": "encrypt",
+   "spec": "RFC 7517 4.3 (AES GCM key wrapping wraps a key)",
+   "expect": {
+    "ok": false,
+    "kind": "KeyUse"
+   }
+  },
+  {
+   "id": "dir-key-ops-encrypt",
+   "op": "jwk_encrypt_key",
+   "alg": "dir",
+   "jwk": {
+    "kty": "oct",
+    "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+    "key_ops": [
+     "encrypt"
+    ]
+   },
+   "direction": "encrypt",
+   "spec": "RFC 7517 4.3 (dir encrypts the content with the key)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "dir-key-ops-wrap-key",
+   "op": "jwk_encrypt_key",
+   "alg": "dir",
+   "jwk": {
+    "kty": "oct",
+    "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+    "key_ops": [
+     "wrapKey"
+    ]
+   },
+   "direction": "encrypt",
+   "spec": "RFC 7517 4.3 (dir does not wrap a key)",
+   "expect": {
+    "ok": false,
+    "kind": "KeyUse"
+   }
+  },
+  {
+   "id": "kw-key-ops-sign-only",
+   "op": "jwk_encrypt_key",
+   "alg": "A256KW",
+   "jwk": {
+    "kty": "oct",
+    "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+    "key_ops": [
+     "sign"
+    ]
+   },
+   "direction": "encrypt",
+   "spec": "RFC 7517 4.3",
+   "expect": {
+    "ok": false,
+    "kind": "KeyUse"
+   }
+  },
+  {
    "id": "any-alg-bound",
    "op": "any_verify_key",
    "jwk": {

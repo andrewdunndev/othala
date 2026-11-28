@@ -40,7 +40,7 @@ struct Case {
 
 #[test]
 fn claims_cases() {
-    let tally = run::<Case>(vector!("jose-derived/claims.json"), 23, |case| {
+    let tally = run::<Case>(vector!("jose-derived/claims.json"), 25, |case| {
         let policy = Issuer::new(&case.policy.iss).and_then(|iss| {
             Policy::<AccessToken>::new(
                 iss,
@@ -61,5 +61,5 @@ fn claims_cases() {
         );
         Outcome::Checked
     });
-    assert_eq!((tally.total(), tally.checked()), (23, 23));
+    assert_eq!((tally.total(), tally.checked()), (25, 25));
 }

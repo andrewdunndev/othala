@@ -15,7 +15,7 @@ use serde::Deserialize;
 use serde::de::IgnoredAny;
 use serde_json::value::RawValue;
 
-use crate::jwk::decode::{Capped, Key, parse, scan};
+use crate::jwk::decode::{Capped, Key, named, parse, scan};
 use crate::jwk::thumbprint::members;
 use crate::jws::header::REGISTERED;
 use crate::key::{Private, Public};
@@ -150,7 +150,8 @@ struct Fields<'a> {
     alg: Option<String>,
     enc: Option<String>,
     kid: Option<String>,
-    zip: Option<IgnoredAny>,
+    #[serde(default, deserialize_with = "named")]
+    zip: Option<String>,
     crit: Option<Vec<String>>,
     apu: Option<String>,
     apv: Option<String>,
@@ -180,7 +181,7 @@ fn fixed<const N: usize>(text: Option<&str>) -> Result<Option<[u8; N]>, Error> {
         .transpose()
 }
 
-/// A header object: `zip` is refused, and the `epk`, `iv`, `tag`, `apu` and `apv` are decoded.
+/// A header object: `zip` is refused (`null` or any non-string is `Malformed`, RFC 7516 4.1.3), and the `epk`, `iv`, `tag`, `apu` and `apv` are decoded.
 fn read(json: &[u8]) -> Result<Header, Error> {
     scan(json)?;
     let fields: Fields<'_> = serde_json::from_slice(json).map_err(|_| malformed())?;
@@ -838,6 +839,14 @@ mod tests {
             (
                 r#"{"alg":"dir","enc":"A128GCM","zip":"DEF"}"#,
                 ErrorKind::UnsupportedAlg,
+            ),
+            (
+                r#"{"alg":"dir","enc":"A128GCM","zip":null}"#,
+                ErrorKind::Malformed,
+            ),
+            (
+                r#"{"alg":"dir","enc":"A128GCM","zip":1}"#,
+                ErrorKind::Malformed,
             ),
             (
                 r#"{"alg":"dir","enc":"A128GCM","crit":["x"],"x":1}"#,

@@ -516,7 +516,7 @@ method Jwk::verify_key fn<A: PublicAlg>(self: &Self) -> Result<VerifyKey<A>, Err
 method JwkSet::decode fn(json: &[u8]) -> Result<Self, Error>
 method JwkSet::decode_public fn(json: &[u8]) -> Result<Self, Error>
 method JwkSet::entries fn(self: &Self) -> impl ExactSizeIterator<Item = JwkEntry<'_>>
-method JwkSet::find fn(self: &Self, kid: &Kid) -> Result<JwkEntry<'_>, Error>
+method JwkSet::find fn(self: &Self, kid: &Kid) -> Option<JwkEntry<'_>>
 method JwkSet::new fn(keys: Vec<Jwk>) -> Result<Self, Error>
 method Jws::kids fn(self: &Self) -> &[Kid]
 method Jws::parse fn(compact: &'a str) -> Result<Self, Error>

@@ -1,4 +1,5 @@
 //! JWK Set decoding, lookup and publication (RFC 7517 section 5).
+use alloc::collections::BTreeSet;
 use alloc::vec::Vec;
 
 use serde::ser::{SerializeMap as _, Serializer};
@@ -47,6 +48,16 @@ impl Member {
     }
 }
 
+/// No `kid` twice (`DuplicateMember`), so a lookup by `kid` never has two answers.
+fn distinct<'a>(kids: impl Iterator<Item = &'a Kid>) -> Result<(), Error> {
+    let mut seen = BTreeSet::new();
+    if kids.into_iter().all(|kid| seen.insert(kid)) {
+        Ok(())
+    } else {
+        Err(ErrorKind::DuplicateMember.into())
+    }
+}
+
 #[derive(Deserialize)]
 struct Document<'a> {
     #[serde(borrow)]
@@ -54,8 +65,10 @@ struct Document<'a> {
 }
 
 impl JwkSet {
-    /// Decodes `{"keys": [...]}`: a member that is not a supported key (an unknown `kty`, X25519, a weak modulus) is
-    /// skipped and not counted; a malformed one, a name used twice or more than `MAX_JWKS_KEYS` kept keys is refused.
+    /// Decodes `{"keys": [...]}`: a member object that is not a supported key (an unknown `kty`, a missing or
+    /// out-of-range value, a weak modulus; RFC 7517 5) is skipped and not counted. A document without a `keys` array, a
+    /// member that is not an object, a name used twice or more than `MAX_JWKS_KEYS` kept keys is refused. Members that
+    /// share a `kid` are all skipped, since a lookup could not choose between them.
     /// For a document fetched from a remote `jwks_uri`, use [`Self::decode_public`].
     pub fn decode(json: &[u8]) -> Result<Self, Error> {
         Self::read(json, false)
@@ -74,23 +87,32 @@ impl JwkSet {
             serde_json::from_slice(json).map_err(|_| ErrorKind::Malformed)?;
         let mut keys = Vec::new();
         for raw in document.keys {
+            if !raw.get().starts_with('{') {
+                return Err(ErrorKind::Malformed.into());
+            }
             match parse_filtered(raw.get().as_bytes(), public_only) {
-                Ok(None) => {}
                 Ok(Some((meta, Key::Public(material)))) => {
                     keys.push(Member::Public(Jwk { meta, material }));
                 }
                 Ok(Some((meta, Key::Private(material)))) => {
                     keys.push(Member::Secret(SecretJwk { meta, material }));
                 }
-                Err(error)
-                    if matches!(error.kind(), ErrorKind::UnsupportedAlg | ErrorKind::WeakKey) => {}
-                Err(error) => return Err(error),
+                Ok(None) | Err(_) => {}
             }
             // refused as soon as it is over, not after every member is parsed
             if keys.len() > MAX_JWKS_KEYS {
                 return Err(ErrorKind::TooLarge.into());
             }
         }
+        // `find` could not choose between members that share a `kid`, so none of them is kept (house rule, R27)
+        let mut seen = BTreeSet::new();
+        let shared: BTreeSet<Kid> = keys
+            .iter()
+            .filter_map(Member::kid)
+            .filter(|kid| !seen.insert(*kid))
+            .cloned()
+            .collect();
+        keys.retain(|key| key.kid().is_none_or(|kid| !shared.contains(kid)));
         Ok(Self { keys })
     }
 
@@ -99,28 +121,19 @@ impl JwkSet {
         if keys.len() > MAX_JWKS_KEYS {
             return Err(ErrorKind::TooLarge.into());
         }
-        let kids: Vec<&Kid> = keys.iter().filter_map(Jwk::kid).collect();
-        if kids
-            .iter()
-            .enumerate()
-            .any(|(i, kid)| kids.iter().skip(i + 1).any(|other| other == kid))
-        {
-            return Err(ErrorKind::DuplicateMember.into());
-        }
+        distinct(keys.iter().filter_map(Jwk::kid))?;
         Ok(Self {
             keys: keys.into_iter().map(Member::Public).collect(),
         })
     }
 
-    /// The one key whose `kid` is `kid`, byte for byte: none is `BadSignature` (no key can verify), two are
-    /// `DuplicateMember`, never a pick.
-    pub fn find(&self, kid: &Kid) -> Result<JwkEntry<'_>, Error> {
-        let mut named = self.keys.iter().filter(|key| key.kid() == Some(kid));
-        match (named.next(), named.next()) {
-            (Some(key), None) => Ok(key.entry()),
-            (Some(_), Some(_)) => Err(ErrorKind::DuplicateMember.into()),
-            (None, _) => Err(ErrorKind::BadSignature.into()),
-        }
+    /// The key whose `kid` is `kid`, byte for byte, or none: an unknown `kid` is the host's cue to fetch the set
+    /// again (OpenID Connect Core 10.1.1). A set never holds two keys with one `kid`, so a match is never a pick.
+    pub fn find(&self, kid: &Kid) -> Option<JwkEntry<'_>> {
+        self.keys
+            .iter()
+            .find(|key| key.kid() == Some(kid))
+            .map(Member::entry)
     }
 
     /// The kept keys in document order.
@@ -168,12 +181,32 @@ mod tests {
     use alloc::borrow::ToOwned as _;
     use alloc::format;
     use alloc::string::String;
+    use alloc::vec;
     use alloc::vec::Vec;
 
     use super::JwkSet;
-    use crate::{ErrorKind, MAX_JWKS_KEYS};
+    use crate::{ErrorKind, JwkEntry, Kid, MAX_JWKS_KEYS};
 
     const K: &str = "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg";
+
+    fn kids(text: &str) -> Result<Vec<String>, ErrorKind> {
+        JwkSet::decode(text.as_bytes())
+            .map(|set| {
+                set.entries()
+                    .filter_map(|entry| match entry {
+                        JwkEntry::Public(key) => key.kid().map(|kid| kid.as_str().to_owned()),
+                        JwkEntry::Secret(key) => key.kid().map(|kid| kid.as_str().to_owned()),
+                    })
+                    .collect()
+            })
+            .map_err(|e| e.kind())
+    }
+
+    fn set_text(text: &str) -> Result<usize, ErrorKind> {
+        JwkSet::decode(text.as_bytes())
+            .map(|s| s.entries().len())
+            .map_err(|e| e.kind())
+    }
 
     fn set(members: &[String]) -> Result<usize, ErrorKind> {
         let text = format!(r#"{{"keys":[{}]}}"#, members.join(","));
@@ -186,14 +219,91 @@ mod tests {
         format!(r#"{{"kty":"oct","kid":"k{i}","k":"{K}"}}"#)
     }
 
+    fn oct_with(kid: &str, member: &str) -> String {
+        format!(r#"{{"kty":"oct","kid":"{kid}","k":"{K}",{member}}}"#)
+    }
+
     #[test]
-    fn unsupported_members_are_skipped_and_bad_ones_refused() {
-        let weak = r#"{"kty":"RSA","n":"AQAB","e":"AQAB"}"#.to_owned();
-        let unknown = r#"{"kty":"other"}"#.to_owned();
-        let broken = r#"{"kty":"EC","crv":"P-256"}"#.to_owned();
-        assert_eq!(set(&[oct(0), weak, unknown]), Ok(1));
-        assert_eq!(set(&[oct(0), broken]), Err(ErrorKind::Malformed));
+    fn members_that_are_not_supported_keys_are_skipped() {
+        let x = "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo";
+        let members = [
+            oct(0),
+            r#"{"kty":"RSA","kid":"weak","n":"AQAB","e":"AQAB"}"#.to_owned(),
+            r#"{"kty":"other","kid":"unknown-kty"}"#.to_owned(),
+            r#"{"kty":"EC","kid":"no-y","crv":"P-256"}"#.to_owned(),
+            r#"{"kty":"EC","kid":"short-coordinates","crv":"P-256","x":"AQ","y":"AQ"}"#.to_owned(),
+            format!(r#"{{"kty":"OKP","kid":"x25519","crv":"X25519","x":"{x}"}}"#),
+            oct_with("unknown-use", r#""use":"other""#),
+            oct_with("unknown-op", r#""key_ops":["other"]"#),
+            oct_with("repeated-op", r#""key_ops":["sign","sign"]"#),
+            oct_with("disagree", r#""use":"enc","key_ops":["verify"]"#),
+            oct_with("bad-alg", r#""alg":"none""#),
+            r#"{"kty":"oct","kid":"bad-k","k":"!"}"#.to_owned(),
+            format!(r#"{{"kty":"OKP","kid":"okp","crv":"Ed25519","x":"{x}"}}"#),
+        ];
+        let text = format!(r#"{{"keys":[{}]}}"#, members.join(","));
+        assert_eq!(kids(&text), Ok(vec!["k0".to_owned(), "okp".to_owned()]));
         assert_eq!(set(&[]), Ok(0));
+    }
+
+    #[test]
+    fn a_set_malformed_as_a_whole_is_refused() {
+        let refused = |text: &str| kids(text).err();
+        assert_eq!(refused(r#"{"kids":[]}"#), Some(ErrorKind::Malformed));
+        assert_eq!(refused(r#"{"keys":{}}"#), Some(ErrorKind::Malformed));
+        assert_eq!(refused(r#"[]"#), Some(ErrorKind::Malformed));
+        for member in ["1", "null", r#""oct""#, "[]", "true"] {
+            let text = format!(r#"{{"keys":[{},{member}]}}"#, oct(0));
+            assert_eq!(refused(&text), Some(ErrorKind::Malformed), "{member}");
+        }
+        let named_twice = r#"{"keys":[{"kty":"oct","kty":"oct"}]}"#;
+        assert_eq!(refused(named_twice), Some(ErrorKind::DuplicateMember));
+        let skipped = format!(r#"{{"keys":[{0},{0}]}}"#, r#"{"kty":"other","kid":"k0"}"#);
+        assert_eq!(kids(&skipped), Ok(Vec::new()));
+    }
+
+    #[test]
+    fn members_that_share_a_kid_are_all_skipped() {
+        let text = format!(
+            r#"{{"keys":[{},{},{},{}]}}"#,
+            oct(0),
+            oct(1),
+            oct(0),
+            oct(0)
+        );
+        assert_eq!(kids(&text), Ok(vec!["k1".to_owned()]));
+        let all = format!(r#"{{"keys":[{0},{0}]}}"#, oct(0));
+        assert_eq!(kids(&all), Ok(Vec::new()));
+        // a wrong-typed kid is a member that is skipped, not a refusal of the set
+        let typed = format!(
+            r#"{{"keys":[{},{{"kty":"oct","kid":5,"k":"{K}"}}]}}"#,
+            oct(0)
+        );
+        assert_eq!(set_text(&typed), Ok(1));
+        // a member skipped for another reason does not make a usable key's kid shared
+        let other = r#"{"kty":"other","kid":"k0"}"#;
+        let text = format!(r#"{{"keys":[{other},{},{}]}}"#, oct(0), oct(1));
+        assert_eq!(kids(&text), Ok(vec!["k0".to_owned(), "k1".to_owned()]));
+        let public = r#"{"kty":"OKP","kid":"k0","crv":"Ed25519","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}"#;
+        let text = format!(r#"{{"keys":[{},{public}]}}"#, oct(0));
+        let remote = JwkSet::decode_public(text.as_bytes()).map(|s| s.entries().len());
+        assert_eq!(remote.map_err(|e| e.kind()), Ok(1));
+    }
+
+    #[test]
+    fn find_is_some_for_a_kid_the_set_holds_and_none_otherwise() {
+        let text = format!(r#"{{"keys":[{},{}]}}"#, oct(0), oct(1));
+        let set = JwkSet::decode(text.as_bytes()).ok();
+        let find = |kid: &str| {
+            let kid = Kid::new(kid).ok()?;
+            match set.as_ref()?.find(&kid)? {
+                JwkEntry::Secret(key) => key.kid().map(|kid| kid.as_str().to_owned()),
+                _ => None,
+            }
+        };
+        assert_eq!(find("k1"), Some("k1".to_owned()));
+        assert_eq!(find("k2"), None);
+        assert_eq!(find("K1"), None);
     }
 
     #[test]
@@ -217,19 +327,9 @@ mod tests {
     }
 
     #[test]
-    fn remote_sets_drop_any_private_parameter_unparsed() {
-        let lone = r#"{"keys":[{"kty":"EC","crv":"P-256","d":"!"}]}"#;
-        let kept = |decode: fn(&[u8]) -> Result<JwkSet, crate::Error>| {
-            decode(lone.as_bytes()).map(|s| s.entries().len()).ok()
-        };
-        assert_eq!(kept(JwkSet::decode), None);
-        assert_eq!(kept(JwkSet::decode_public), Some(0));
-    }
-
-    #[test]
     fn key_count_is_refused_before_later_members_are_read() {
         let mut keys: Vec<String> = (0..=MAX_JWKS_KEYS).map(oct).collect();
-        keys.push(r#"{"kty":"EC","crv":"P-256"}"#.to_owned());
+        keys.push("1".to_owned());
         assert_eq!(set(&keys), Err(ErrorKind::TooLarge));
     }
 
