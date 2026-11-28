@@ -14,10 +14,18 @@ use base::{
 
 use crate::{Seeded, seeded};
 
-/// Concurrent handles [`store_conformance_shared`] drives at once; a host's connection pool must hold this many.
+/// Concurrent handles [`store_conformance_shared`] holds open at once; a host's connection pool must hold this many.
 pub const RACERS: usize = 8;
 
 const ROUNDS: u8 = 16;
+
+// the guard each round races on, with the failure every loser must be told
+#[derive(Clone, Copy)]
+enum Race {
+    Consume,
+    Update,
+    Delete,
+}
 
 /// Proves a concrete store honours the `Effect` obligation; run it on the exact apply path a shell uses.
 /// `fresh` makes an empty store; `key(n)` must be injective, increasing in `n` and inside one transaction
@@ -66,10 +74,12 @@ pub fn store_conformance<K, R, S>(
     c.at_bound(&mut fresh());
 }
 
-/// Proves a store keeps a consume single-use when applies run at once. `open` returns a new handle on one
-/// backing store, empty at the first call, and is called once per racer from the calling thread. Each round
-/// seeds a row, then [`RACERS`] handles consume it together: one gets the receipt and every other a `Missing`
-/// conflict. A pass is evidence from the scheduler's interleavings, not a proof, so run it where the store's
+/// Proves a store serializes applies that race on one row. `open` returns a new handle on one backing store,
+/// empty at the first call, and is called from the calling thread. Three kinds of round, each on fresh rows:
+/// [`RACERS`] handles together consume a row, update it against the version they all saw, or delete it against
+/// that version. Each round ends with one receipt and, for every other handle, a `Conflict` naming the key
+/// (`Missing` after a consume or delete, `Changed` after an update); a lost serialization is a `Conflict`, never
+/// an `Error`. A pass is evidence from the scheduler's interleavings, not a proof, so run it where the store's
 /// isolation level is the production one. The other arguments are as for [`store_conformance`].
 pub fn store_conformance_shared<K, R, S>(
     open: impl Fn() -> S,
@@ -89,9 +99,11 @@ pub fn store_conformance_shared<K, R, S>(
         now: UnixTime::new(1_000),
     };
     c.name = "shared_consume";
-    for n in 0..ROUNDS {
-        c.shared_consume(&open, n);
-    }
+    c.rounds(&open, Race::Consume);
+    c.name = "shared_update";
+    c.rounds(&open, Race::Update);
+    c.name = "shared_delete";
+    c.rounds(&open, Race::Delete);
 }
 
 struct Case<'a, K, R> {
@@ -314,19 +326,47 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
         self.holds(s, 1, Some(r1), "a consume leaves its sibling alone");
     }
 
-    // consumes race one row per round, since a store that checks and then writes lets several through
-    fn shared_consume<S>(&mut self, open: &impl Fn() -> S, n: u8)
+    fn rounds<S>(&mut self, open: &impl Fn() -> S, race: Race)
     where
         K: Send,
         R: Send,
         S: Store<K, R> + Send,
         S::Error: Debug,
     {
-        let mut seeder = open();
-        self.seed(&mut seeder, [n]);
+        for n in 0..ROUNDS {
+            self.shared(open, race, n);
+        }
+    }
+
+    // one row per round, since a store that checks and then writes lets several through
+    fn shared<S>(&mut self, open: &impl Fn() -> S, race: Race, round: u8)
+    where
+        K: Send,
+        R: Send,
+        S: Store<K, R> + Send,
+        S::Error: Debug,
+    {
+        let n = round
+            + ROUNDS
+                * match race {
+                    Race::Consume => 0,
+                    Race::Update => 1,
+                    Race::Delete => 2,
+                };
+        let [seen] = {
+            let mut seeder = open();
+            self.seed(&mut seeder, [n])
+        };
         let (now, start) = (self.now, Barrier::new(RACERS));
         let racers: Vec<_> = (0..RACERS)
-            .map(|_| (open(), self.build(|b, c| b.consume(c.k(n)))))
+            .map(|_| {
+                let effect = self.build(|b, c| match race {
+                    Race::Consume => b.consume(c.k(n)),
+                    Race::Update => b.update(c.k(n), &seen, c.r(n + 64), None),
+                    Race::Delete => b.delete(c.k(n), &seen),
+                });
+                (open(), effect)
+            })
             .collect();
         let answers: Vec<_> = thread::scope(|scope| {
             let threads: Vec<_> = racers
@@ -348,6 +388,10 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
                 })
                 .collect()
         });
+        let lost = match race {
+            Race::Update => Failure::Changed,
+            Race::Consume | Race::Delete => Failure::Missing,
+        };
         let mut won: Vec<EffectId> = Vec::new();
         for (id, answer) in answers {
             match answer {
@@ -363,9 +407,9 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
                 }
                 Ok(Err(conflict)) => assert_eq!(
                     conflict.failures(),
-                    [(self.k(n), Failure::Missing)],
+                    [(self.k(n), lost)],
                     "{}",
-                    self.fail("a losing consume names the consumed key as missing")
+                    self.fail("a loser's conflict names the raced key and why its guard failed")
                 ),
             }
         }
@@ -373,9 +417,22 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
             won.len(),
             1,
             "{}",
-            self.fail("exactly one racing consume takes the row")
+            self.fail("exactly one racer wins the row")
         );
-        self.holds(&mut seeder, n, None, "the consumed row is gone");
+        let mut reader = open();
+        match race {
+            Race::Update => {
+                let after = self
+                    .row(&mut reader, n)
+                    .unwrap_or_else(|| panic!("{}", self.fail("the updated row stands")));
+                assert!(
+                    after.record() == &self.r(n + 64) && after.version() != seen.version(),
+                    "{}",
+                    self.fail("the winner's update is the row")
+                );
+            }
+            Race::Consume | Race::Delete => self.holds(&mut reader, n, None, "the row is gone"),
+        }
     }
 
     fn reapply<S: Store<K, R>>(&mut self, s: &mut S)
