@@ -225,6 +225,36 @@
    }
   },
   {
+   "id": "crit-null",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsImNyaXQiOm51bGx9.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.NAha5jhUcNbmNhjb0o8jFK9ocREEu9PgnLuOoZxTvZw",
+   "spec": "RFC 7515 4.1.11 (an array; null is not an absent member)",
+   "expect": {
+    "ok": false,
+    "kind": "Malformed"
+   }
+  },
+  {
+   "id": "b64-null",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsImI2NCI6bnVsbH0.eyJpc3MiOiJqb2UiLCJleHAiOjEzMDA4MTkzODB9.7Kou1EdCqooJ-ZJvAjzVKbHQX4U8-wNws75W4wzRs94",
+   "spec": "RFC 7797 3 (b64 is a boolean; null is not an absent member)",
+   "expect": {
+    "ok": false,
+    "kind": "Malformed"
+   }
+  },
+  {
    "id": "header-array",
    "op": "jws_verify",
    "alg": "HS256",

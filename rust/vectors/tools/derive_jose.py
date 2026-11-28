@@ -67,6 +67,8 @@ def header():
         v("crit-registered-name", "RFC 7515 4.1.11 (MUST NOT list names this spec defines)", '{"alg":"HS256","crit":["alg"]}', kind("Malformed")),
         v("crit-name-absent", "RFC 7515 4.1.11 (listed names MUST be present)", '{"alg":"HS256","crit":["exp-x"]}', kind("Malformed")),
         v("crit-not-array", "RFC 7515 4.1.11 (an array)", '{"alg":"HS256","crit":"exp-x"}', kind("Malformed")),
+        v("crit-null", "RFC 7515 4.1.11 (an array; null is not an absent member)", '{"alg":"HS256","crit":null}', kind("Malformed")),
+        v("b64-null", "RFC 7797 3 (b64 is a boolean; null is not an absent member)", '{"alg":"HS256","b64":null}', kind("Malformed")),
         v("header-array", "RFC 7515 5.2 step 3 (a JSON object)", '["alg","HS256"]', kind("Malformed")),
         v("header-not-json", "RFC 7515 5.2 step 3", '{alg:HS256}', kind("Malformed")),
     ]

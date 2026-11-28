@@ -6,7 +6,8 @@ use serde::ser::{SerializeMap as _, Serializer};
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 
-use crate::jwk::decode::{Key, parse_filtered, scan};
+use crate::json::scan;
+use crate::jwk::decode::{Key, parse_filtered};
 use crate::jwk::thumbprint::members;
 use crate::{Error, ErrorKind, Jwk, Kid, MAX_JWKS_KEYS, SecretJwk};
 
