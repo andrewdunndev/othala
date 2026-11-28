@@ -14,7 +14,7 @@
 Coverage (each row becomes a CONTRACT.md line as covered, feature-gated, or named non-goal):
 - jose: RFC 7515 compact, flattened and general; 7517; 7518 signature algs HS/RS/PS/ES plus EdDSA via 8037; 7519; 7638; every RFC 8725 3.1-3.12 practice mapped to a rule or a non-goal; optional 7797, 9278, 9864; JWE (7516) now in scope (D3). Open slot: no Rust crate has compile-time binding, this breadth, pure-Rust crypto and 8725 defaults together.
 - webauthn-rp: L3 7.1 and 7.2 in full; six attestation formats, one feature each, each with a published vector: none (16.2), packed (16.7-16.12), tpm (16.13), android-key (16.14), apple (16.15), fido-u2f (16.16). Named non-goals until a corpus exists: android-safetynet (8.5) and compound (8.9). Extensions appid, appidExclude, credProps, prf (16.17.1), largeBlob; BE/BS; JSON option shapes (5.1.8-9); signal data (5.1.10); related origins (5.11); topOrigin; conditional mediation; hints; server-side timeout. Open slot: no library advertises a sans-IO, wasm-clean, full-L3 verifier. Built so far: the 7.1 and 7.2 ceremonies with the `none` format; the rest of this row is planned, under Planned in `rust/webauthn-rp/CONTRACT.md`.
-- oidc-provider: NOW rows (Core code flow, Discovery/8414, RFC 6749 code and refresh with basic/post/none, 7636, 8628, 8707, 9700 defaults, back-channel and RP-initiated logout) in the default feature set; SOON rows (7009, 7662, 9068, 9207) next; COMP rows (implicit/hybrid, PAR, DPoP, front-channel, DCR, token exchange, mTLS) as separate features.
+- oidc-provider: unbuilt; no crate exists, so every oidc-provider line in this document is design. NOW rows (Core code flow, Discovery/8414, RFC 6749 code and refresh with basic/post/none, 7636, 8628, 8707, 9700 defaults, back-channel and RP-initiated logout) in the default feature set; SOON rows (7009, 7662, 9068, 9207) next; COMP rows (implicit/hybrid, PAR, DPoP, front-channel, DCR, token exchange, mTLS) as separate features. The first slice (M4) is ruled narrower; section 2 names the ruling.
 - factor: RFC 4226/6238, NIST SP 800-63B look-up secrets and length rules, OWASP Argon2id floor; hashing via RustCrypto argon2.
 DAG: othala-native and othala-worker -> othala-core -> {oidc-provider -> jose, webauthn-rp, factor} -> base; webauthn-mds -> webauthn-rp; testkit is a dev-dependency of every crate and depends on base only. No publishable crate depends on an Othala crate, on another crate's internals, or on an I/O crate.
 
@@ -48,6 +48,7 @@ Public signatures: `rust/webauthn-rp/public-api.txt`, generated and gated by `ju
   - Ceremony rows are written only to the store. puts() exposes the Record and encode is public, so a host could park them in a cookie; only review stops that.
 
 ### oidc-provider
+Unbuilt: no crate exists, and this block is the broad design of 2026-11-24. The operator ruling of 2026-11-26 narrows the first slice (M4) and wins where it differs: client authentication is client_secret_basic or none; userinfo waits for M5; the device grant, logout (end_session, the Sid index, LogoutDelivery) and revocation are out; secrets compare in constant time; code reuse follows the tombstone rule under Obligation.
 pub struct Provider;  // Provider::new(Issuer, Capabilities, Lifetimes, SigningKeys) is the single source for routing, refusals, metadata and JWKS. SigningKeys: a NonEmpty set of public Jwk with kid and alg.
 impl Provider { metadata() -> Metadata; jwks() -> JwkSet;  // both derive from the constructor arguments; there is no other constructor
   handle(&self, req: &HttpRequest, browser: Option<&Browser>, now, e) -> Step;
@@ -75,13 +76,13 @@ pub fn drive<S: Store<Key,Record>>(step, store: &mut S, signer: &impl Sign, retr
   - plain PKCE (CodeChallenge has only S256);
   - a client secret or its hash supplied by admin input (generate is the only constructor outside Record::decode).
 - Runtime:
-  - An auth_time the request cannot accept; the crate makes no provenance claim. The Interaction row records its issue time and the request's max_age and prompt. handle and resume(LoggedIn) answer LoginRequired for an auth_time after now, older than now - max_age, or earlier than the ticket's issue under prompt=login. acr_values is checked the same way; this closes the gap Fosite leaves to integrators.
+  - An auth_time the request cannot accept (OIDC Core 3.1.2.1: past max_age, or under prompt=login, the OP must re-authenticate or answer login_required); the crate makes no provenance claim. The Interaction row records its issue time and the request's max_age and prompt. handle and resume(LoggedIn) answer LoginRequired for an auth_time after now, older than now - max_age, or earlier than the ticket's issue under prompt=login. acr_values is checked the same way, a house rule: Core 3.1.2.1 requests acr only as a Voluntary Claim.
   - A ticket resumed from another browser (binding digest mismatch; the role of Hydra's login CSRF cookie).
   - A row reported through Rows::corrupt answers Corrupt, never absent. That the host reports every decode failure that way is an Obligation.
   - An authorization request without S256 from any client, public or confidential, unless that client row carries Pkce::Exempt (RFC 9700 2.1.1).
 - Obligation (the base one):
-  - Every row a decision read appears in its Effect as Unchanged (found) or Absent (missing), and single-use rows as Consume. So a code or refresh token redeemed twice, a refresh racing a logout that deleted its family, and a ticket resumed twice all lose as Conflict.
-  - Reuse rule: only a Missing failure on the Consume of the code or refresh token this request presented revokes (the code's tokens, or the refresh family). Every other failure re-loads and re-decides. A lost commit result is re-applied as the same effect, so within one host attempt it never reads as reuse.
+  - Every row a decision read appears in its Effect as Unchanged (found) or Absent (missing), and single-use rows as Consume (a code: Unchanged on the row its tombstone replaces). So a code or refresh token redeemed twice, a refresh racing a logout that deleted its family, and a ticket resumed twice all lose as Conflict.
+  - Reuse rule: only a Missing failure on the Consume of the refresh token this request presented revokes its family. A code is never Consumed (ruling 2026-11-26): redeeming it rewrites its row as a tombstone that lives until the longest-lived token issued from it expires, so a replay reads the tombstone, is refused, and revokes those tokens (RFC 6749 4.1.2: MUST deny, SHOULD revoke). Every other failure re-loads and re-decides. A lost commit result is re-applied as the same effect, so within one host attempt it never reads as reuse.
   - Not claimed: when the host attempt ends after the commit, the client's resend of that refresh token reads Missing and revokes the family. That is the RFC 9700 4.14 rotation trade-off; no grace rule weakens reuse detection to hide it.
   - No decision reads a range: end_session finds families through the Sid index row.
 
@@ -173,7 +174,7 @@ Also binding:
 
 ## 6. What we learn from Ory and others
 1. Interaction is a return value, not a second service. Hydra's login needs a redirect with login_challenge, an admin-API fetch, an accept call and a redirect_to follow. We return NeedLogin/NeedConsent and take a Decision, and the host still owns the UI, as in Duende's split.
-2. Session policy is protocol logic and ships inside the core. Fosite leaves prompt, max_age, id_token_hint and session management to the integrator, and the spike then got auth_time wrong. AuthnClaim goes in and a verdict comes out. What the provider cannot see (where the claim came from) it does not claim; the opinionated consumer closes that by type.
+2. Session policy is protocol logic and ships inside the core: OIDC Core 3.1.2.1 and 15.1 make prompt and max_age the OP's duty, and the spike got auth_time wrong. AuthnClaim goes in and a verdict comes out. What the provider cannot see (where the claim came from) it does not claim; the opinionated consumer closes that by type.
 3. One storage seam, shaped around atomic consume. panva's adapter requires an atomic consume; Duende exposes eight or more store interfaces. We emit one Effect type across three crates and ship drive plus an in-memory store, where Fosite ships storage only as a reference.
 4. What is enabled is one value, and there are no development defaults. panva's devInteractions is on by default and must be turned off for production. Capabilities has no Default, and metadata derives from it.
 5. Extension points are stable or absent. Keycloak documents its Authentication SPI as internal and subject to change. We seal traits, keep fields private, and gate releases on semver checks.
@@ -282,7 +283,7 @@ The rulings R-j to R-o were added on 2026-11-26. Where a ruling differs from sec
 
 **R-l** A row may be a `--lib` filter where the claim needs crate-internal code: R34's Argon2id mapping, and HOTP before TOTP lands.
 
-**R-m** Lockout cap floor is 1 h. othala-core carries an Obligation to alert on a subject's sustained backoff. NIST 800-63B-4 3.2.2 is met on rate, not by disabling; CONTRACT N6 states this.
+**R-m** Lockout cap floor is 1 h. othala-core carries an Obligation to alert on a subject's sustained backoff. This departs from NIST 800-63B-4 3.2.2, whose SHALL disables an authenticator after 100 consecutive failures: the growing wait replaces the disable, and factor CONTRACT N6 states the guess bound that leaves.
 
 **R-n** CBOR key order. The strict reader enforces CTAP2 canonical order on authenticator-produced CBOR: the credential public key and extensions inside authData, and attStmt. The outer attestationObject map, which a client may re-encode (none conveyance), is read order-tolerant. It still refuses duplicate keys, indefinite lengths and non-shortest integers.
 
