@@ -13,7 +13,7 @@ use serde::de::IgnoredAny;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::alg::{CONTENT, SIGNING, registry_name};
-use crate::json::{named, scan};
+use crate::json::{named, object, scan};
 use crate::key::{Fam, Private, Public, dup, dup_private, private_info, public_info, public_of};
 use crate::{
     Alg, DecryptKey, EncryptKey, Error, ErrorKind, JweAlg, KeyAlg, MAX_NAME_LEN, MAX_RSA_BITS,
@@ -364,7 +364,7 @@ pub(crate) fn parse(json: &[u8]) -> Result<(Meta, Key), Error> {
 /// As [`parse`]; with `public_only` a key carrying a private parameter or an `oct` key is `None`, before any is built.
 pub(crate) fn parse_filtered(json: &[u8], public_only: bool) -> Result<Option<(Meta, Key)>, Error> {
     scan(json)?;
-    let r: Raw<'_> = serde_json::from_slice(json).map_err(|_| malformed())?;
+    let r: Raw<'_> = object(json).map_err(|_| malformed())?;
     let private = [r.d, r.p, r.q, r.dp, r.dq, r.qi]
         .iter()
         .any(Option::is_some);
@@ -1118,12 +1118,10 @@ mod tests {
         assert_eq!(oth("[]"), Some(ErrorKind::UnsupportedAlg));
     }
 
-    //= https://www.rfc-editor.org/rfc/rfc7517#section-4
-    //= type=test
-    //# Additional members can be present in the JWK; if not understood by implementations encountering them, they MUST be ignored.
+    // RFC 7517 4.1 to 4.4 give each member a string or array value; the RFC has no sentence that refuses null, so
+    // this is a deliberate strictness (R67), not a cited requirement
     #[test]
     fn a_null_member_is_malformed_not_absent() {
-        // RFC 7517 4 types every member as a string or an array: null is no value, so it is not an absent member
         let injected = |base: &Members, name: &str| {
             let json = text(base).replacen('{', &format!("{{\"{name}\":null,"), 1);
             parse(json.as_bytes()).err().map(|e| e.kind())
@@ -1141,6 +1139,20 @@ mod tests {
             };
             assert_eq!(injected(&base, name), Some(ErrorKind::Malformed), "{name}");
         }
+    }
+
+    #[test]
+    fn a_key_written_as_an_array_is_malformed() {
+        // serde reads a struct from an array by position; the members, in order, must not make a key
+        let key = r#"["oct","a","HS256","sig",["sign"],"c","x","y","n","e","d","p","q","dp","dq","qi",[],"AAAA"]"#;
+        assert_eq!(
+            parse(key.as_bytes()).err().map(|e| e.kind()),
+            Some(ErrorKind::Malformed)
+        );
+        assert_eq!(
+            parse(br#"["EC","1"]"#).err().map(|e| e.kind()),
+            Some(ErrorKind::Malformed)
+        );
     }
 
     #[test]

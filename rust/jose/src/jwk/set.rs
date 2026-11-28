@@ -6,7 +6,7 @@ use serde::ser::{SerializeMap as _, Serializer};
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 
-use crate::json::scan;
+use crate::json::{object, scan};
 use crate::jwk::decode::{Key, parse_filtered};
 use crate::jwk::thumbprint::members;
 use crate::{Error, ErrorKind, Jwk, Kid, MAX_JWKS_KEYS, SecretJwk};
@@ -96,8 +96,7 @@ impl JwkSet {
     //# [ECMAScript].
     fn read(json: &[u8], public_only: bool) -> Result<Self, Error> {
         scan(json)?;
-        let document: Document<'_> =
-            serde_json::from_slice(json).map_err(|_| ErrorKind::Malformed)?;
+        let document: Document<'_> = object(json).map_err(|_| ErrorKind::Malformed)?;
         let mut keys = Vec::new();
         for raw in document.keys {
             if !raw.get().starts_with('{') {
@@ -303,6 +302,21 @@ mod tests {
 
     fn oct(i: usize) -> String {
         format!(r#"{{"kty":"oct","kid":"k{i}","k":"{K}"}}"#)
+    }
+
+    #[test]
+    fn a_key_with_a_null_member_is_skipped_and_an_array_is_no_object() {
+        // a null member makes that key Malformed, and a Malformed key is skipped, not the whole set refused (R26)
+        let nulled = oct_with("bad", r#""use":null"#);
+        let text = format!(r#"{{"keys":[{nulled},{}]}}"#, oct(1));
+        assert_eq!(kids(&text), Ok(vec!["k1".to_owned()]));
+        assert_eq!(
+            kids(&format!(r#"{{"keys":[{}]}}"#, oct(1))),
+            Ok(vec!["k1".to_owned()])
+        );
+        // a set written as an array is not a set, however many members it holds
+        let array = format!(r#"[[{}]]"#, oct(1));
+        assert_eq!(kids(&array), Err(ErrorKind::Malformed));
     }
 
     fn oct_with(kid: &str, member: &str) -> String {

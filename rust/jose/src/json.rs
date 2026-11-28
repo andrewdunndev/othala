@@ -169,6 +169,11 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Object<T> {
     }
 }
 
+/// `json` read as one `T` from a JSON object: an array never stands in for the members of a struct.
+pub(crate) fn object<'de, T: Deserialize<'de>>(json: &'de [u8]) -> Result<T, serde_json::Error> {
+    serde_json::from_slice::<Object<T>>(json).map(|Object(value)| value)
+}
+
 /// A member that must hold a `T` when it is named: JSON `null` is an ill-typed member, never an absent one.
 pub(crate) fn named<'de, T: Deserialize<'de>, D: Deserializer<'de>>(
     d: D,

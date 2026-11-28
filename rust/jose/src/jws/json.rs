@@ -6,7 +6,7 @@ use base::b64url_decode;
 use serde::Deserialize;
 use serde_json::value::RawValue;
 
-use crate::json::{Capped, named, scan};
+use crate::json::{Capped, Object, named, object, scan};
 use crate::jws::compact::Signature;
 use crate::jws::header::Parsed;
 use crate::{Compact, Error, ErrorKind, Jws, MAX_ENTRIES};
@@ -39,7 +39,7 @@ struct Document<'a> {
     #[serde(default, deserialize_with = "named")]
     signature: Option<&'a str>,
     #[serde(default, deserialize_with = "named")]
-    signatures: Option<Capped<Entry<'a>>>,
+    signatures: Option<Capped<Object<Entry<'a>>>>,
 }
 
 impl<'a> Jws<'a> {
@@ -48,13 +48,12 @@ impl<'a> Jws<'a> {
     /// and more than `MAX_ENTRIES` signatures is `TooLarge`.
     pub fn parse_json(json: &'a [u8]) -> Result<Self, Error> {
         scan(json)?;
-        let document: Document<'a> =
-            serde_json::from_slice(json).map_err(|_| ErrorKind::Malformed)?;
+        let document: Document<'a> = object(json).map_err(|_| ErrorKind::Malformed)?;
         //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.2
         //# The "signatures" member MUST NOT be present when using this syntax.
         let entries = match (document.signatures, document.signature) {
             (Some(entries), None) if document.protected.is_none() && document.header.is_none() => {
-                entries.0
+                entries.0.into_iter().map(|Object(entry)| entry).collect()
             }
             (None, Some(signature)) => alloc::vec![Entry {
                 protected: document.protected,
@@ -255,12 +254,66 @@ mod tests {
         for json in nulls {
             assert_eq!(kind(&json), Some(ErrorKind::Malformed), "{json}");
         }
-        // a header member of null (RFC 7515 4.1.4 types kid, typ and cty as strings)
-        for name in ["alg", "kid", "typ", "cty"] {
-            let protected = base::b64url_encode(format!(r#"{{"{name}":null}}"#).as_bytes());
-            let doc = format!(r#"{{"payload":"AA","protected":"{protected}","signature":"AQ"}}"#);
-            assert_eq!(kind(&doc), Some(ErrorKind::Malformed), "{name}");
+        // a header member of null (RFC 7515 4.1.4 types kid, typ and cty as strings), in the protected and the
+        // unprotected header; alg is carried in the other one, so only the null can make the document Malformed
+        let doc = |protected: &str, header: &str| {
+            let protected = base::b64url_encode(protected.as_bytes());
+            format!(
+                r#"{{"payload":"AA","protected":"{protected}","header":{header},"signature":"AQ"}}"#
+            )
+        };
+        assert_eq!(kind(&doc(r#"{}"#, r#"{"alg":"HS256"}"#)), None);
+        for name in ["kid", "typ", "cty"] {
+            let own = format!(r#"{{"alg":"HS256","{name}":"x"}}"#);
+            let hdr = format!(r#"{{"{name}":"x"}}"#);
+            assert_eq!(kind(&doc(&own, "{}")), None, "{name} string, protected");
+            assert_eq!(
+                kind(&doc(r#"{"alg":"HS256"}"#, &hdr)),
+                None,
+                "{name} string, header"
+            );
+            let own = format!(r#"{{"alg":"HS256","{name}":null}}"#);
+            let hdr = format!(r#"{{"{name}":null}}"#);
+            assert_eq!(kind(&doc(&own, "{}")), Some(ErrorKind::Malformed), "{name}");
+            assert_eq!(
+                kind(&doc(r#"{"alg":"HS256"}"#, &hdr)),
+                Some(ErrorKind::Malformed),
+                "{name} header"
+            );
         }
+        // alg: the same name in the other header would be DuplicateMember were null read as absent
+        assert_eq!(
+            kind(&doc(r#"{"alg":null}"#, r#"{"alg":"HS256"}"#)),
+            Some(ErrorKind::Malformed)
+        );
+        assert_eq!(
+            kind(&doc(r#"{"alg":"HS256"}"#, r#"{"alg":null}"#)),
+            Some(ErrorKind::Malformed)
+        );
+    }
+
+    #[test]
+    fn a_document_or_entry_written_as_an_array_is_malformed() {
+        // serde reads a struct from an array by position: payload, protected, header, signature, signatures
+        assert_eq!(
+            kind(&format!(r#"["AA","{H}",null,"AQ"]"#)),
+            Some(ErrorKind::Malformed)
+        );
+        assert_eq!(
+            kind(&format!(r#"["AA","{H}",{{"kid":"k"}},"AQ"]"#)),
+            Some(ErrorKind::Malformed)
+        );
+        // an entry: protected, header, signature
+        let entry = format!(r#"["{H}",{{"kid":"k"}},"AQ"]"#);
+        assert_eq!(
+            kind(&format!(r#"{{"payload":"AA","signatures":[{entry}]}}"#)),
+            Some(ErrorKind::Malformed)
+        );
+        let object = format!(r#"{{"protected":"{H}","header":{{"kid":"k"}},"signature":"AQ"}}"#);
+        assert_eq!(
+            kind(&format!(r#"{{"payload":"AA","signatures":[{object}]}}"#)),
+            None
+        );
     }
 
     //= https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
