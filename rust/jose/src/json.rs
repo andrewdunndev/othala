@@ -187,6 +187,25 @@ mod tests {
     use crate::{ErrorKind, MAX_ENTRIES, MAX_JSON_DEPTH, MAX_JSON_LEN};
 
     #[test]
+    fn an_object_reads_from_a_map_only() {
+        #[derive(serde::Deserialize)]
+        struct Open {
+            #[serde(default)]
+            #[expect(dead_code, reason = "read only to prove the shape")]
+            a: Option<u8>,
+        }
+        let read = |json: &str| {
+            serde_json::from_str::<super::Object<Open>>(json)
+                .err()
+                .map(|e| e.to_string())
+        };
+        assert_eq!(read(r#"{"a":1}"#), None);
+        assert_eq!(read("{}"), None);
+        let refused = read("[]").unwrap_or_default();
+        assert!(refused.contains("expected an object"), "{refused}");
+    }
+
+    #[test]
     fn capped_arrays_keep_one_past_the_bound() {
         let json = |n: usize| format!("[{}]", vec!["1"; n].join(","));
         let read = |n: usize| {
