@@ -15,8 +15,8 @@ extern crate alloc;
 
 mod alg;
 mod claims;
+mod crit;
 mod error;
-mod header;
 mod json;
 mod jwt;
 mod key;

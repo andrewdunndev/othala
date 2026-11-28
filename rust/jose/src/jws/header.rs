@@ -7,7 +7,7 @@ use base::b64url_decode;
 use serde::Deserialize;
 use serde::de::IgnoredAny;
 
-use crate::header::refuse_crit;
+use crate::crit::refuse_crit;
 use crate::json::{named, scan};
 use crate::{Error, ErrorKind, Kid};
 

@@ -1027,6 +1027,25 @@ mod tests {
     }
 
     #[test]
+    fn dir_key_names_its_content_algorithm() {
+        use crate::JweAlg;
+        let check = |alg: &str, jwe: JweAlg| {
+            let key = parse(text(&with(&oct(), "alg", alg)).as_bytes()).ok();
+            key.and_then(|(m, k)| match k {
+                Key::Private(k) => m.check_jwe(private_info(&k), jwe, false).err(),
+                Key::Public(_) => None,
+            })
+            .map(|e| e.kind())
+        };
+        assert_eq!(check("A128GCM", JweAlg::Dir), None);
+        assert_eq!(check("A128KW", JweAlg::Dir), Some(ErrorKind::AlgMismatch));
+        assert_eq!(
+            check("A128GCM", JweAlg::A128Kw),
+            Some(ErrorKind::AlgMismatch)
+        );
+    }
+
+    #[test]
     fn algorithms_bind_keys() {
         use crate::{JweAlg, SigningAlg};
         let info = |key: &Members| match parse(text(key).as_bytes()) {

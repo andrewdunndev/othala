@@ -15,7 +15,7 @@ use serde::Deserialize;
 use serde::de::IgnoredAny;
 use serde_json::value::RawValue;
 
-use crate::header::refuse_crit;
+use crate::crit::refuse_crit;
 use crate::json::{Capped, named, scan};
 use crate::jwk::decode::{Key, parse};
 use crate::jwk::thumbprint::members;

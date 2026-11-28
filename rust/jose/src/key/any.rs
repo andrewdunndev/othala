@@ -2,8 +2,7 @@ use core::fmt;
 
 use crate::alg::sealed;
 use crate::jwk::decode::{Meta, SIGN, VERIFY};
-use crate::key::{Private, Public};
-use crate::key::{dup, dup_private, private_info, public_info};
+use crate::key::{Private, Public, dup, dup_private, private_info, public_info};
 use crate::{Error, ErrorKind, Jwk, LocalAlg, SecretJwk, Signer, SigningAlg};
 
 /// A verification key bound at runtime to one algorithm, for JWK Set consumers. Not `Clone`, `Debug` redacted.

@@ -1,0 +1,19 @@
+Malformed	input is not well-formed; reject it, it cannot be repaired
+TooLarge	input exceeds a size bound; reject it, or raise the bound if the input is trusted
+DuplicateMember	a member appears twice; reject the input, it is ambiguous
+UnsupportedAlg	algorithm, curve or compression is not supported; choose an implemented one or enable its feature
+AlgMismatch	algorithm does not match the key; use a key of the type and curve the algorithm takes
+KeyAlgMissing	key has no alg; set the algorithm on the key or pass it explicitly
+CriticalHeader	token requires a critical header extension this crate does not understand; reject the token
+WeakKey	key is below the algorithm's minimum size; use a larger key
+KeyUse	key does not permit this operation; use a key whose use and key_ops allow it
+BadSignature	no signature verified; reject the token, or check that the verification key is the issuer's
+Decrypt	decryption failed; reject the token, no cause is given
+Expired	token has expired; obtain a fresh token
+NotYetValid	token is not valid yet; retry later or check the clocks and leeway
+Issuer	issuer is not the expected one; reject the token or check the policy's issuer
+Audience	audience does not include this recipient; reject the token or check the policy's audience
+Type	token type is not the expected one; reject the token or check the policy's type
+MissingClaim	a required claim is absent; reject the token or check the policy's required claims
+ClaimType	a registered claim has the wrong JSON type; reject the token
+Signer	the signer failed; check the HSM or KMS and retry

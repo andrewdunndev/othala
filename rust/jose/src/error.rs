@@ -113,18 +113,27 @@ impl core::error::Error for Error {}
 
 #[cfg(test)]
 mod tests {
-    use alloc::collections::BTreeSet;
+    use alloc::collections::{BTreeMap, BTreeSet};
+    use alloc::format;
     use alloc::string::ToString;
 
     use crate::{Error, ErrorKind};
 
     #[test]
     fn each_kind_reads_distinctly() {
+        let golden: BTreeMap<&str, &str> = include_str!("../tests/golden/error_texts.txt")
+            .lines()
+            .filter_map(|line| line.split_once('\t'))
+            .collect();
+        assert_eq!(golden.len(), ErrorKind::ALL.len());
         for &kind in ErrorKind::ALL {
-            let text = kind.message();
             let error = Error::from(kind);
             assert_eq!(error.kind(), kind);
-            assert_eq!(error.to_string(), text);
+            let text = golden
+                .get(format!("{kind:?}").as_str())
+                .copied()
+                .unwrap_or_default();
+            assert_eq!(error.to_string(), text, "{kind:?}");
             // fixed prose: no quoting, bracketing or digits that could carry input or a Debug form
             assert!(
                 text.chars()
