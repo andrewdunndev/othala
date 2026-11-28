@@ -7,7 +7,7 @@
     "wasm32-unknown-unknown": ["--no-default-features"],
     "thumbv7em-none-eabi": ["--no-default-features"]
   },
-  "mutants": { "floor": 179, "tests": ["factor"] },
+  "mutants": { "floor": 182, "tests": ["factor"] },
   "expose": ["otp", "password", "recovery"],
   "vectors": ["rfc4226", "rfc6238", "rfc9106", "phc-winner-argon2"],
   "allow": ["argon2", "blake2", "cmov", "ctutils", "hmac", "password-hash", "phc", "sha1"]
